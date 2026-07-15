@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 700" role="img" aria-label="Nhân vật đặc biệt">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="36%" r="74%">
+      <stop offset="0" stop-color="#154d55"/>
+      <stop offset=".5" stop-color="#102b38"/>
+      <stop offset="1" stop-color="#07111e"/>
+    </radialGradient>
+    <linearGradient id="mark" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#7bf4d5"/>
+      <stop offset="1" stop-color="#d5a941"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="700" fill="url(#bg)"/>
+  <circle cx="600" cy="330" r="170" fill="none" stroke="url(#mark)" stroke-width="8" opacity=".65"/>
+  <path d="M600 176 704 330 600 484 496 330Z" fill="none" stroke="url(#mark)" stroke-width="18"/>
+  <path d="m600 235 48 95-48 95-48-95Z" fill="url(#mark)"/>
+  <text x="600" y="590" fill="#e6fbf6" font-family="Arial,sans-serif" font-size="48" font-weight="700" text-anchor="middle">NHÂN VẬT ĐẶC BIỆT</text>
+</svg>
