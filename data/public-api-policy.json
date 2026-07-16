@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "minimumDiscoveryScore": 5,
+  "allowedCategories": [
+    "Anime",
+    "Data Validation",
+    "Dictionaries",
+    "Documents & Productivity",
+    "Games & Comics",
+    "Machine Learning",
+    "News",
+    "Open Data",
+    "Programming",
+    "Social",
+    "Sports & Fitness",
+    "Text Analysis",
+    "Translation"
+  ],
+  "priorityKeywords": [
+    "league of legends",
+    "teamfight tactics",
+    "tft",
+    "riot games",
+    "game data",
+    "translation",
+    "dictionary",
+    "chinese",
+    "text analysis",
+    "news",
+    "community",
+    "social"
+  ],
+  "blockedKeywords": [
+    "adult",
+    "gambling",
+    "casino",
+    "weapon",
+    "malware"
+  ],
+  "verificationRequirements": {
+    "httpsRequired": true,
+    "licenseMustBeReviewed": true,
+    "rateLimitMustBeDocumented": true,
+    "authenticationMustBeDocumented": true,
+    "corsMustBeReviewedForBrowserCalls": true,
+    "noSecretInClientBundle": true,
+    "manualApprovalRequired": true
+  }
+}
