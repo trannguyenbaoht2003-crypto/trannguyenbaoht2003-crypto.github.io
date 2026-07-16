@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ChampionGuide,
   Role,
@@ -13,11 +13,6 @@ import {
   roles,
   sourceSync,
 } from "./data";
-
-type InstallPrompt = Event & {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
-};
 
 const tierOrder = { SSS: 5, SS: 4, S: 3, A: 2, B: 1 } as const;
 
@@ -32,6 +27,65 @@ function SearchIcon() {
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <circle cx="11" cy="11" r="6.5" />
       <path d="m16 16 4 4" />
+    </svg>
+  );
+}
+
+function LogoIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="m12 2 8 4.6v10.8L12 22l-8-4.6V6.6L12 2Z" />
+      <path d="m9 8 6 8M15 8l-6 8" />
+    </svg>
+  );
+}
+
+function HomeIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="m3 11 9-8 9 8" />
+      <path d="M5.5 9.5V21h13V9.5M9.5 21v-6h5v6" />
+    </svg>
+  );
+}
+
+function GridIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="3" y="3" width="7" height="7" rx="1.5" />
+      <rect x="14" y="3" width="7" height="7" rx="1.5" />
+      <rect x="3" y="14" width="7" height="7" rx="1.5" />
+      <rect x="14" y="14" width="7" height="7" rx="1.5" />
+    </svg>
+  );
+}
+
+function ArrowUpRightIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M7 17 17 7M8 7h9v9" />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6" /></svg>;
+}
+
+function AlertIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 3 2.8 20h18.4L12 3Z" />
+      <path d="M12 9v5m0 3h.01" />
+    </svg>
+  );
+}
+
+function BoxIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="m4 7 8-4 8 4-8 4-8-4Z" />
+      <path d="M4 7v10l8 4 8-4V7M12 11v10" />
     </svg>
   );
 }
@@ -64,38 +118,39 @@ function ChampionCard({
   onFavorite: () => void;
 }) {
   return (
-    <article className="champion-card" onClick={onOpen}>
-      <div className="card-art">
-        <img src={championSplash(champion)} alt="" loading="lazy" />
-        <div className="card-art-shade" />
-        <span className={`tier-badge tier-${champion.tier.toLowerCase()}`}>{champion.tier}</span>
-        <button
-          className="favorite-button"
-          aria-label={favorite ? `Bỏ lưu ${champion.name}` : `Lưu ${champion.name}`}
-          onClick={(event) => {
-            event.stopPropagation();
-            onFavorite();
-          }}
-        >
-          <HeartIcon filled={favorite} />
-        </button>
-        <div className="card-name">
-          <h3>{champion.name}</h3>
-          <p>{champion.title}</p>
+    <article className="champion-card">
+      <button className="card-open" type="button" onClick={onOpen} aria-label={`Mở hướng dẫn ${champion.name}`}>
+        <div className="card-art">
+          <img src={championSplash(champion)} alt="" loading="lazy" />
+          <div className="card-art-shade" />
+          <span className={`tier-badge tier-${champion.tier.toLowerCase()}`}>{champion.tier}</span>
+          <div className="card-name">
+            <h3>{champion.name}</h3>
+            <p>{champion.title}</p>
+          </div>
         </div>
-      </div>
-      <div className="card-body">
-        <div className="card-label">Lõi trung tâm</div>
-        <div className="card-core">
-          {champion.coreAugments[0]?.icon && <img src={champion.coreAugments[0].icon} alt="" loading="lazy" />}
-          <strong>{champion.coreAugments.map((augment) => augment.vi).join(" + ") || "Theo danh sách ưu tiên"}</strong>
+        <div className="card-body">
+          <div className="card-label">Lõi trung tâm</div>
+          <div className="card-core">
+            {champion.coreAugments[0]?.icon && <img src={champion.coreAugments[0].icon} alt="" loading="lazy" />}
+            <strong>{champion.coreAugments.map((augment) => augment.vi).join(" + ") || "Theo danh sách ưu tiên"}</strong>
+          </div>
+          <p>{champion.buildName}</p>
+          <div className="card-footer">
+            <span>{champion.role}</span>
+            <span className="card-cta">Chi tiết <ArrowUpRightIcon /></span>
+          </div>
         </div>
-        <p>{champion.buildName}</p>
-        <div className="card-footer">
-          <span>{champion.role}</span>
-          <button type="button">Xem hướng dẫn <span>→</span></button>
-        </div>
-      </div>
+      </button>
+      <button
+        className="favorite-button"
+        type="button"
+        aria-label={favorite ? `Bỏ lưu ${champion.name}` : `Lưu ${champion.name}`}
+        aria-pressed={favorite}
+        onClick={onFavorite}
+      >
+        <HeartIcon filled={favorite} />
+      </button>
     </article>
   );
 }
@@ -149,6 +204,36 @@ function GuideDrawer({
   onFavorite: () => void;
 }) {
   const [picks, setPicks] = useState<string[]>([]);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const drawerRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    closeButtonRef.current?.focus();
+    const keepFocusInside = (event: KeyboardEvent) => {
+      if (event.key !== "Tab") return;
+      const focusable = Array.from(
+        drawerRef.current?.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), summary, [tabindex]:not([tabindex="-1"])',
+        ) ?? [],
+      );
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (!first || !last) return;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", keepFocusInside);
+    return () => {
+      document.removeEventListener("keydown", keepFocusInside);
+      previouslyFocused?.focus();
+    };
+  }, []);
 
   const priorities = useMemo(() => {
     const all = [...champion.prismatic, ...champion.gold, ...champion.silver];
@@ -182,13 +267,14 @@ function GuideDrawer({
   return (
     <div className="drawer-backdrop" role="presentation" onMouseDown={onClose}>
       <section
+        ref={drawerRef}
         className="guide-drawer"
         role="dialog"
         aria-modal="true"
         aria-label={`Hướng dẫn ${champion.name}`}
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <button className="drawer-close" onClick={onClose} aria-label="Đóng hướng dẫn">
+        <button ref={closeButtonRef} className="drawer-close" onClick={onClose} aria-label="Đóng hướng dẫn">
           <CloseIcon />
         </button>
 
@@ -202,7 +288,7 @@ function GuideDrawer({
               <h2>{champion.name}</h2>
               <p>{champion.title}</p>
             </div>
-            <button className={`drawer-favorite ${favorite ? "active" : ""}`} onClick={onFavorite}>
+            <button className={`drawer-favorite ${favorite ? "active" : ""}`} aria-pressed={favorite} onClick={onFavorite}>
               <HeartIcon filled={favorite} /> {favorite ? "Đã lưu" : "Lưu tướng"}
             </button>
           </div>
@@ -233,7 +319,7 @@ function GuideDrawer({
                   <div className="core-augment" key={augment.cn}>
                     {augment.icon
                       ? <img className="augment-art" src={augment.icon} alt="" loading="lazy" />
-                      : <span className="augment-gem">✦</span>}
+                      : <span className="augment-gem"><LogoIcon /></span>}
                     <div><strong>{augment.vi}</strong><small>{augment.cn}</small></div>
                   </div>
                 ))}
@@ -245,9 +331,8 @@ function GuideDrawer({
                     const asset = champion.itemData?.[index];
                     return (
                     <div className="item-step" key={item}>
-                      {asset?.icon
-                        ? <img src={asset.icon} alt="" loading="lazy" />
-                        : <span>{index + 1}</span>}
+                      <span>{index + 1}</span>
+                      {asset?.icon ? <img src={asset.icon} alt="" loading="lazy" /> : <i><BoxIcon /></i>}
                       <div><strong>{item}</strong>{asset?.original && <small>{asset.original}</small>}</div>
                     </div>
                     );
@@ -292,7 +377,7 @@ function GuideDrawer({
                         <span>Lõi</span>
                         {build.coreAugments.map((augment) => (
                           <div className="community-asset" key={augment.cn} title={augment.cn}>
-                            {augment.icon ? <img src={augment.icon} alt="" loading="lazy" /> : <i>✦</i>}
+                            {augment.icon ? <img src={augment.icon} alt="" loading="lazy" /> : <i><LogoIcon /></i>}
                             <b>{augment.vi}<small>{augment.cn}</small></b>
                           </div>
                         ))}
@@ -303,7 +388,7 @@ function GuideDrawer({
                         <span>Đồ được nguồn nêu rõ</span>
                         {build.itemData.map((item) => (
                           <div className="community-asset" key={item.original} title={item.original}>
-                            {item.icon ? <img src={item.icon} alt="" loading="lazy" /> : <i>◇</i>}
+                            {item.icon ? <img src={item.icon} alt="" loading="lazy" /> : <i><BoxIcon /></i>}
                             <b>{item.name}<small>{item.original}</small></b>
                           </div>
                         ))}
@@ -363,11 +448,11 @@ function GuideDrawer({
 
           <section id="notes" className="notes-grid">
             <div className="note-panel good">
-              <span className="note-icon">✓</span>
+              <span className="note-icon"><CheckIcon /></span>
               <div><h3>Tương tác nên tận dụng</h3>{champion.tips.map((tip) => <p key={tip}>{tip}</p>)}</div>
             </div>
             <div className="note-panel warning">
-              <span className="note-icon">!</span>
+              <span className="note-icon"><AlertIcon /></span>
               <div><h3>Bẫy cần tránh</h3>{champion.traps.map((trap) => <p key={trap}>{trap}</p>)}</div>
             </div>
           </section>
@@ -402,25 +487,36 @@ export default function Home() {
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [selected, setSelected] = useState<ChampionGuide | null>(null);
-  const [installPrompt, setInstallPrompt] = useState<InstallPrompt | null>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const featured = champions.find((champion) => champion.id === "ryze") ?? champions[0];
 
   useEffect(() => {
     const saved = window.localStorage.getItem("loi-meta-favorites");
-    const frame = saved
-      ? window.requestAnimationFrame(() => setFavorites(JSON.parse(saved)))
-      : null;
-    if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => undefined);
-
-    const onInstall = (event: Event) => {
-      event.preventDefault();
-      setInstallPrompt(event as InstallPrompt);
-    };
-    window.addEventListener("beforeinstallprompt", onInstall);
+    let frame: number | null = null;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) frame = window.requestAnimationFrame(() => setFavorites(parsed));
+      } catch {
+        window.localStorage.removeItem("loi-meta-favorites");
+      }
+    }
     return () => {
       if (frame !== null) window.cancelAnimationFrame(frame);
-      window.removeEventListener("beforeinstallprompt", onInstall);
     };
+  }, []);
+
+  useEffect(() => {
+    const focusSearch = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const isTyping = target?.matches("input, textarea, select, [contenteditable='true']");
+      if (event.key === "/" && !isTyping && !event.metaKey && !event.ctrlKey && !event.altKey) {
+        event.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", focusSearch);
+    return () => window.removeEventListener("keydown", focusSearch);
   }, []);
 
   useEffect(() => {
@@ -469,21 +565,12 @@ export default function Home() {
     });
   }
 
-  async function installApp() {
-    if (!installPrompt) {
-      document.getElementById("install-guide")?.scrollIntoView({ behavior: "smooth" });
-      return;
-    }
-    await installPrompt.prompt();
-    await installPrompt.userChoice;
-    setInstallPrompt(null);
-  }
-
   return (
-    <main>
+    <main id="main-content">
+      <a className="skip-link" href="#champions">Bỏ qua phần giới thiệu</a>
       <header className="site-header">
         <a className="brand" href="#top" aria-label="Lõi Meta - Trang chủ">
-          <span className="brand-mark">✦</span>
+          <span className="brand-mark"><LogoIcon /></span>
           <span>LÕI<span>.META</span></span>
           <small>ARAM MAYHEM</small>
         </a>
@@ -492,7 +579,6 @@ export default function Home() {
           <a href="#how-to">Cách dùng</a>
           <a href="#community-sources">Nguồn cộng đồng</a>
         </nav>
-        <button className="install-button" onClick={installApp}><span>↓</span> Cài ứng dụng</button>
       </header>
 
       <section className="hero" id="top">
@@ -501,26 +587,32 @@ export default function Home() {
         <div className="hero-content">
           <div className="hero-copy">
             <div className="version-pill"><span /> Đồng bộ nguồn · {sourceSync.newestSourceDate ?? "đang cập nhật"}</div>
-            <h1>Chọn lõi đúng.<br /><span>Lên đồ đúng nhịp.</span></h1>
-            <p>Hướng dẫn tiếng Việt cho ARAM: Mayhem — tập trung vào build, lõi trung tâm, tương tác đặc biệt và những lựa chọn dễ khiến bạn “tự hủy”.</p>
+            <h1>Tìm build.<br /><span>Chọn lõi. Vào trận.</span></h1>
+            <p>Tra cứu nhanh {champions.length} tướng ARAM: Mayhem bằng tiếng Việt. Thấy ngay lõi trung tâm, thứ tự trang bị, tương tác mạnh và bẫy cần tránh.</p>
             <div className="hero-search">
               <SearchIcon />
+              <label className="sr-only" htmlFor="champion-search">Tìm tướng, lối build hoặc lõi</label>
               <input
+                ref={searchRef}
+                id="champion-search"
+                type="search"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Tìm tướng, biệt danh, lối build hoặc lõi..."
-                aria-label="Tìm hướng dẫn tướng"
+                autoComplete="off"
+                aria-controls="champion-grid"
               />
               {query && <button onClick={() => setQuery("")} aria-label="Xóa tìm kiếm"><CloseIcon /></button>}
+              {!query && <kbd aria-hidden="true">/</kbd>}
             </div>
             <div className="hero-proof">
-              <span><b>{champions.length}</b> tướng đã biên tập</span>
-              <span><b>{communitySourceStats.buildCount}</b> lối cộng đồng đã gộp</span>
-              <span><b>{communitySourceStats.championCount}</b> tướng có nguồn chéo</span>
-              <span><b>0</b> tỷ lệ thắng bịa</span>
+              <span><b>{champions.length}</b><small>Tướng đã biên tập</small></span>
+              <span><b>{communitySourceStats.buildCount}</b><small>Lối cộng đồng đã gộp</small></span>
+              <span><b>{communitySourceStats.championCount}</b><small>Tướng có nguồn chéo</small></span>
+              <span><b>0</b><small>Tỷ lệ thắng tự bịa</small></span>
             </div>
           </div>
-          <div className="hero-featured" onClick={() => setSelected(featured)}>
+          <button className="hero-featured" type="button" onClick={() => setSelected(featured)} aria-label={`Mở build nổi bật của ${featured.name}`}>
             <div className="featured-art">
               <img src={championSplash(featured)} alt={featured.name} />
               <div className="featured-shade" />
@@ -530,24 +622,25 @@ export default function Home() {
             <div className="featured-augments">
               {featured.coreAugments.slice(0, 2).map((augment, index) => <span key={augment.cn}>{index > 0 && <b>+</b>}{augment.vi}</span>)}
             </div>
-            <button>Xem cách vận hành <span>↗</span></button>
-          </div>
+            <span className="featured-cta">Xem cách vận hành <ArrowUpRightIcon /></span>
+          </button>
         </div>
       </section>
 
       <section className="champion-section" id="champions">
         <div className="section-intro">
           <div><span className="eyebrow">Kho hướng dẫn</span><h2>Chọn tướng của bạn</h2><p>Nhấn vào một thẻ để xem build đầy đủ và thử so sánh ba lõi đang xuất hiện trong trận.</p></div>
-          <div className="result-count"><b>{filtered.length}</b><span>kết quả</span></div>
+          <div className="result-count" role="status" aria-live="polite"><b>{filtered.length}</b><span>kết quả</span></div>
         </div>
         <div className="filter-bar">
           <div className="role-tabs">
-            {roles.map((item) => <button key={item} className={role === item ? "active" : ""} onClick={() => setRole(item)}>{item}</button>)}
+            {roles.map((item) => <button key={item} aria-pressed={role === item} className={role === item ? "active" : ""} onClick={() => setRole(item)}>{item}</button>)}
           </div>
-          <button className={`favorite-filter ${favoritesOnly ? "active" : ""}`} onClick={() => setFavoritesOnly((value) => !value)}><HeartIcon filled={favoritesOnly} /> Đã lưu ({favorites.length})</button>
+          <span className="filter-count-inline" aria-hidden="true">{filtered.length} tướng</span>
+          <button aria-pressed={favoritesOnly} className={`favorite-filter ${favoritesOnly ? "active" : ""}`} onClick={() => setFavoritesOnly((value) => !value)}><HeartIcon filled={favoritesOnly} /> Đã lưu ({favorites.length})</button>
         </div>
         {filtered.length ? (
-          <div className="champion-grid">
+          <div className="champion-grid" id="champion-grid">
             {filtered.map((champion) => (
               <ChampionCard
                 key={champion.id}
@@ -559,7 +652,7 @@ export default function Home() {
             ))}
           </div>
         ) : (
-          <div className="empty-state"><span>⌕</span><h3>Chưa tìm thấy tướng phù hợp</h3><p>Thử tên khác hoặc bỏ bộ lọc hiện tại.</p><button onClick={() => { setQuery(""); setRole("Tất cả"); setFavoritesOnly(false); }}>Xóa bộ lọc</button></div>
+          <div className="empty-state" role="status"><SearchIcon /><h3>Chưa tìm thấy tướng phù hợp</h3><p>Thử tên khác hoặc bỏ bộ lọc hiện tại.</p><button onClick={() => { setQuery(""); setRole("Tất cả"); setFavoritesOnly(false); }}>Xóa bộ lọc</button></div>
         )}
       </section>
 
@@ -591,7 +684,7 @@ export default function Home() {
               <div><span>{source.platform}</span><small>{source.kind}</small></div>
               <h3>{source.title}</h3>
               <p>{source.note}</p>
-              <div className="source-watch-meta"><span>{formatSourceDate(source.publishedAt)}</span>{source.signal && <b>{source.signal}</b>}<i>↗</i></div>
+              <div className="source-watch-meta"><span>{formatSourceDate(source.publishedAt)}</span>{source.signal && <b>{source.signal}</b>}<i><ArrowUpRightIcon /></i></div>
             </a>
           ))}
         </div>
@@ -607,14 +700,8 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="install-guide" id="install-guide">
-        <div className="install-visual"><span className="brand-mark">✦</span><i>+</i></div>
-        <div><span className="eyebrow">PWA · dùng như ứng dụng</span><h2>Ghim Lõi.Meta lên màn hình chính</h2><p>Trên iPhone: Chia sẻ → Thêm vào MH chính. Trên Android/Chrome: chọn “Cài đặt ứng dụng”. Những trang đã mở vẫn xem được khi mạng chập chờn.</p></div>
-        <button onClick={installApp}>Cài ứng dụng <span>↓</span></button>
-      </section>
-
       <footer id="sources">
-        <div className="footer-brand"><span className="brand-mark">✦</span><div><strong>LÕI.META</strong><p>Hướng dẫn ARAM: Mayhem bằng tiếng Việt.</p></div></div>
+        <div className="footer-brand"><span className="brand-mark"><LogoIcon /></span><div><strong>LÕI.META</strong><p>Hướng dẫn ARAM: Mayhem bằng tiếng Việt.</p></div></div>
         <p className="disclaimer">Dự án cộng đồng, không được Riot Games bảo trợ. Đã đồng bộ {sourceSync.championCount} tướng từ phần công khai của 海斗小助手; Bilibili, Zhihu, Tieba và các trang hướng dẫn chỉ bổ sung nguồn chéo. Tên và ảnh lõi/trang bị được đối chiếu qua dữ liệu client Việt Nam của Riot/CommunityDragon.</p>
         <div className="footer-links"><a href="https://lolhaidou.cn/" target="_blank" rel="noreferrer">Hải Đấu ↗</a><a href="#community-sources">Nguồn cộng đồng ↑</a><a href="https://www.communitydragon.org/" target="_blank" rel="noreferrer">CommunityDragon ↗</a></div>
       </footer>
@@ -630,9 +717,9 @@ export default function Home() {
       )}
 
       <nav className="mobile-nav" aria-label="Điều hướng di động">
-        <a href="#top"><span>⌂</span>Trang chủ</a>
-        <a href="#champions"><span>♙</span>Tướng</a>
-        <button onClick={() => setFavoritesOnly((value) => !value)}><span>♡</span>Đã lưu</button>
+        <a href="#top"><HomeIcon />Trang chủ</a>
+        <a href="#champions"><GridIcon />Tướng</a>
+        <button aria-pressed={favoritesOnly} onClick={() => setFavoritesOnly((value) => !value)}><HeartIcon filled={favoritesOnly} />Đã lưu</button>
       </nav>
     </main>
   );

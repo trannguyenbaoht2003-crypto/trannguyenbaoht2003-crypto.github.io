@@ -4,11 +4,9 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Lõi.Meta — Hướng dẫn ARAM: Mayhem tiếng Việt",
   description: "Build trang bị, lõi ưu tiên, tương tác đặc biệt và bẫy cần tránh cho ARAM: Mayhem.",
-  manifest: "/manifest.webmanifest",
   applicationName: "Lõi.Meta",
-  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Lõi.Meta" },
   other: { "codex-preview": "development" },
-  icons: { icon: "/app-icon.svg", apple: "/app-icon.svg" },
+  icons: { icon: "/favicon.svg" },
 };
 
 export const viewport: Viewport = {
