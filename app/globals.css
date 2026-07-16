@@ -41,7 +41,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, summary:focus-visibl
   height: 68px; padding: 0 max(24px, calc((100vw - 1400px) / 2)); display: flex; align-items: center; justify-content: space-between;
   position: sticky; top: 0; z-index: 40; border-bottom: 1px solid var(--line); background: rgba(5, 9, 20, .88); backdrop-filter: blur(18px); box-shadow: 0 8px 30px rgba(0,0,0,.14);
 }
-.brand { display: flex; align-items: center; gap: 10px; font-weight: 900; letter-spacing: .03em; }
+.brand { min-height: 44px; display: flex; align-items: center; gap: 10px; font-weight: 900; letter-spacing: .03em; }
 .brand > span:nth-child(2) span { color: var(--cyan); }
 .brand small { color: var(--muted); font-size: 10px; letter-spacing: .16em; border-left: 1px solid var(--line); padding-left: 10px; }
 .brand-mark { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 11px; color: #061b1c; background: linear-gradient(145deg, var(--cyan-soft), var(--cyan)); box-shadow: 0 0 28px rgba(101, 226, 220, .22); }
