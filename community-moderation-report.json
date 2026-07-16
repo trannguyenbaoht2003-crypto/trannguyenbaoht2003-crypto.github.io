@@ -1,0 +1,18 @@
+{
+  "generatedAt": "2026-07-16T10:40:26.169Z",
+  "contentHash": "edb75a50857eea1e09bed698f626a282c142a873e65aaded8a88c61c0169eb06",
+  "evidenceHash": "08147184f6092f555b1af2a9b2121926c9e4daa2973ad12bfe26bc5511d353f9",
+  "currentPatch": "16.14",
+  "candidateCount": 13,
+  "decisionCount": 12,
+  "statusCounts": {
+    "auto-approved": 0,
+    "needs-verification": 0,
+    "observing": 12,
+    "rejected": 0
+  },
+  "generatedRecordCount": 0,
+  "skippedCollisionCount": 0,
+  "skippedCollisions": [],
+  "autoPublish": true
+}

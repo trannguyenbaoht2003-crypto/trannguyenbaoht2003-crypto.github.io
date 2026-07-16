@@ -1,0 +1,506 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-07-16T10:40:26.169Z",
+  "currentPatch": "16.14",
+  "contentHash": "471afae1e3853231bca94bb1802b4ed96271d5df71467405178815871947a64e",
+  "decisions": [
+    {
+      "signature": "annie:2031:",
+      "championId": "annie",
+      "augmentIds": [
+        2031
+      ],
+      "itemIds": [],
+      "status": "observing",
+      "score": 50,
+      "hardGateFailures": [
+        "missing-item-evidence"
+      ],
+      "reasons": [
+        "Tương tác tích cực chưa đạt ngưỡng"
+      ],
+      "sources": [
+        {
+          "platform": "Bilibili",
+          "url": "https://www.bilibili.com/video/BV1XdKg6TEvq/",
+          "title": "万血熊大熊二？空投熊安妮！",
+          "author": "螃蟹俄洛伊",
+          "publishedAt": "2026-07-16"
+        }
+      ],
+      "metrics": {
+        "views": 866,
+        "likes": 18,
+        "favorites": 0
+      },
+      "comments": {
+        "positive": 0,
+        "negative": 0,
+        "neutral": 0,
+        "meaningful": 0,
+        "positiveRatio": 0,
+        "negativeRatio": 0
+      },
+      "patch": "16.14",
+      "checkedAt": "2026-07-16T10:40:26.169Z",
+      "consecutiveFailures": 0
+    },
+    {
+      "signature": "aurora:2083:",
+      "championId": "aurora",
+      "augmentIds": [
+        2083
+      ],
+      "itemIds": [],
+      "status": "observing",
+      "score": 50,
+      "hardGateFailures": [
+        "missing-item-evidence"
+      ],
+      "reasons": [
+        "Tương tác tích cực chưa đạt ngưỡng"
+      ],
+      "sources": [
+        {
+          "platform": "Bilibili",
+          "url": "https://www.bilibili.com/video/BV1azNU6BE4m/",
+          "title": "海克斯大乱斗牙仙子阿萝拉教学，高容错出装，一套秒满血！",
+          "author": "声沙Hoarse",
+          "publishedAt": "2026-07-13"
+        }
+      ],
+      "metrics": {
+        "views": 843,
+        "likes": 16,
+        "favorites": 1
+      },
+      "comments": {
+        "positive": 0,
+        "negative": 0,
+        "neutral": 0,
+        "meaningful": 0,
+        "positiveRatio": 0,
+        "negativeRatio": 0
+      },
+      "patch": "16.14",
+      "checkedAt": "2026-07-16T10:40:26.169Z",
+      "consecutiveFailures": 0
+    },
+    {
+      "signature": "belveth:1058:",
+      "championId": "belveth",
+      "augmentIds": [
+        1058
+      ],
+      "itemIds": [],
+      "status": "observing",
+      "score": 50,
+      "hardGateFailures": [
+        "missing-item-evidence"
+      ],
+      "reasons": [
+        "Tương tác tích cực chưa đạt ngưỡng"
+      ],
+      "sources": [
+        {
+          "platform": "Bilibili",
+          "url": "https://www.bilibili.com/video/BV1ztNt6xEEa/",
+          "title": "盘点海斗强势英雄玩法-秘术冲拳AP大卑",
+          "author": "海斗教主张无忌",
+          "publishedAt": "2026-07-14"
+        }
+      ],
+      "metrics": {
+        "views": 455,
+        "likes": 18,
+        "favorites": 2
+      },
+      "comments": {
+        "positive": 0,
+        "negative": 0,
+        "neutral": 0,
+        "meaningful": 0,
+        "positiveRatio": 0,
+        "negativeRatio": 0
+      },
+      "patch": "16.14",
+      "checkedAt": "2026-07-16T10:40:26.169Z",
+      "consecutiveFailures": 0
+    },
+    {
+      "signature": "ezreal:1029:",
+      "championId": "ezreal",
+      "augmentIds": [
+        1029
+      ],
+      "itemIds": [],
+      "status": "observing",
+      "score": 50,
+      "hardGateFailures": [
+        "missing-item-evidence"
+      ],
+      "reasons": [
+        "Tương tác tích cực chưa đạt ngưỡng"
+      ],
+      "sources": [
+        {
+          "platform": "Bilibili",
+          "url": "https://www.bilibili.com/video/BV13bN96DEF8/",
+          "title": "海克斯大乱斗第13期：明探险家·伊泽瑞尔「虚幻武器谁能解释下？」",
+          "author": "乱斗仙人",
+          "publishedAt": "2026-07-16"
+        }
+      ],
+      "metrics": {
+        "views": 5,
+        "likes": 3,
+        "favorites": 0
+      },
+      "comments": {
+        "positive": 0,
+        "negative": 0,
+        "neutral": 0,
+        "meaningful": 0,
+        "positiveRatio": 0,
+        "negativeRatio": 0
+      },
+      "patch": "16.14",
+      "checkedAt": "2026-07-16T10:40:26.169Z",
+      "consecutiveFailures": 0
+    },
+    {
+      "signature": "kaisa:1029-1030:",
+      "championId": "kaisa",
+      "augmentIds": [
+        1030,
+        1029
+      ],
+      "itemIds": [],
+      "status": "observing",
+      "score": 50,
+      "hardGateFailures": [
+        "missing-item-evidence"
+      ],
+      "reasons": [
+        "Tương tác tích cực chưa đạt ngưỡng"
+      ],
+      "sources": [
+        {
+          "platform": "Bilibili",
+          "url": "https://www.bilibili.com/video/BV1EoKD6ZEdK/",
+          "title": "43杀卡莎，卡莎的好处就是可以根据海克斯出装，像这局虚幻+尤里卡就直接转ap（43杀+五杀）",
+          "author": "海斗K头滴神",
+          "publishedAt": "2026-07-01"
+        }
+      ],
+      "metrics": {
+        "views": 656,
+        "likes": 2,
+        "favorites": 1
+      },
+      "comments": {
+        "positive": 0,
+        "negative": 0,
+        "neutral": 0,
+        "meaningful": 0,
+        "positiveRatio": 0,
+        "negativeRatio": 0
+      },
+      "patch": "16.14",
+      "checkedAt": "2026-07-16T10:40:26.169Z",
+      "consecutiveFailures": 0
+    },
+    {
+      "signature": "senna:2006:",
+      "championId": "senna",
+      "augmentIds": [
+        2006
+      ],
+      "itemIds": [],
+      "status": "observing",
+      "score": 50,
+      "hardGateFailures": [
+        "missing-item-evidence"
+      ],
+      "reasons": [
+        "Tương tác tích cực chưa đạt ngưỡng"
+      ],
+      "sources": [
+        {
+          "platform": "Bilibili",
+          "url": "https://www.bilibili.com/video/BV1CHNE6BEBc/",
+          "title": "飞身踢塞纳，MD这β海克斯打出伤害不斩人的，玩的憋气（37杀+大腿）",
+          "author": "海斗K头滴神",
+          "publishedAt": "2026-07-16"
+        }
+      ],
+      "metrics": {
+        "views": 117,
+        "likes": 4,
+        "favorites": 0
+      },
+      "comments": {
+        "positive": 0,
+        "negative": 0,
+        "neutral": 0,
+        "meaningful": 0,
+        "positiveRatio": 0,
+        "negativeRatio": 0
+      },
+      "patch": "16.14",
+      "checkedAt": "2026-07-16T10:40:26.169Z",
+      "consecutiveFailures": 0
+    },
+    {
+      "signature": "skarner:1353-2006-2102:3084",
+      "championId": "skarner",
+      "augmentIds": [
+        1353,
+        2006,
+        2102
+      ],
+      "itemIds": [
+        3084
+      ],
+      "status": "observing",
+      "score": 50,
+      "hardGateFailures": [
+        "missing-item-evidence"
+      ],
+      "reasons": [
+        "Tương tác tích cực chưa đạt ngưỡng"
+      ],
+      "sources": [
+        {
+          "platform": "Bilibili",
+          "url": "https://www.bilibili.com/video/BV1vETn6KEDG/",
+          "title": "海克斯大乱斗心之钢坦克教学，海克斯符文出装推荐，学会你也能飞身踢秒脆皮，高压锅主宰比赛！",
+          "author": "声沙Hoarse",
+          "publishedAt": "2026-07-02"
+        }
+      ],
+      "metrics": {
+        "views": 4532,
+        "likes": 36,
+        "favorites": 12
+      },
+      "comments": {
+        "positive": 0,
+        "negative": 0,
+        "neutral": 0,
+        "meaningful": 0,
+        "positiveRatio": 0,
+        "negativeRatio": 0
+      },
+      "patch": "16.14",
+      "checkedAt": "2026-07-16T10:40:26.169Z",
+      "consecutiveFailures": 0
+    },
+    {
+      "signature": "smolder:1048:",
+      "championId": "smolder",
+      "augmentIds": [
+        1048
+      ],
+      "itemIds": [],
+      "status": "observing",
+      "score": 50,
+      "hardGateFailures": [
+        "missing-item-evidence"
+      ],
+      "reasons": [
+        "Tương tác tích cực chưa đạt ngưỡng"
+      ],
+      "sources": [
+        {
+          "platform": "Bilibili",
+          "url": "https://www.bilibili.com/video/BV1RXNL6SEyM/",
+          "title": "小火龙，大腿局，法爆火龙大战4刺客，还是无限q剑圣和身法凯隐（23杀+大腿）",
+          "author": "海斗K头滴神",
+          "publishedAt": "2026-07-15"
+        }
+      ],
+      "metrics": {
+        "views": 447,
+        "likes": 4,
+        "favorites": 0
+      },
+      "comments": {
+        "positive": 0,
+        "negative": 0,
+        "neutral": 0,
+        "meaningful": 0,
+        "positiveRatio": 0,
+        "negativeRatio": 0
+      },
+      "patch": "16.14",
+      "checkedAt": "2026-07-16T10:40:26.169Z",
+      "consecutiveFailures": 0
+    },
+    {
+      "signature": "trundle:2129:",
+      "championId": "trundle",
+      "augmentIds": [
+        2129
+      ],
+      "itemIds": [],
+      "status": "observing",
+      "score": 50,
+      "hardGateFailures": [
+        "missing-item-evidence"
+      ],
+      "reasons": [
+        "Tương tác tích cực chưa đạt ngưỡng"
+      ],
+      "sources": [
+        {
+          "platform": "Bilibili",
+          "url": "https://www.bilibili.com/video/BV1iAN36BEWd/",
+          "title": "海克斯大乱斗地形专家巨魔教学，出装海克斯符文推荐，胶黏对手折磨到死！",
+          "author": "声沙Hoarse",
+          "publishedAt": "2026-07-12"
+        }
+      ],
+      "metrics": {
+        "views": 283,
+        "likes": 9,
+        "favorites": 0
+      },
+      "comments": {
+        "positive": 0,
+        "negative": 0,
+        "neutral": 0,
+        "meaningful": 0,
+        "positiveRatio": 0,
+        "negativeRatio": 0
+      },
+      "patch": "16.14",
+      "checkedAt": "2026-07-16T10:40:26.169Z",
+      "consecutiveFailures": 0
+    },
+    {
+      "signature": "vayne:1081-1225:",
+      "championId": "vayne",
+      "augmentIds": [
+        1081,
+        1225
+      ],
+      "itemIds": [],
+      "status": "observing",
+      "score": 50,
+      "hardGateFailures": [
+        "missing-item-evidence"
+      ],
+      "reasons": [
+        "Tương tác tích cực chưa đạt ngưỡng"
+      ],
+      "sources": [
+        {
+          "platform": "Bilibili",
+          "url": "https://www.bilibili.com/video/BV1QcNj65EQ6/",
+          "title": "VN，踏踏舞+双刀，对面看情况不对直接8分点了不让爽（14杀+大腿）",
+          "author": "海斗K头滴神",
+          "publishedAt": "2026-07-15"
+        }
+      ],
+      "metrics": {
+        "views": 472,
+        "likes": 4,
+        "favorites": 0
+      },
+      "comments": {
+        "positive": 0,
+        "negative": 0,
+        "neutral": 0,
+        "meaningful": 0,
+        "positiveRatio": 0,
+        "negativeRatio": 0
+      },
+      "patch": "16.14",
+      "checkedAt": "2026-07-16T10:40:26.169Z",
+      "consecutiveFailures": 0
+    },
+    {
+      "signature": "xayah:1048:",
+      "championId": "xayah",
+      "augmentIds": [
+        1048
+      ],
+      "itemIds": [],
+      "status": "observing",
+      "score": 50,
+      "hardGateFailures": [
+        "missing-item-evidence"
+      ],
+      "reasons": [
+        "Tương tác tích cực chưa đạt ngưỡng"
+      ],
+      "sources": [
+        {
+          "platform": "Bilibili",
+          "url": "https://www.bilibili.com/video/BV1vBNE6oEoT/",
+          "title": "霞，54%伤害占比，顶级法爆ad，qer全吃法爆增伤，伤害根本看不懂（23杀+五杀）",
+          "author": "海斗K头滴神",
+          "publishedAt": "2026-07-15"
+        }
+      ],
+      "metrics": {
+        "views": 281,
+        "likes": 5,
+        "favorites": 0
+      },
+      "comments": {
+        "positive": 0,
+        "negative": 0,
+        "neutral": 0,
+        "meaningful": 0,
+        "positiveRatio": 0,
+        "negativeRatio": 0
+      },
+      "patch": "16.14",
+      "checkedAt": "2026-07-16T10:40:26.169Z",
+      "consecutiveFailures": 0
+    },
+    {
+      "signature": "yunara:1092:",
+      "championId": "yunara",
+      "augmentIds": [
+        1092
+      ],
+      "itemIds": [],
+      "status": "observing",
+      "score": 65,
+      "hardGateFailures": [
+        "missing-item-evidence"
+      ],
+      "reasons": [
+        "Phản hồi công khai đạt ngưỡng tích cực"
+      ],
+      "sources": [
+        {
+          "platform": "Bilibili",
+          "url": "https://www.bilibili.com/video/BV1pfT76GEcA/",
+          "title": "芸阿娜拿到易损这样出装暴击飞弹的数量能最大化！【海克斯大乱斗3.0】",
+          "author": "乱斗陀螺王-今井",
+          "publishedAt": "2026-07-02"
+        }
+      ],
+      "metrics": {
+        "views": 394724,
+        "likes": 5733,
+        "favorites": 1421
+      },
+      "comments": {
+        "positive": 0,
+        "negative": 0,
+        "neutral": 0,
+        "meaningful": 0,
+        "positiveRatio": 0,
+        "negativeRatio": 0
+      },
+      "patch": "16.14",
+      "checkedAt": "2026-07-16T10:40:26.169Z",
+      "consecutiveFailures": 0
+    }
+  ]
+}

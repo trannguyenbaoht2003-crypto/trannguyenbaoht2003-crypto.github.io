@@ -2,140 +2,77 @@
 
 Website công khai: <https://trannguyenbaoht2003-crypto.github.io/>
 
-Repository này tự động build và phát hành bản tĩnh lên GitHub Pages khi nhánh
-`main` được cập nhật.
+Lõi.Meta là cẩm nang web tiếng Việt cho ARAM: Mayhem. Trang hiển thị toàn bộ danh sách tướng, lõi ưu tiên, thứ tự trang bị, cách vận hành và nguồn đối chiếu. Đây là website responsive thông thường; dự án không có PWA, service worker, web manifest hoặc lời mời cài ứng dụng.
 
-## Đồng bộ dữ liệu ARAM: Mayhem
+## Nguồn dữ liệu
 
-Dự án dùng ba lớp dữ liệu, không tự bịa tỷ lệ thắng:
+Dự án tách dữ liệu thành ba lớp:
 
-- Hải Đấu công khai để đối chiếu danh sách tướng và hướng dẫn hiện hành.
-- Riot Data Dragon/CommunityDragon để khóa đúng ID, tên tiếng Việt và ảnh của tướng, lõi, trang bị.
-- Metadata công khai từ Bilibili, Zhihu, Tieba, Douyin và các trang hướng dẫn Trung Quốc để phát hiện lối chơi mới. Không vượt đăng nhập/CAPTCHA và không lưu nguyên bài hoặc transcript.
+- Phần công khai của Hải Đấu để đối chiếu danh sách tướng và hướng dẫn hiện hành.
+- Riot Data Dragon/CommunityDragon để khóa đúng ID, tên tiếng Việt và ảnh của tướng, lõi và trang bị.
+- Metadata công khai từ Bilibili, Zhihu, Tieba, Douyin và các trang hướng dẫn Trung Quốc để phát hiện lối chơi mới.
 
-Các lệnh chính:
+Quy trình không vượt đăng nhập/CAPTCHA, không truy cập phần khóa trong WeChat mini-program, không lưu nguyên bài, transcript hoặc nội dung bình luận. Lượt xem và tương tác chỉ là bằng chứng quan tâm dùng trong kiểm duyệt, không phải tỷ lệ thắng.
+
+## Kiểm duyệt tự động
+
+`policy.autoPublish=true` chỉ cho phép runner xuất bản khi mọi hàng rào cứng đều đạt:
+
+- đúng ARAM: Mayhem và còn phù hợp với bản game hiện hành;
+- có đúng một `championId` cùng ID/ảnh client;
+- có ít nhất một lõi và ít nhất hai trang bị khớp đúng ID/ảnh client;
+- có URL, tác giả và ngày nguồn công khai;
+- không chứa bug đã sửa, tin đồn hoặc nội dung bị khóa.
+
+Sau đó build phải đi qua một trong hai đường:
+
+1. **Hai nguồn độc lập:** hai tác giả/nền tảng độc lập nêu tổ hợp tương tự, đạt ngưỡng điểm chéo.
+2. **Nguồn uy tín + phản hồi tích cực:** tác giả trong danh sách `established`, nguồn đã đủ tuổi tối thiểu và tương tác công khai vượt đồng thời ngưỡng lượt xem, hành động tích cực và tỷ lệ tương tác có trọng số.
+
+Một build từng được duyệt sẽ chuyển thành **Cần kiểm chứng** khi đổi bản mà chưa có xác nhận mới, phản hồi tiêu cực vượt ngưỡng, hoặc nguồn lỗi/vắng mặt trong hai lần quét liên tiếp. Dữ liệu tự động không bao giờ ghi đè bản Hải Đấu hay bản ghi cộng đồng biên tập có cùng `championId + canonicalKey`.
+
+## Tệp audit
+
+- `data/community-inbox.json`: hàng chờ ứng viên đã nhận dạng.
+- `data/community-evidence.json`: bằng chứng đủ trạng thái để runner xem xét.
+- `data/community-decisions.json`: quyết định, lý do, đường duyệt và lịch sử hạ trạng thái.
+- `app/generated-community-sources.json`: chỉ các build tự động được phép hiển thị hoặc đang cần kiểm chứng.
+- `community-watch-report.json`: báo cáo thu thập và `contentHash` ổn định.
+- `community-moderation-report.json`: báo cáo quyết định tự động và `contentHash` bỏ qua dao động metric.
+- `community-sync-report.json`: kiểm tra gộp trùng và khớp ID/ảnh client.
+
+## Lệnh vận hành
+
+Yêu cầu Node.js `>=22.13.0`.
 
 ```bash
-npm run collect:community   # cập nhật hàng chờ ứng viên cộng đồng
-npm run validate:community  # kiểm tra nguồn, ID và quy tắc gộp trùng
-npm run sync:data           # chạy toàn bộ quy trình Hải Đấu + cộng đồng
+npm run collect:community    # thu thập metadata công khai vào inbox
+npm run moderate:community   # đánh giá và sinh dữ liệu tự động
+npm run validate:community   # kiểm tra schema, gộp trùng, ID và ảnh client
+npm run sync:data            # đồng bộ Riot/Hải Đấu/cộng đồng rồi kiểm duyệt
+npm run test:moderation      # kiểm thử luật duyệt và hạ trạng thái
+npm test                     # kiểm thử luật + build GitHub Pages + HTML
+npm run lint                 # kiểm tra mã nguồn
+npm run build:pages          # tạo bản tĩnh trong out/ và giữ out/.nojekyll
 ```
 
-Nguồn như Douyin có thể không hiện qua tìm kiếm web. Khi đó, thêm URL và phần mô tả ngắn nhìn thấy công khai theo mẫu `data/community-manual-input.example.json`, rồi chạy:
+Nguồn không xuất hiện qua tìm kiếm web có thể được đưa vào `data/community-manual-input.json` theo mẫu `data/community-manual-input.example.json`, sau đó chạy:
 
 ```bash
 npm run collect:community -- --input data/community-manual-input.json
 ```
 
-Ứng viên được lưu tại `data/community-inbox.json`; báo cáo và hash nằm trong `community-watch-report.json`. Trạng thái `ready-for-review` hoặc `cross-source-review` chỉ có nghĩa là máy đã nhận diện được tổ hợp bằng ID và đủ điều kiện để con người kiểm tra URL. `patch-watch` là tin thay đổi bản cần đọc. Mọi trạng thái khác tiếp tục nằm trong hàng chờ.
+Đầu vào thủ công vẫn phải đi qua đúng các hàng rào tự động; không có đường tắt để đăng thẳng lên web.
 
-`autoPublish` luôn để `false`: ứng viên không tự biến thành build trên web. Chỉ sau khi đối chiếu nội dung, bản game, ID và tín hiệu nguồn, build đã gộp trùng mới được thêm vào `app/community-sources.json`.
+## Triển khai
 
-## Nền tảng kỹ thuật
+Nhánh `main` được phát hành lên GitHub Pages. Trước khi đẩy bản mới phải chạy:
 
-A clean full-stack starter running on
-[vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and
-Drizzle support.
-
-## Prerequisites
-
-- Node.js `>=22.13.0`
-- Linux with `flock`, `curl`, and GNU `timeout`
-
-## Sites Lifecycle
-
-The Sites lifecycle CLI runs the locked dependency install before returning this checkout. Edit the source under `app/`, then checkpoint when a coherent milestone is ready to inspect or share. The remote Sites builder runs `npm run build` against the pushed commit. Do not repeat install or build as a normal pre-checkpoint step.
-
-This starter does not use `wrangler.jsonc`.
-
-`install:ci` is intentionally a single, non-retrying `npm ci`. It refuses a concurrent install for the same project, consumes a matching image-seeded npm cache with `--prefer-offline` while retaining registry fallback for a missing cache object, otherwise downloads and verifies the complete vinext tarball recorded in `package-lock.json`, limits npm to one socket, and terminates a stalled install. `build` applies a short timeout and then validates the Sites artifact. These helpers target Linux and use GNU `timeout`; they are not native macOS scripts.
-
-Scripts that need writable project-scoped home, npm, XDG, and temporary paths use `scripts/sites-env.sh`. The `dev` and `start` scripts honor the caller's runtime environment and keep Wrangler logs inside the checkout. The generated `.sites-runtime/` directory is disposable and ignored by Git.
-
-## Included Shape
-
-- edit site code under `app/`
-- `app/chatgpt-auth.ts` provides optional dispatch-owned ChatGPT sign-in helpers
-- `.openai/hosting.json` declares optional Sites D1 and R2 bindings
-- `vite.config.ts` simulates declared bindings for local development
-- `db/index.ts` reads the D1 binding from the Cloudflare Worker environment
-- `db/schema.ts` starts intentionally empty
-- `examples/d1/` contains an optional D1 example surface
-- `drizzle.config.ts` supports local migration generation when needed
-
-## Workspace Auth Headers
-
-OpenAI workspace sites can read the current user's email from
-`oai-authenticated-user-email`.
-
-SIWC-authenticated workspace sites may also receive
-`oai-authenticated-user-full-name` when the user's SIWC profile has a non-empty
-`name` claim. The full-name value is percent-encoded UTF-8 and is accompanied by
-`oai-authenticated-user-full-name-encoding: percent-encoded-utf-8`.
-
-Treat the full name as optional and fall back to email when it is absent:
-
-```tsx
-import { headers } from "next/headers";
-
-export default async function Home() {
-  const requestHeaders = await headers();
-  const email = requestHeaders.get("oai-authenticated-user-email");
-  const encodedFullName = requestHeaders.get("oai-authenticated-user-full-name");
-  const fullName =
-    encodedFullName &&
-    requestHeaders.get("oai-authenticated-user-full-name-encoding") ===
-      "percent-encoded-utf-8"
-      ? decodeURIComponent(encodedFullName)
-      : null;
-
-  const displayName = fullName ?? email;
-  // ...
-}
+```bash
+npm run validate:community
+npm test
+npm run lint
+npm run build:pages
 ```
 
-## Optional Dispatch-Owned ChatGPT Sign-In
-
-Import the ready-to-use helpers from `app/chatgpt-auth.ts` when the site needs
-optional or required ChatGPT sign-in:
-
-- Use `getChatGPTUser()` for optional signed-in UI.
-- Use `requireChatGPTUser(returnTo)` for server-rendered pages that should send
-  anonymous visitors through Sign in with ChatGPT.
-- Use `chatGPTSignInPath(returnTo)` and `chatGPTSignOutPath(returnTo)` for
-  browser links or actions.
-- Pass a same-origin relative `returnTo` path for the destination after sign-in
-  or sign-out. The helper validates and safely encodes it.
-- Mark protected pages with `export const dynamic = "force-dynamic"` because
-  they depend on per-request identity headers.
-
-Dispatch owns `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`, the
-OAuth cookies, and identity header injection. Do not implement app routes for
-those reserved paths. Routes that do not import and call the helper remain
-anonymous-compatible.
-
-SIWC establishes identity only; it does not prove workspace membership. Use the
-Sites hosting platform's access policy controls for workspace-wide restrictions,
-or enforce explicit server-side membership or allowlist checks.
-
-Use SIWC for account pages, user-specific dashboards, saved records, and write
-actions tied to the current ChatGPT user. Leave public content anonymous.
-
-## Diagnostic Commands
-
-- `npm run install:ci`: perform the one bounded lockfile install
-- `npm run dev`: start the Vite/Vinext development server
-- `npm run build`: build and validate the deployable Sites artifact
-- `npm run start`: start the built Vinext application
-- `npm test`: build, validate, and verify the rendered development-preview metadata
-- `npm run validate:artifact`: recheck an existing artifact's manifest and ESM `default.fetch` export
-- `npm run db:generate`: generate Drizzle migrations after schema changes
-
-Use build and validation commands for targeted diagnosis after a remote failure, not as part of the normal checkpoint path.
-
-The timeout defaults can be overridden for a controlled canary with `SITES_INSTALL_TIMEOUT`, `SITES_INSTALL_KILL_AFTER`, `SITES_BUILD_TIMEOUT`, and `SITES_BUILD_KILL_AFTER`. A timeout fails the command; the helpers never retry an unchanged install or build.
-
-## Learn More
-
-- [vinext Documentation](https://github.com/cloudflare/vinext)
-- [Drizzle D1 Guide](https://orm.drizzle.team/docs/get-started/d1-new)
+Sau triển khai, xác nhận trang chính trả HTTP 200 và mọi CSS/JavaScript được HTML tham chiếu đều tải thành công.

@@ -1,4 +1,4 @@
-import { writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { createHash } from "node:crypto";
@@ -312,9 +312,15 @@ async function main() {
   const newestSourceDate = guides.map((guide) => guide.sourceModified).filter(Boolean).sort().at(-1);
   const generatedAt = new Date().toISOString();
   const contentHash = createHash("sha256").update(JSON.stringify(guides)).digest("hex");
+  const reportPath = path.join(ROOT, "data-sync-report.json");
+  const previousReport = await readFile(reportPath, "utf8").then(JSON.parse).catch(() => undefined);
+  if (previousReport?.contentHash === contentHash) {
+    console.log(`Không có thay đổi Hải Đấu/Riot có ý nghĩa; giữ nguyên hash ${contentHash}.`);
+    return;
+  }
   const sourceFile = `import type { ChampionGuide } from "./data";\n\nexport const sourceSync = ${JSON.stringify({ generatedAt, newestSourceDate, championCount: guides.length, contentHash, source: `${SOURCE}/` }, null, 2)} as const;\n\nexport const generatedChampions: ChampionGuide[] = ${JSON.stringify(guides, null, 2)};\n`;
   await writeFile(path.join(ROOT, "app/generated-guides.ts"), sourceFile);
-  await writeFile(path.join(ROOT, "data-sync-report.json"), `${JSON.stringify({ generatedAt, newestSourceDate, championCount: guides.length, contentHash, unmatchedChampions, unmatchedItems: [...unmatchedItems].sort(), unmatchedAugments: [...unmatchedAugments].sort() }, null, 2)}\n`);
+  await writeFile(reportPath, `${JSON.stringify({ generatedAt, newestSourceDate, championCount: guides.length, contentHash, unmatchedChampions, unmatchedItems: [...unmatchedItems].sort(), unmatchedAugments: [...unmatchedAugments].sort() }, null, 2)}\n`);
   console.log(`Đã tạo ${guides.length} hướng dẫn. Tướng chưa khớp: ${unmatchedChampions.length}; trang bị chưa khớp: ${unmatchedItems.size}; lõi chưa khớp: ${unmatchedAugments.size}.`);
 }
 

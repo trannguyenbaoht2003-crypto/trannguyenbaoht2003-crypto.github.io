@@ -9,7 +9,7 @@
       "title": "海克斯大乱斗第13期：明探险家·伊泽瑞尔「虚幻武器谁能解释下？」",
       "author": "乱斗仙人",
       "publishedAt": "2026-07-16",
-      "signal": "5 lượt xem · 3 lượt thích · 0 lượt lưu",
+      "signal": "81 lượt xem · 5 lượt thích · 0 lượt lưu",
       "sourceQueryIds": [
         "bilibili-patch"
       ],
@@ -41,7 +41,18 @@
         "1 lõi khớp ID game",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 81,
+        "likes": 5,
+        "favorites": 0
+      },
+      "authorTier": "watch",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "currentEnough": true
     },
     {
       "id": "candidate-3617bf8f07406d7a",
@@ -50,7 +61,7 @@
       "title": "飞身踢塞纳，MD这β海克斯打出伤害不斩人的，玩的憋气（37杀+大腿）",
       "author": "海斗K头滴神",
       "publishedAt": "2026-07-16",
-      "signal": "117 lượt xem · 4 lượt thích · 0 lượt lưu",
+      "signal": "312 lượt xem · 6 lượt thích · 0 lượt lưu",
       "sourceQueryIds": [
         "bilibili-patch"
       ],
@@ -82,7 +93,18 @@
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
       "firstSeenAt": "2026-07-16",
-      "signature": "senna:2006:"
+      "signature": "senna:2006:",
+      "metrics": {
+        "views": 312,
+        "likes": 6,
+        "favorites": 0
+      },
+      "authorTier": "watch",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "currentEnough": true
     },
     {
       "id": "candidate-6b9f6d12837e64c6",
@@ -91,7 +113,7 @@
       "title": "万血熊大熊二？空投熊安妮！",
       "author": "螃蟹俄洛伊",
       "publishedAt": "2026-07-16",
-      "signal": "866 lượt xem · 18 lượt thích · 0 lượt lưu",
+      "signal": "936 lượt xem · 19 lượt thích · 0 lượt lưu",
       "sourceQueryIds": [
         "bilibili-patch"
       ],
@@ -123,7 +145,18 @@
         "1 lõi khớp ID game",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 936,
+        "likes": 19,
+        "favorites": 0
+      },
+      "authorTier": "unlisted",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "currentEnough": true
     },
     {
       "id": "candidate-3a37b9aade573cfd",
@@ -132,7 +165,7 @@
       "title": "卡莎，大后期经典巨杀跟法穿棒一块出，大后期还是需要双穿的（27杀）",
       "author": "海斗K头滴神",
       "publishedAt": "2026-07-16",
-      "signal": "137 lượt xem · 2 lượt thích · 1 lượt lưu",
+      "signal": "739 lượt xem · 3 lượt thích · 1 lượt lưu",
       "sourceQueryIds": [
         "bilibili-patch"
       ],
@@ -164,7 +197,18 @@
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
       "firstSeenAt": "2026-07-16",
-      "signature": "kaisa::3135"
+      "signature": "kaisa::3135",
+      "metrics": {
+        "views": 739,
+        "likes": 3,
+        "favorites": 1
+      },
+      "authorTier": "watch",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "currentEnough": true
     },
     {
       "id": "candidate-5057a3fa583c0b85",
@@ -173,7 +217,7 @@
       "title": "37杀男枪，现在亮剑无尽配两个暴击已经是标配了吗？（37杀+大腿）",
       "author": "海斗K头滴神",
       "publishedAt": "2026-07-16",
-      "signal": "31 lượt xem · 1 lượt thích · 0 lượt lưu",
+      "signal": "136 lượt xem · 5 lượt thích · 0 lượt lưu",
       "sourceQueryIds": [
         "bilibili-patch"
       ],
@@ -195,16 +239,38 @@
         "Nhận dạng Graves",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 136,
+        "likes": 5,
+        "favorites": 0
+      },
+      "authorTier": "watch",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "currentEnough": true
     },
     {
-      "id": "candidate-6676b77004635d51",
+      "id": "candidate-00cb5197a0b113fc",
       "platform": "Bilibili",
-      "url": "https://www.bilibili.com/video/BV1XyNE6XENt/",
-      "title": "39杀小火龙，没有法爆也能C，爆率海克斯多可以不考虑吸蓝刀（39杀+大腿）",
+      "url": "https://www.bilibili.com/video/BV1qBNn6vEG5/",
+      "title": "小火龙，开局无限循环还是要补眼泪的，有爆率海克斯的情况下无尽大穿就够满爆了（21杀）",
       "author": "海斗K头滴神",
       "publishedAt": "2026-07-16",
-      "signal": "181 lượt xem · 5 lượt thích · 0 lượt lưu",
+      "signal": "1 lượt xem · 2 lượt thích · 0 lượt lưu",
+      "metrics": {
+        "views": 1,
+        "likes": 2,
+        "favorites": 0
+      },
+      "authorTier": "watch",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "currentEnough": true,
       "sourceQueryIds": [
         "bilibili-patch"
       ],
@@ -229,13 +295,122 @@
       "firstSeenAt": "2026-07-16"
     },
     {
+      "id": "candidate-6676b77004635d51",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1XyNE6XENt/",
+      "title": "39杀小火龙，没有法爆也能C，爆率海克斯多可以不考虑吸蓝刀（39杀+大腿）",
+      "author": "海斗K头滴神",
+      "publishedAt": "2026-07-16",
+      "signal": "533 lượt xem · 8 lượt thích · 0 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-patch"
+      ],
+      "championMatches": [
+        {
+          "id": "smolder",
+          "cn": "斯莫德",
+          "match": "小火龙",
+          "vi": "Smolder",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/901.png"
+        }
+      ],
+      "augmentMatches": [],
+      "itemMatches": [],
+      "score": 55,
+      "status": "needs-details",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nhận dạng Smolder",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 533,
+        "likes": 8,
+        "favorites": 0
+      },
+      "authorTier": "watch",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "currentEnough": true
+    },
+    {
+      "id": "candidate-e6c7d797e7acce7f",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV14aN663EvX/",
+      "title": "7.16符文乱斗周报，3分钟快速了解版本信息差",
+      "author": "符文乱斗周报",
+      "publishedAt": "2026-07-16",
+      "signal": "1032 lượt xem · 8 lượt thích · 0 lượt lưu",
+      "metrics": {
+        "views": 1032,
+        "likes": 8,
+        "favorites": 0
+      },
+      "authorTier": "unlisted",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "currentEnough": true,
+      "sourceQueryIds": [
+        "bilibili-patch"
+      ],
+      "championMatches": [],
+      "augmentMatches": [],
+      "itemMatches": [],
+      "score": 30,
+      "status": "needs-champion",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-3190f54e2487d13a",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1zAKG6nEom/",
+      "title": "26.15版本：怀旧海斗上线，老装备配新海克斯",
+      "author": "LOL拉乐丝",
+      "publishedAt": "2026-07-16",
+      "patchHint": "26.15",
+      "signal": "400 lượt xem · 30 lượt thích · 1 lượt lưu",
+      "metrics": {
+        "views": 400,
+        "likes": 30,
+        "favorites": 1
+      },
+      "authorTier": "unlisted",
+      "accessState": "ok",
+      "modeValid": false,
+      "disqualifiers": [],
+      "engagementState": false,
+      "currentEnough": true,
+      "sourceQueryIds": [
+        "bilibili-patch"
+      ],
+      "championMatches": [],
+      "augmentMatches": [],
+      "itemMatches": [],
+      "score": 30,
+      "status": "patch-watch",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
       "id": "candidate-522f700d9fc3174a",
       "platform": "Bilibili",
       "url": "https://www.bilibili.com/video/BV1QcNj65EQ6/",
       "title": "VN，踏踏舞+双刀，对面看情况不对直接8分点了不让爽（14杀+大腿）",
       "author": "海斗K头滴神",
       "publishedAt": "2026-07-15",
-      "signal": "472 lượt xem · 4 lượt thích · 0 lượt lưu",
+      "signal": "475 lượt xem · 4 lượt thích · 0 lượt lưu",
       "sourceQueryIds": [
         "bilibili-patch"
       ],
@@ -274,7 +449,18 @@
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
       "firstSeenAt": "2026-07-16",
-      "signature": "vayne:1081-1225:"
+      "signature": "vayne:1081-1225:",
+      "metrics": {
+        "views": 475,
+        "likes": 4,
+        "favorites": 0
+      },
+      "authorTier": "watch",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "currentEnough": true
     },
     {
       "id": "candidate-0b711f6e7ff866df",
@@ -283,7 +469,7 @@
       "title": "小火龙，大腿局，法爆火龙大战4刺客，还是无限q剑圣和身法凯隐（23杀+大腿）",
       "author": "海斗K头滴神",
       "publishedAt": "2026-07-15",
-      "signal": "447 lượt xem · 4 lượt thích · 0 lượt lưu",
+      "signal": "494 lượt xem · 4 lượt thích · 0 lượt lưu",
       "sourceQueryIds": [
         "bilibili-patch"
       ],
@@ -315,7 +501,18 @@
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
       "firstSeenAt": "2026-07-16",
-      "signature": "smolder:1048:"
+      "signature": "smolder:1048:",
+      "metrics": {
+        "views": 494,
+        "likes": 4,
+        "favorites": 0
+      },
+      "authorTier": "watch",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "currentEnough": true
     },
     {
       "id": "candidate-b1364fc25027cc57",
@@ -324,7 +521,7 @@
       "title": "霞，54%伤害占比，顶级法爆ad，qer全吃法爆增伤，伤害根本看不懂（23杀+五杀）",
       "author": "海斗K头滴神",
       "publishedAt": "2026-07-15",
-      "signal": "281 lượt xem · 5 lượt thích · 0 lượt lưu",
+      "signal": "287 lượt xem · 5 lượt thích · 0 lượt lưu",
       "sourceQueryIds": [
         "bilibili-patch"
       ],
@@ -356,7 +553,18 @@
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
       "firstSeenAt": "2026-07-16",
-      "signature": "xayah:1048:"
+      "signature": "xayah:1048:",
+      "metrics": {
+        "views": 287,
+        "likes": 5,
+        "favorites": 0
+      },
+      "authorTier": "watch",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "currentEnough": true
     },
     {
       "id": "candidate-1c310a3bd3f1952f",
@@ -365,7 +573,7 @@
       "title": "新版海斗寒冰无敌玩法",
       "author": "乱斗螃蟹",
       "publishedAt": "2026-07-15",
-      "signal": "561 lượt xem · 14 lượt thích · 1 lượt lưu",
+      "signal": "566 lượt xem · 14 lượt thích · 1 lượt lưu",
       "sourceQueryIds": [
         "bilibili-builds",
         "bilibili-patch"
@@ -388,7 +596,18 @@
         "Nhận dạng Ashe",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 566,
+        "likes": 14,
+        "favorites": 1
+      },
+      "authorTier": "unlisted",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "currentEnough": true
     },
     {
       "id": "candidate-ac24fbdb2968ff80",
@@ -397,7 +616,7 @@
       "title": "飞机，其实飞机池子挺杂的，能刷到ap的海克斯，不是很推荐玩（32杀）",
       "author": "海斗K头滴神",
       "publishedAt": "2026-07-15",
-      "signal": "333 lượt xem · 5 lượt thích · 0 lượt lưu",
+      "signal": "341 lượt xem · 5 lượt thích · 0 lượt lưu",
       "sourceQueryIds": [
         "bilibili-patch"
       ],
@@ -419,7 +638,18 @@
         "Nhận dạng Corki",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 341,
+        "likes": 5,
+        "favorites": 0
+      },
+      "authorTier": "watch",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "currentEnough": true
     },
     {
       "id": "candidate-767a09822ceb1a59",
@@ -428,7 +658,7 @@
       "title": "新版本必须要玩的海克斯，轻松万血",
       "author": "下雨天-海斗版",
       "publishedAt": "2026-07-15",
-      "signal": "164 lượt xem · 1 lượt thích · 0 lượt lưu",
+      "signal": "166 lượt xem · 1 lượt thích · 0 lượt lưu",
       "sourceQueryIds": [
         "bilibili-patch"
       ],
@@ -450,7 +680,18 @@
         "1 lõi khớp ID game",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 166,
+        "likes": 1,
+        "favorites": 0
+      },
+      "authorTier": "unlisted",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "currentEnough": true
     },
     {
       "id": "candidate-ba6a7d9049fbf1d1",
@@ -459,7 +700,7 @@
       "title": "金克丝，其实金局金克丝没那么刮痧，只要启动了伤害就够使（34杀+双五杀）",
       "author": "海斗K头滴神",
       "publishedAt": "2026-07-15",
-      "signal": "650 lượt xem · 9 lượt thích · 0 lượt lưu",
+      "signal": "653 lượt xem · 9 lượt thích · 0 lượt lưu",
       "sourceQueryIds": [
         "bilibili-patch"
       ],
@@ -481,7 +722,18 @@
         "Nhận dạng Jinx",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 653,
+        "likes": 9,
+        "favorites": 0
+      },
+      "authorTier": "watch",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "currentEnough": true
     },
     {
       "id": "candidate-b76e98020acd1a09",
@@ -490,7 +742,7 @@
       "title": "韦鲁斯，现在爆率海克斯随便来两个，穿甲韦鲁斯也能满爆打后期了（29杀）",
       "author": "海斗K头滴神",
       "publishedAt": "2026-07-15",
-      "signal": "263 lượt xem · 6 lượt thích · 1 lượt lưu",
+      "signal": "273 lượt xem · 6 lượt thích · 1 lượt lưu",
       "sourceQueryIds": [
         "bilibili-patch"
       ],
@@ -512,7 +764,18 @@
         "Nhận dạng Varus",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 273,
+        "likes": 6,
+        "favorites": 1
+      },
+      "authorTier": "watch",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "currentEnough": true
     },
     {
       "id": "candidate-44e2cb25e9d45d44",
@@ -521,7 +784,7 @@
       "title": "泽丽，这仨海克斯就是泽丽金彩局最胡的三个海克斯了，挑不出更好用的了（33杀+五杀）",
       "author": "海斗K头滴神",
       "publishedAt": "2026-07-15",
-      "signal": "762 lượt xem · 3 lượt thích · 0 lượt lưu",
+      "signal": "828 lượt xem · 3 lượt thích · 0 lượt lưu",
       "sourceQueryIds": [
         "bilibili-patch"
       ],
@@ -543,7 +806,18 @@
         "Nhận dạng Zeri",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 828,
+        "likes": 3,
+        "favorites": 0
+      },
+      "authorTier": "watch",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "currentEnough": true
     },
     {
       "id": "candidate-02d07972676fbba6",
@@ -552,7 +826,7 @@
       "title": "海克斯大乱斗第12期：流光镜影·梅尔「键盘有点发烫！」",
       "author": "乱斗仙人",
       "publishedAt": "2026-07-15",
-      "signal": "237 lượt xem · 5 lượt thích · 0 lượt lưu",
+      "signal": "243 lượt xem · 6 lượt thích · 0 lượt lưu",
       "sourceQueryIds": [
         "bilibili-patch"
       ],
@@ -574,7 +848,18 @@
         "Nhận dạng Mel",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 243,
+        "likes": 6,
+        "favorites": 0
+      },
+      "authorTier": "watch",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "currentEnough": true
     },
     {
       "id": "candidate-8022bbc4ea4f4129",
@@ -584,7 +869,7 @@
       "author": "海斗教主张无忌",
       "publishedAt": "2026-07-15",
       "patchHint": "26.14",
-      "signal": "23686 lượt xem · 391 lượt thích · 16 lượt lưu",
+      "signal": "25395 lượt xem · 415 lượt thích · 20 lượt lưu",
       "sourceQueryIds": [
         "bilibili-patch"
       ],
@@ -606,7 +891,18 @@
         "1 lõi khớp ID game",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 25395,
+        "likes": 415,
+        "favorites": 20
+      },
+      "authorTier": "unlisted",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "currentEnough": true
     },
     {
       "id": "candidate-7079204277aa9081",
@@ -615,7 +911,7 @@
       "title": "韦鲁斯，亮剑最喜欢对面打车轮战了，添油战术坦克就是给我回血的（30杀+五杀）",
       "author": "海斗K头滴神",
       "publishedAt": "2026-07-15",
-      "signal": "276 lượt xem · 6 lượt thích · 0 lượt lưu",
+      "signal": "285 lượt xem · 6 lượt thích · 0 lượt lưu",
       "sourceQueryIds": [
         "bilibili-patch"
       ],
@@ -637,7 +933,18 @@
         "Nhận dạng Varus",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 285,
+        "likes": 6,
+        "favorites": 0
+      },
+      "authorTier": "watch",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "currentEnough": true
     },
     {
       "id": "candidate-2e2e82be9275251d",
@@ -677,7 +984,7 @@
       "title": "37杀阿克尚，池子干净程度仅次于VN，适配度也高，也属于无尽特效都能用的（37杀+双五杀）",
       "author": "海斗K头滴神",
       "publishedAt": "2026-07-15",
-      "signal": "260 lượt xem · 5 lượt thích · 0 lượt lưu",
+      "signal": "272 lượt xem · 5 lượt thích · 0 lượt lưu",
       "sourceQueryIds": [
         "bilibili-patch"
       ],
@@ -699,7 +1006,18 @@
         "Nhận dạng Akshan",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 272,
+        "likes": 5,
+        "favorites": 0
+      },
+      "authorTier": "watch",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "currentEnough": true
     },
     {
       "id": "candidate-c002b53073a33891",
@@ -708,7 +1026,7 @@
       "title": "盘点海斗强势英雄玩法-秘术冲拳AP大卑",
       "author": "海斗教主张无忌",
       "publishedAt": "2026-07-14",
-      "signal": "455 lượt xem · 18 lượt thích · 2 lượt lưu",
+      "signal": "465 lượt xem · 18 lượt thích · 2 lượt lưu",
       "sourceQueryIds": [
         "bilibili-builds"
       ],
@@ -740,7 +1058,18 @@
         "1 lõi khớp ID game",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 465,
+        "likes": 18,
+        "favorites": 2
+      },
+      "authorTier": "unlisted",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "currentEnough": true
     },
     {
       "id": "candidate-5ddb1378b51989d7",
@@ -749,7 +1078,7 @@
       "title": "出装对一半，海克斯对一半，等于全对！",
       "author": "癫火莎弥拉",
       "publishedAt": "2026-07-14",
-      "signal": "1304 lượt xem · 18 lượt thích · 0 lượt lưu",
+      "signal": "1305 lượt xem · 18 lượt thích · 0 lượt lưu",
       "sourceQueryIds": [
         "bilibili-items"
       ],
@@ -762,7 +1091,18 @@
         "Có từ khóa Hải Đấu/ARAM Mayhem",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 1305,
+        "likes": 18,
+        "favorites": 0
+      },
+      "authorTier": "unlisted",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "currentEnough": true
     },
     {
       "id": "candidate-a08669762e13c722",
@@ -771,7 +1111,7 @@
       "title": "海克斯大乱斗牙仙子阿萝拉教学，高容错出装，一套秒满血！",
       "author": "声沙Hoarse",
       "publishedAt": "2026-07-13",
-      "signal": "843 lượt xem · 16 lượt thích · 1 lượt lưu",
+      "signal": "864 lượt xem · 17 lượt thích · 1 lượt lưu",
       "sourceQueryIds": [
         "bilibili-items"
       ],
@@ -803,7 +1143,18 @@
         "1 lõi khớp ID game",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 864,
+        "likes": 17,
+        "favorites": 1
+      },
+      "authorTier": "unlisted",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "currentEnough": true
     },
     {
       "id": "candidate-04bbbfe387d894ba",
@@ -812,7 +1163,7 @@
       "title": "物理转魔法的正确出装，成就六边形法师",
       "author": "乱斗-不良人",
       "publishedAt": "2026-07-13",
-      "signal": "51484 lượt xem · 772 lượt thích · 143 lượt lưu",
+      "signal": "52046 lượt xem · 777 lượt thích · 144 lượt lưu",
       "sourceQueryIds": [
         "bilibili-items"
       ],
@@ -834,7 +1185,18 @@
         "1 lõi khớp ID game",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 52046,
+        "likes": 777,
+        "favorites": 144
+      },
+      "authorTier": "unlisted",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": true,
+      "currentEnough": true
     },
     {
       "id": "candidate-47945bcbf45da5c7",
@@ -865,7 +1227,18 @@
         "Nhận dạng Garen",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 197,
+        "likes": 3,
+        "favorites": 0
+      },
+      "authorTier": "unlisted",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "currentEnough": true
     },
     {
       "id": "candidate-d6964814ee37678b",
@@ -874,7 +1247,7 @@
       "title": "海克斯大乱斗AD:出装和海克斯应该怎么选？",
       "author": "癫火莎弥拉",
       "publishedAt": "2026-07-13",
-      "signal": "1067 lượt xem · 17 lượt thích · 1 lượt lưu",
+      "signal": "1070 lượt xem · 17 lượt thích · 1 lượt lưu",
       "sourceQueryIds": [
         "bilibili-items"
       ],
@@ -887,7 +1260,18 @@
         "Có từ khóa Hải Đấu/ARAM Mayhem",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 1070,
+        "likes": 17,
+        "favorites": 1
+      },
+      "authorTier": "unlisted",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "currentEnough": true
     },
     {
       "id": "candidate-6992a45059fa1339",
@@ -896,7 +1280,7 @@
       "title": "海克斯大乱斗地形专家巨魔教学，出装海克斯符文推荐，胶黏对手折磨到死！",
       "author": "声沙Hoarse",
       "publishedAt": "2026-07-12",
-      "signal": "283 lượt xem · 9 lượt thích · 0 lượt lưu",
+      "signal": "284 lượt xem · 9 lượt thích · 0 lượt lưu",
       "sourceQueryIds": [
         "bilibili-items"
       ],
@@ -928,7 +1312,18 @@
         "1 lõi khớp ID game",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 284,
+        "likes": 9,
+        "favorites": 0
+      },
+      "authorTier": "unlisted",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "currentEnough": true
     },
     {
       "id": "candidate-d0ecfdbaf14fe5bc",
@@ -937,7 +1332,7 @@
       "title": "英雄联盟海克斯大乱斗 学了绝活哥卡萨丁的出装，爱上卡萨丁了",
       "author": "一起去踩水坑嗎",
       "publishedAt": "2026-07-12",
-      "signal": "1050 lượt xem · 13 lượt thích · 2 lượt lưu",
+      "signal": "1052 lượt xem · 13 lượt thích · 2 lượt lưu",
       "sourceQueryIds": [
         "bilibili-items"
       ],
@@ -959,7 +1354,18 @@
         "Nhận dạng Kassadin",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 1052,
+        "likes": 13,
+        "favorites": 2
+      },
+      "authorTier": "unlisted",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "currentEnough": true
     },
     {
       "id": "candidate-1c28a98698a96476",
@@ -968,7 +1374,7 @@
       "title": "海斗螳螂的3种玩法，妈妈他在天上飞！",
       "author": "海斗小助手",
       "publishedAt": "2026-07-11",
-      "signal": "1242 lượt xem · 19 lượt thích · 6 lượt lưu",
+      "signal": "1247 lượt xem · 19 lượt thích · 6 lượt lưu",
       "sourceQueryIds": [
         "bilibili-builds"
       ],
@@ -990,7 +1396,18 @@
         "Nhận dạng Kha'Zix",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 1247,
+        "likes": 19,
+        "favorites": 6
+      },
+      "authorTier": "unlisted",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": true,
+      "currentEnough": true
     },
     {
       "id": "candidate-4b837aabd37626ef",
@@ -999,7 +1416,7 @@
       "title": "海斗真的永远不要出卢登吗？这件装备似乎有点被妖魔化了",
       "author": "取个合适的名称吧_",
       "publishedAt": "2026-07-11",
-      "signal": "5531 lượt xem · 24 lượt thích · 1 lượt lưu",
+      "signal": "5577 lượt xem · 24 lượt thích · 1 lượt lưu",
       "sourceQueryIds": [
         "bilibili-items"
       ],
@@ -1028,7 +1445,18 @@
         "2 trang bị khớp ID game",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 5577,
+        "likes": 24,
+        "favorites": 1
+      },
+      "authorTier": "unlisted",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "currentEnough": true
     },
     {
       "id": "candidate-f3644d545995b9e3",
@@ -1037,7 +1465,7 @@
       "title": "海斗3.0:无限技能的四种玩法！达成条件以及出装思路！",
       "author": "可乐乱斗",
       "publishedAt": "2026-07-10",
-      "signal": "5137 lượt xem · 51 lượt thích · 34 lượt lưu",
+      "signal": "5164 lượt xem · 51 lượt thích · 34 lượt lưu",
       "sourceQueryIds": [
         "bilibili-builds",
         "bilibili-items"
@@ -1074,7 +1502,18 @@
         "3 lõi khớp ID game",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 5164,
+        "likes": 51,
+        "favorites": 34
+      },
+      "authorTier": "unlisted",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": true,
+      "currentEnough": true
     },
     {
       "id": "candidate-ca70e3c024159021",
@@ -1083,7 +1522,7 @@
       "title": "海克斯大乱斗个人推荐薇恩出装",
       "author": "Rainbow_ice7",
       "publishedAt": "2026-07-10",
-      "signal": "205 lượt xem · 2 lượt thích · 0 lượt lưu",
+      "signal": "206 lượt xem · 2 lượt thích · 0 lượt lưu",
       "sourceQueryIds": [
         "bilibili-items"
       ],
@@ -1105,7 +1544,18 @@
         "Nhận dạng Vayne",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 206,
+        "likes": 2,
+        "favorites": 0
+      },
+      "authorTier": "unlisted",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "currentEnough": true
     },
     {
       "id": "candidate-28ed427a9a17cb21",
@@ -1127,7 +1577,18 @@
         "Có từ khóa Hải Đấu/ARAM Mayhem",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 121,
+        "likes": 2,
+        "favorites": 1
+      },
+      "authorTier": "unlisted",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "currentEnough": true
     },
     {
       "id": "candidate-23866d4597ff6d00",
@@ -1136,7 +1597,7 @@
       "title": "芸阿娜大优势出装，8分钟就这三件套T1整队来了都嘚瑟一下（30杀+双五杀）",
       "author": "海斗K头滴神",
       "publishedAt": "2026-07-09",
-      "signal": "1957 lượt xem · 10 lượt thích · 0 lượt lưu",
+      "signal": "1981 lượt xem · 10 lượt thích · 0 lượt lưu",
       "sourceQueryIds": [
         "bilibili-items"
       ],
@@ -1158,7 +1619,18 @@
         "Nhận dạng Yunara",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 1981,
+        "likes": 10,
+        "favorites": 0
+      },
+      "authorTier": "watch",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "currentEnough": true
     },
     {
       "id": "candidate-42f54e879a85a97d",
@@ -1167,7 +1639,7 @@
       "title": "过早出魔宗是最大的陷阱，人马全流派玩法",
       "author": "炭烧魚",
       "publishedAt": "2026-07-08",
-      "signal": "49827 lượt xem · 862 lượt thích · 184 lượt lưu",
+      "signal": "49981 lượt xem · 865 lượt thích · 184 lượt lưu",
       "sourceQueryIds": [
         "bilibili-builds",
         "bilibili-items"
@@ -1206,7 +1678,18 @@
         "1 trang bị khớp ID game",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 49981,
+        "likes": 865,
+        "favorites": 184
+      },
+      "authorTier": "unlisted",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": true,
+      "currentEnough": true
     },
     {
       "id": "candidate-a85b36a850015960",
@@ -1215,7 +1698,7 @@
       "title": "无限www吸血鬼！符文炼狱导管+150技能极速即可解锁新欢乐玩法！#海克斯大乱斗",
       "author": "LOL阿阳哥搞笑王子",
       "publishedAt": "2026-07-08",
-      "signal": "1533 lượt xem · 29 lượt thích · 1 lượt lưu",
+      "signal": "1537 lượt xem · 29 lượt thích · 1 lượt lưu",
       "sourceQueryIds": [
         "bilibili-builds"
       ],
@@ -1237,7 +1720,18 @@
         "1 lõi khớp ID game",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 1537,
+        "likes": 29,
+        "favorites": 1
+      },
+      "authorTier": "unlisted",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": true,
+      "currentEnough": true
     },
     {
       "id": "candidate-208ea2cfe170d367",
@@ -1246,7 +1740,7 @@
       "title": "无限e流星雨女枪！折磨！海克斯选择和出装思路，带你看流星雨~",
       "author": "往尘dd",
       "publishedAt": "2026-07-08",
-      "signal": "153626 lượt xem · 2339 lượt thích · 308 lượt lưu",
+      "signal": "154964 lượt xem · 2353 lượt thích · 310 lượt lưu",
       "sourceQueryIds": [
         "bilibili-items"
       ],
@@ -1268,7 +1762,18 @@
         "1 lõi khớp ID game",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 154964,
+        "likes": 2353,
+        "favorites": 310
+      },
+      "authorTier": "unlisted",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": true,
+      "currentEnough": true
     },
     {
       "id": "candidate-295a7179e792b309",
@@ -1277,7 +1782,7 @@
       "title": "海克斯大乱斗3.0软辅海克斯及出装选取思路",
       "author": "抱鸡飞蛋",
       "publishedAt": "2026-07-08",
-      "signal": "3171 lượt xem · 37 lượt thích · 22 lượt lưu",
+      "signal": "3199 lượt xem · 38 lượt thích · 22 lượt lưu",
       "sourceQueryIds": [
         "bilibili-items"
       ],
@@ -1290,7 +1795,18 @@
         "Có từ khóa Hải Đấu/ARAM Mayhem",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 3199,
+        "likes": 38,
+        "favorites": 22
+      },
+      "authorTier": "unlisted",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": true,
+      "currentEnough": true
     },
     {
       "id": "candidate-6b1fe4a6b11d03ac",
@@ -1299,7 +1815,7 @@
       "title": "海克斯大乱斗炸弹人3套玩法推荐",
       "author": "海斗小助手",
       "publishedAt": "2026-07-07",
-      "signal": "836 lượt xem · 25 lượt thích · 2 lượt lưu",
+      "signal": "846 lượt xem · 25 lượt thích · 2 lượt lưu",
       "sourceQueryIds": [
         "bilibili-builds"
       ],
@@ -1321,7 +1837,18 @@
         "Nhận dạng Ziggs",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 846,
+        "likes": 25,
+        "favorites": 2
+      },
+      "authorTier": "unlisted",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "currentEnough": true
     },
     {
       "id": "candidate-c8c8573da8327b09",
@@ -1352,7 +1879,18 @@
         "Nhận dạng Locke",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 157,
+        "likes": 12,
+        "favorites": 0
+      },
+      "authorTier": "unlisted",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "currentEnough": true
     },
     {
       "id": "candidate-e868f0ff6fc4e63a",
@@ -1361,7 +1899,7 @@
       "title": "奶枪物法皆修邪修玩法",
       "author": "乱斗螃蟹",
       "publishedAt": "2026-07-07",
-      "signal": "2829 lượt xem · 22 lượt thích · 3 lượt lưu",
+      "signal": "2851 lượt xem · 22 lượt thích · 2 lượt lưu",
       "sourceQueryIds": [
         "bilibili-builds"
       ],
@@ -1390,7 +1928,18 @@
         "2 lõi khớp ID game",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 2851,
+        "likes": 22,
+        "favorites": 2
+      },
+      "authorTier": "unlisted",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "currentEnough": true
     },
     {
       "id": "candidate-e206433367f38bd1",
@@ -1399,7 +1948,7 @@
       "title": "海克斯大乱斗锐雯4套玩法推荐",
       "author": "海斗小助手",
       "publishedAt": "2026-07-06",
-      "signal": "1615 lượt xem · 22 lượt thích · 7 lượt lưu",
+      "signal": "1621 lượt xem · 22 lượt thích · 7 lượt lưu",
       "sourceQueryIds": [
         "bilibili-builds"
       ],
@@ -1421,7 +1970,18 @@
         "Nhận dạng Riven",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 1621,
+        "likes": 22,
+        "favorites": 7
+      },
+      "authorTier": "unlisted",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": true,
+      "currentEnough": true
     },
     {
       "id": "candidate-94002449d1bcec93",
@@ -1430,7 +1990,7 @@
       "title": "海克斯大乱斗奎桑提的2种推荐玩法",
       "author": "海斗小助手",
       "publishedAt": "2026-07-05",
-      "signal": "3051 lượt xem · 50 lượt thích · 9 lượt lưu",
+      "signal": "3059 lượt xem · 50 lượt thích · 10 lượt lưu",
       "sourceQueryIds": [
         "bilibili-builds"
       ],
@@ -1452,7 +2012,18 @@
         "Nhận dạng K'Sante",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 3059,
+        "likes": 50,
+        "favorites": 10
+      },
+      "authorTier": "unlisted",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": true,
+      "currentEnough": true
     },
     {
       "id": "candidate-fb7c83755333637b",
@@ -1461,7 +2032,7 @@
       "title": "牙仙子的正确玩法出装",
       "author": "乱斗-不良人",
       "publishedAt": "2026-07-05",
-      "signal": "33709 lượt xem · 698 lượt thích · 315 lượt lưu",
+      "signal": "33753 lượt xem · 698 lượt thích · 315 lượt lưu",
       "sourceQueryIds": [
         "bilibili-builds",
         "bilibili-items"
@@ -1484,7 +2055,18 @@
         "1 lõi khớp ID game",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 33753,
+        "likes": 698,
+        "favorites": 315
+      },
+      "authorTier": "unlisted",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": true,
+      "currentEnough": true
     },
     {
       "id": "candidate-fbe442d55e32a72e",
@@ -1506,7 +2088,18 @@
         "Có từ khóa Hải Đấu/ARAM Mayhem",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 137,
+        "likes": 10,
+        "favorites": 1
+      },
+      "authorTier": "unlisted",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "currentEnough": true
     },
     {
       "id": "candidate-2ef14ca8e323aa43",
@@ -1515,7 +2108,7 @@
       "title": "符文大乱斗最阴玩法！对面胡牌直接重开！队友玩的很舒服！",
       "author": "Mr狂赵",
       "publishedAt": "2026-07-05",
-      "signal": "29547 lượt xem · 442 lượt thích · 21 lượt lưu",
+      "signal": "29665 lượt xem · 445 lượt thích · 21 lượt lưu",
       "sourceQueryIds": [
         "bilibili-builds"
       ],
@@ -1528,7 +2121,18 @@
         "Có từ khóa Hải Đấu/ARAM Mayhem",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 29665,
+        "likes": 445,
+        "favorites": 21
+      },
+      "authorTier": "unlisted",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "currentEnough": true
     },
     {
       "id": "candidate-6b6deef77e064277",
@@ -1537,7 +2141,7 @@
       "title": "海克斯大乱斗：无限飞弹的唯一玩法揭秘",
       "author": "大汉只是个外号",
       "publishedAt": "2026-07-05",
-      "signal": "143569 lượt xem · 3994 lượt thích · 409 lượt lưu",
+      "signal": "144135 lượt xem · 4000 lượt thích · 408 lượt lưu",
       "sourceQueryIds": [
         "bilibili-builds"
       ],
@@ -1550,7 +2154,21 @@
         "Có từ khóa Hải Đấu/ARAM Mayhem",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 144135,
+        "likes": 4000,
+        "favorites": 408
+      },
+      "authorTier": "unlisted",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [
+        "BUG",
+        "bug"
+      ],
+      "engagementState": true,
+      "currentEnough": true
     },
     {
       "id": "candidate-3dd2164dfccb1d0c",
@@ -1559,7 +2177,7 @@
       "title": "新英雄拉完了，唯一玩法揭秘，海克斯信息差！",
       "author": "大汉只是个外号",
       "publishedAt": "2026-07-05",
-      "signal": "245328 lượt xem · 4307 lượt thích · 182 lượt lưu",
+      "signal": "245569 lượt xem · 4310 lượt thích · 182 lượt lưu",
       "sourceQueryIds": [
         "bilibili-builds"
       ],
@@ -1572,7 +2190,21 @@
         "Có từ khóa Hải Đấu/ARAM Mayhem",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 245569,
+        "likes": 4310,
+        "favorites": 182
+      },
+      "authorTier": "unlisted",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [
+        "BUG",
+        "bug"
+      ],
+      "engagementState": false,
+      "currentEnough": true
     },
     {
       "id": "candidate-eb1696d6b20e45ca",
@@ -1581,7 +2213,7 @@
       "title": "男枪怎样出装打成型的大肉",
       "author": "日尽水长去",
       "publishedAt": "2026-07-04",
-      "signal": "1929 lượt xem · 24 lượt thích · 0 lượt lưu",
+      "signal": "1935 lượt xem · 24 lượt thích · 0 lượt lưu",
       "sourceQueryIds": [
         "bilibili-items"
       ],
@@ -1603,7 +2235,18 @@
         "Nhận dạng Graves",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 1935,
+        "likes": 24,
+        "favorites": 0
+      },
+      "authorTier": "unlisted",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "currentEnough": true
     },
     {
       "id": "candidate-62ce827d237509e7",
@@ -1612,7 +2255,7 @@
       "title": "海克斯大乱斗派克的3种玩法",
       "author": "海斗小助手",
       "publishedAt": "2026-07-04",
-      "signal": "887 lượt xem · 22 lượt thích · 2 lượt lưu",
+      "signal": "898 lượt xem · 22 lượt thích · 2 lượt lưu",
       "sourceQueryIds": [
         "bilibili-builds"
       ],
@@ -1634,7 +2277,18 @@
         "Nhận dạng Pyke",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 898,
+        "likes": 22,
+        "favorites": 2
+      },
+      "authorTier": "unlisted",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "currentEnough": true
     },
     {
       "id": "candidate-6eb760a41ab74213",
@@ -1643,7 +2297,7 @@
       "title": "海克斯大乱斗雪人的三种玩法",
       "author": "海斗小助手",
       "publishedAt": "2026-07-03",
-      "signal": "989 lượt xem · 11 lượt thích · 0 lượt lưu",
+      "signal": "993 lượt xem · 11 lượt thích · 0 lượt lưu",
       "sourceQueryIds": [
         "bilibili-builds"
       ],
@@ -1665,7 +2319,18 @@
         "Nhận dạng Nunu & Willump",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 993,
+        "likes": 11,
+        "favorites": 0
+      },
+      "authorTier": "unlisted",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "currentEnough": true
     },
     {
       "id": "candidate-9bf94222ee526223",
@@ -1674,7 +2339,7 @@
       "title": "海克斯大乱斗心之钢坦克教学，海克斯符文出装推荐，学会你也能飞身踢秒脆皮，高压锅主宰比赛！",
       "author": "声沙Hoarse",
       "publishedAt": "2026-07-02",
-      "signal": "4532 lượt xem · 36 lượt thích · 12 lượt lưu",
+      "signal": "4553 lượt xem · 36 lượt thích · 12 lượt lưu",
       "sourceQueryIds": [
         "bilibili-items"
       ],
@@ -1729,7 +2394,18 @@
         "1 trang bị khớp ID game",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 4553,
+        "likes": 36,
+        "favorites": 12
+      },
+      "authorTier": "unlisted",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "currentEnough": true
     },
     {
       "id": "candidate-9807fefc4804b387",
@@ -1738,7 +2414,7 @@
       "title": "芸阿娜拿到易损这样出装暴击飞弹的数量能最大化！【海克斯大乱斗3.0】",
       "author": "乱斗陀螺王-今井",
       "publishedAt": "2026-07-02",
-      "signal": "394724 lượt xem · 5733 lượt thích · 1421 lượt lưu",
+      "signal": "395231 lượt xem · 5740 lượt thích · 1420 lượt lưu",
       "sourceQueryIds": [
         "bilibili-items"
       ],
@@ -1770,7 +2446,18 @@
         "1 lõi khớp ID game",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 395231,
+        "likes": 5740,
+        "favorites": 1420
+      },
+      "authorTier": "unlisted",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": true,
+      "currentEnough": true
     },
     {
       "id": "candidate-2c102c8fb9da00cc",
@@ -1779,7 +2466,7 @@
       "title": "盘点海克斯大乱斗中奥恩不当陀螺的3套玩法",
       "author": "海斗小助手",
       "publishedAt": "2026-07-02",
-      "signal": "677 lượt xem · 9 lượt thích · 2 lượt lưu",
+      "signal": "679 lượt xem · 9 lượt thích · 2 lượt lưu",
       "sourceQueryIds": [
         "bilibili-builds"
       ],
@@ -1801,7 +2488,18 @@
         "Nhận dạng Ornn",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 679,
+        "likes": 9,
+        "favorites": 2
+      },
+      "authorTier": "unlisted",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "currentEnough": true
     },
     {
       "id": "candidate-533bf61ef2c911bf",
@@ -1849,7 +2547,18 @@
         "2 lõi khớp ID game",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 656,
+        "likes": 2,
+        "favorites": 1
+      },
+      "authorTier": "watch",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "currentEnough": true
     },
     {
       "id": "candidate-bf0f92220bf80105",
@@ -1858,7 +2567,7 @@
       "title": "海克斯大乱斗拉克丝3种不同玩法推荐",
       "author": "海斗小助手",
       "publishedAt": "2026-06-30",
-      "signal": "2908 lượt xem · 61 lượt thích · 15 lượt lưu",
+      "signal": "2920 lượt xem · 61 lượt thích · 16 lượt lưu",
       "sourceQueryIds": [
         "bilibili-items"
       ],
@@ -1880,7 +2589,18 @@
         "Nhận dạng Lux",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
-      "firstSeenAt": "2026-07-16"
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 2920,
+        "likes": 61,
+        "favorites": 16
+      },
+      "authorTier": "unlisted",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": true,
+      "currentEnough": true
     }
   ]
 }

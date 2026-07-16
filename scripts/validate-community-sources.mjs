@@ -3,8 +3,11 @@ import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
+import { mergeCommunityRecords, validateGeneratedRecord } from "./lib/community-moderation.mjs";
+
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const COMMUNITY_PATH = path.join(ROOT, "app/community-sources.json");
+const GENERATED_PATH = path.join(ROOT, "app/generated-community-sources.json");
 const GUIDES_PATH = path.join(ROOT, "app/generated-guides.ts");
 const REPORT_PATH = path.join(ROOT, "community-sync-report.json");
 
@@ -34,17 +37,40 @@ function validateSource(source, label) {
   if (source.publishedAt && !validDate(source.publishedAt)) fail(`${label} có ngày không hợp lệ: ${source.publishedAt}`);
 }
 
-const [communityText, guidesText] = await Promise.all([
+const [communityText, generatedText, guidesText] = await Promise.all([
   readFile(COMMUNITY_PATH, "utf8"),
+  readFile(GENERATED_PATH, "utf8"),
   readFile(GUIDES_PATH, "utf8"),
 ]);
 const community = JSON.parse(communityText);
+const generated = JSON.parse(generatedText);
 const guides = parseGuides(guidesText);
 
 if (community.schemaVersion !== 1) fail("schemaVersion chưa được hỗ trợ");
 if (!validDate(community.updatedAt)) fail("updatedAt không hợp lệ");
 if (!/^\d+\.\d+$/.test(community.patchBaseline)) fail("patchBaseline không hợp lệ");
 if (!Array.isArray(community.records) || !community.records.length) fail("không có bản ghi lối chơi");
+if (generated.schemaVersion !== 1) fail("schemaVersion dữ liệu tự động chưa được hỗ trợ");
+if (!validDate(generated.updatedAt)) fail("updatedAt dữ liệu tự động không hợp lệ");
+if (!/^\d+\.\d+$/.test(generated.patchBaseline)) fail("patchBaseline dữ liệu tự động không hợp lệ");
+if (!Array.isArray(generated.records)) fail("dữ liệu tự động thiếu records");
+
+const curatedKeys = new Set(community.records.map((record) => `${record.championId}:${record.canonicalKey}`));
+const generatedKeys = new Set();
+const generatedCollisions = [];
+for (const [index, record] of generated.records.entries()) {
+  const key = `${record.championId}:${record.canonicalKey}`;
+  if (generatedKeys.has(key)) fail(`bản ghi tự động bị trùng khóa: ${key}`);
+  try {
+    validateGeneratedRecord(record);
+  } catch (error) {
+    fail(`generated.records[${index}] ${error.message}`);
+  }
+  if (curatedKeys.has(key)) generatedCollisions.push(key);
+  generatedKeys.add(key);
+}
+const allRecords = mergeCommunityRecords({ curated: community.records, generated: generated.records });
+const automaticRecords = new Set(generated.records.filter((record) => !curatedKeys.has(`${record.championId}:${record.canonicalKey}`)));
 
 const guideById = new Map(guides.map((guide) => [guide.id, guide]));
 const augmentByCn = new Map();
@@ -66,8 +92,8 @@ for (const [index, source] of community.globalSources.entries()) {
 }
 
 const groups = new Map();
-for (const [index, record] of community.records.entries()) {
-  const label = `records[${index}]`;
+for (const [index, record] of allRecords.entries()) {
+  const label = `${automaticRecords.has(record) ? "generated.records" : "records"}[${index}]`;
   const guide = guideById.get(record.championId);
   if (!guide) fail(`${label} dùng championId không tồn tại: ${record.championId}`);
   if (!/^[a-z0-9-]+$/.test(record.canonicalKey)) fail(`${label} có canonicalKey không chuẩn`);
@@ -122,28 +148,45 @@ const normalized = [...groups.entries()].sort(([left], [right]) => left.localeCo
   coreCn: [...new Set(records.flatMap((record) => record.coreCn))].sort(),
   itemCn: [...new Set(records.flatMap((record) => record.itemCn))].sort(),
   sourceUrls: [...new Set(records.flatMap((record) => record.sources.map((source) => source.url)))].sort(),
+  automation: records[0].automation ? {
+    status: records[0].automation.status,
+    approvalPath: records[0].automation.approvalPath,
+    patch: records[0].automation.patch,
+    reasons: [...records[0].automation.reasons].sort(),
+    score: records[0].automation.score,
+  } : undefined,
 }));
 const contentHash = createHash("sha256").update(JSON.stringify({
   schemaVersion: community.schemaVersion,
-  updatedAt: community.updatedAt,
-  patchBaseline: community.patchBaseline,
+  updatedAt: { curated: community.updatedAt, automatic: generated.updatedAt },
+  patchBaseline: { curated: community.patchBaseline, automatic: generated.patchBaseline },
   globalSources: community.globalSources,
   builds: normalized,
 })).digest("hex");
 const report = {
   generatedAt: new Date().toISOString(),
   contentHash,
-  rawRecordCount: community.records.length,
+  rawRecordCount: allRecords.length,
   buildCount: groups.size,
-  championCount: new Set(community.records.map((record) => record.championId)).size,
-  mergedDuplicates: community.records.length - groups.size,
+  championCount: new Set(allRecords.map((record) => record.championId)).size,
+  mergedDuplicates: allRecords.length - groups.size,
+  automaticRecordCount: automaticRecords.size,
+  automaticApprovedCount: [...automaticRecords].filter((record) => record.automation.status === "auto-approved").length,
+  automaticNeedsVerificationCount: [...automaticRecords].filter((record) => record.automation.status === "needs-verification").length,
+  generatedCollisionCount: generatedCollisions.length,
+  generatedCollisions,
   sourceCount: new Set([
     ...community.globalSources.map((source) => source.url),
-    ...community.records.flatMap((record) => record.sources.map((source) => source.url)),
+    ...allRecords.flatMap((record) => record.sources.map((source) => source.url)),
   ]).size,
   unmatchedAugments: [],
   unmatchedItems: [],
 };
 
+const previousReport = await readFile(REPORT_PATH, "utf8").then(JSON.parse).catch(() => undefined);
+if (previousReport?.contentHash === contentHash) {
+  console.log(`Dữ liệu cộng đồng hợp lệ và không đổi; giữ nguyên hash ${contentHash}.`);
+  process.exit(0);
+}
 await writeFile(REPORT_PATH, `${JSON.stringify(report, null, 2)}\n`);
 console.log(`Đã kiểm tra ${report.buildCount} lối chơi cho ${report.championCount} tướng; gộp ${report.mergedDuplicates} bản ghi trùng; tất cả lõi/trang bị đều có ID và ảnh client.`);

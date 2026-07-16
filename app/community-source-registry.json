@@ -9,6 +9,18 @@
     "符文大乱斗",
     "海斗"
   ],
+  "excludedModeKeywords": [
+    "经典模式",
+    "经典海斗",
+    "怀旧海斗"
+  ],
+  "disqualifierKeywords": [
+    "BUG",
+    "bug",
+    "漏洞",
+    "已修复",
+    "修复后失效"
+  ],
   "queries": [
     {
       "id": "bilibili-builds",
@@ -116,11 +128,24 @@
     ]
   },
   "policy": {
-    "autoPublish": false,
+    "autoPublish": true,
     "requireExactGameId": true,
     "minimumReviewScore": 75,
     "crossSourceWindowDays": 45,
     "maxInboxItems": 500,
-    "storeFullArticleOrTranscript": false
+    "storeFullArticleOrTranscript": false,
+    "moderation": {
+      "crossSourceMinimumScore": 85,
+      "trustedCreatorMinimumScore": 90,
+      "minimumSimilarity": 0.75,
+      "minimumSourceAgeHours": 12,
+      "minimumViews": 1000,
+      "minimumPositiveActions": 20,
+      "minimumWeightedEngagementRate": 0.02,
+      "minimumCommentSample": 10,
+      "minimumPositiveCommentRatio": 0.7,
+      "demoteNegativeCommentRatio": 0.35,
+      "consecutiveFailureLimit": 2
+    }
   }
 }

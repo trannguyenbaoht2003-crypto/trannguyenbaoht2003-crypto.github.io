@@ -3,6 +3,8 @@ import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
+import { parseSignalMetrics, weightedEngagementRate } from "./lib/community-moderation.mjs";
+
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const REGISTRY_PATH = path.join(ROOT, "app/community-source-registry.json");
 const COMMUNITY_PATH = path.join(ROOT, "app/community-sources.json");
@@ -24,6 +26,8 @@ const FETCH_HEADERS = {
   "user-agent": "Mozilla/5.0 (compatible; LoiMetaCommunityWatch/1.0; public metadata only)",
   accept: "application/json,text/xml,text/html;q=0.9,*/*;q=0.8",
 };
+const VALID_AUTHOR_TIERS = new Set(["established", "watch", "unlisted"]);
+const VALID_ACCESS_STATES = new Set(["ok", "temporary-error", "locked", "captcha", "private"]);
 
 function fail(message) {
   throw new Error(`Bộ theo dõi cộng đồng: ${message}`);
@@ -31,6 +35,29 @@ function fail(message) {
 
 function hash(value) {
   return createHash("sha256").update(typeof value === "string" ? value : JSON.stringify(value)).digest("hex");
+}
+
+function finiteMetric(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0 ? number : undefined;
+}
+
+function signalFromMetrics(metrics = {}) {
+  return [
+    metrics.views !== undefined ? `${metrics.views} lượt xem` : undefined,
+    metrics.likes !== undefined ? `${metrics.likes} lượt thích` : undefined,
+    metrics.coins !== undefined ? `${metrics.coins} coin` : undefined,
+    metrics.favorites !== undefined ? `${metrics.favorites} lượt lưu` : undefined,
+    metrics.comments !== undefined ? `${metrics.comments} bình luận` : undefined,
+  ].filter(Boolean).join(" · ");
+}
+
+function engagementPass(metrics, registry) {
+  const moderation = registry.policy.moderation;
+  const positiveActions = (metrics.likes ?? 0) + (metrics.coins ?? 0) + (metrics.favorites ?? 0);
+  return (metrics.views ?? 0) >= moderation.minimumViews
+    && positiveActions >= moderation.minimumPositiveActions
+    && weightedEngagementRate(metrics) >= moderation.minimumWeightedEngagementRate;
 }
 
 function normalize(value = "") {
@@ -151,20 +178,58 @@ async function collectBilibili(query) {
     { "user-agent": "Mozilla/5.0", referer: "https://www.bilibili.com/" },
   );
   if (payload.code !== 0 || !Array.isArray(payload.data?.result)) throw new Error(payload.message || "phản hồi Bilibili không hợp lệ");
-  return payload.data.result.slice(0, query.maxResults).map((row) => ({
-    platform: "Bilibili",
-    url: `https://www.bilibili.com/video/${row.bvid}/`,
-    title: plain(row.title),
-    author: plain(row.author),
-    publishedAt: dateOnly(new Date(Number(row.pubdate) * 1000)),
-    description: plain([row.description, row.tag].filter(Boolean).join(" · ")),
-    signal: [
-      Number.isFinite(row.play) ? `${row.play} lượt xem` : undefined,
-      Number.isFinite(row.like) ? `${row.like} lượt thích` : undefined,
-      Number.isFinite(row.favorites) ? `${row.favorites} lượt lưu` : undefined,
-    ].filter(Boolean).join(" · "),
-    sourceQueryId: query.id,
-  }));
+  return payload.data.result.slice(0, query.maxResults).map((row) => {
+    const metrics = {
+      views: finiteMetric(row.play),
+      likes: finiteMetric(row.like),
+      favorites: finiteMetric(row.favorites),
+    };
+    return {
+      platform: "Bilibili",
+      url: `https://www.bilibili.com/video/${row.bvid}/`,
+      title: plain(row.title),
+      author: plain(row.author),
+      publishedAt: dateOnly(new Date(Number(row.pubdate) * 1000)),
+      description: plain([row.description, row.tag].filter(Boolean).join(" · ")),
+      metrics,
+      signal: signalFromMetrics(metrics),
+      accessState: "ok",
+      sourceQueryId: query.id,
+    };
+  });
+}
+
+function bilibiliVideoId(url) {
+  return String(url ?? "").match(/\/(BV[\w]+)/i)?.[1];
+}
+
+async function enrichBilibiliCandidate(raw) {
+  const bvid = bilibiliVideoId(raw.url);
+  if (!bvid) return raw;
+  try {
+    const payload = await request(
+      `https://api.bilibili.com/x/web-interface/view?bvid=${encodeURIComponent(bvid)}`,
+      "json",
+      { "user-agent": "Mozilla/5.0", referer: raw.url },
+    );
+    if (payload.code !== 0 || !payload.data?.stat) throw new Error(payload.message || "phản hồi chi tiết Bilibili không hợp lệ");
+    const stat = payload.data.stat;
+    const metrics = {
+      views: finiteMetric(stat.view) ?? raw.metrics?.views,
+      likes: finiteMetric(stat.like) ?? raw.metrics?.likes,
+      coins: finiteMetric(stat.coin),
+      favorites: finiteMetric(stat.favorite) ?? raw.metrics?.favorites,
+      comments: finiteMetric(stat.reply),
+    };
+    return {
+      ...raw,
+      metrics,
+      signal: signalFromMetrics(metrics),
+      accessState: "ok",
+    };
+  } catch {
+    return { ...raw, accessState: "temporary-error" };
+  }
 }
 
 async function collectBingRss(query) {
@@ -291,6 +356,10 @@ function classify(raw, context) {
   const normalizedText = normalize(text);
   const hasModeKeyword = context.registry.modeKeywords.some((keyword) => normalizedText.includes(normalize(keyword)));
   if (!hasModeKeyword) return undefined;
+  const modeValid = !(context.registry.excludedModeKeywords ?? [])
+    .some((keyword) => normalizedText.includes(normalize(keyword)));
+  const disqualifiers = (context.registry.disqualifierKeywords ?? [])
+    .filter((keyword) => normalizedText.includes(normalize(keyword)));
 
   const champions = findTerms(raw.title, context.indexes.champions, 1);
   if (!champions.length) champions.push(...findTerms(raw.description, context.indexes.champions, 1));
@@ -300,6 +369,10 @@ function classify(raw, context) {
   const items = findTerms(text, context.indexes.items).filter((entry) => !negatedItems.has(entry.id));
   const signature = entitySignature(champions, augments, items);
   const tier = sourceTier(context.registry, raw.platform, raw.author);
+  const metrics = {
+    ...parseSignalMetrics(raw.signal),
+    ...(raw.metrics ?? {}),
+  };
   const patchHint = text.match(/\b(?:16|26)\.\d{1,2}\b/)?.[0];
   const ageDays = raw.publishedAt
     ? Math.floor((Date.now() - Date.parse(`${raw.publishedAt}T00:00:00Z`)) / 86_400_000)
@@ -333,6 +406,13 @@ function classify(raw, context) {
     publishedAt: validDate(raw.publishedAt) ? raw.publishedAt : undefined,
     patchHint,
     signal: plain(raw.signal) || undefined,
+    metrics,
+    authorTier: tier,
+    accessState: raw.accessState ?? "ok",
+    modeValid,
+    disqualifiers,
+    engagementState: engagementPass(metrics, context.registry),
+    currentEnough,
     sourceQueryIds: [raw.sourceQueryId].filter(Boolean),
     championMatches: champions,
     augmentMatches: augments,
@@ -402,6 +482,12 @@ function normalizeCandidate(candidate) {
     author: candidate.author,
     publishedAt: candidate.publishedAt,
     patchHint: candidate.patchHint,
+    authorTier: candidate.authorTier,
+    accessState: candidate.accessState,
+    modeValid: candidate.modeValid,
+    disqualifiers: [...(candidate.disqualifiers ?? [])].sort(),
+    engagementState: candidate.engagementState,
+    currentEnough: candidate.currentEnough,
     sourceQueryIds: [...(candidate.sourceQueryIds ?? [])].sort(),
     championMatches: (candidate.championMatches ?? []).map(({ id, cn, vi, icon }) => ({ id, cn, vi, icon })).sort((a, b) => String(a.id).localeCompare(String(b.id))),
     augmentMatches: (candidate.augmentMatches ?? []).map(({ id, cn, vi, icon }) => ({ id, cn, vi, icon })).sort((a, b) => a.id - b.id),
@@ -418,7 +504,29 @@ function validateRegistry(registry) {
   if (registry.schemaVersion !== 1) fail("schemaVersion danh mục nguồn chưa được hỗ trợ");
   if (!Array.isArray(registry.queries) || !registry.queries.length) fail("danh mục nguồn không có truy vấn");
   if (!Array.isArray(registry.creators) || !Array.isArray(registry.modeKeywords)) fail("danh mục nguồn thiếu tác giả/từ khóa");
-  if (registry.policy?.autoPublish !== false) fail("autoPublish phải giữ ở false để tránh đăng thẳng dữ liệu chưa kiểm chứng");
+  if (registry.policy?.autoPublish !== true) fail("autoPublish phải bật để runner áp dụng luật kiểm duyệt tự động");
+  const moderation = registry.policy?.moderation;
+  if (!moderation) fail("danh mục nguồn thiếu policy.moderation");
+  for (const key of ["crossSourceMinimumScore", "trustedCreatorMinimumScore"]) {
+    if (!Number.isFinite(moderation[key]) || moderation[key] < 0 || moderation[key] > 100) fail(`ngưỡng ${key} phải nằm trong 0..100`);
+  }
+  for (const key of [
+    "minimumSimilarity",
+    "minimumWeightedEngagementRate",
+    "minimumPositiveCommentRatio",
+    "demoteNegativeCommentRatio",
+  ]) {
+    if (!Number.isFinite(moderation[key]) || moderation[key] < 0 || moderation[key] > 1) fail(`ngưỡng ${key} phải nằm trong 0..1`);
+  }
+  for (const key of [
+    "minimumSourceAgeHours",
+    "minimumViews",
+    "minimumPositiveActions",
+    "minimumCommentSample",
+    "consecutiveFailureLimit",
+  ]) {
+    if (!Number.isFinite(moderation[key]) || moderation[key] < 0) fail(`ngưỡng ${key} phải là số không âm`);
+  }
   const ids = new Set();
   for (const query of registry.queries) {
     if (!query.id || ids.has(query.id)) fail(`truy vấn nguồn bị trùng hoặc thiếu id: ${query.id}`);
@@ -439,6 +547,18 @@ function validateInbox(inbox, indexes) {
     if (!candidate.id || ids.has(candidate.id)) fail(`candidate id bị trùng: ${candidate.id}`);
     if (!candidate.url || urls.has(candidate.url) || !canonicalUrl(candidate.url)) fail(`candidate URL bị trùng hoặc sai: ${candidate.url}`);
     if (!VALID_STATUSES.has(candidate.status)) fail(`candidate có trạng thái lạ: ${candidate.status}`);
+    if (candidate.authorTier !== undefined && !VALID_AUTHOR_TIERS.has(candidate.authorTier)) fail(`candidate có authorTier lạ: ${candidate.authorTier}`);
+    if (candidate.accessState !== undefined && !VALID_ACCESS_STATES.has(candidate.accessState)) fail(`candidate có accessState lạ: ${candidate.accessState}`);
+    if (candidate.modeValid !== undefined && typeof candidate.modeValid !== "boolean") fail(`candidate có modeValid không hợp lệ: ${candidate.id}`);
+    if (candidate.engagementState !== undefined && typeof candidate.engagementState !== "boolean") fail(`candidate có engagementState không hợp lệ: ${candidate.id}`);
+    if (candidate.disqualifiers !== undefined && !Array.isArray(candidate.disqualifiers)) fail(`candidate có disqualifiers không hợp lệ: ${candidate.id}`);
+    if (candidate.metrics !== undefined) {
+      if (!candidate.metrics || typeof candidate.metrics !== "object" || Array.isArray(candidate.metrics)) fail(`candidate có metrics không hợp lệ: ${candidate.id}`);
+      for (const [key, value] of Object.entries(candidate.metrics)) {
+        if (!["views", "likes", "coins", "favorites", "comments"].includes(key)) fail(`candidate có metric lạ: ${key}`);
+        if (!Number.isFinite(value) || value < 0) fail(`candidate có metric âm hoặc không phải số: ${candidate.id}.${key}`);
+      }
+    }
     for (const entry of candidate.championMatches ?? []) if (!championIds.has(entry.id)) fail(`candidate dùng championId lạ: ${entry.id}`);
     for (const entry of candidate.augmentMatches ?? []) if (!augmentIds.has(entry.id)) fail(`candidate dùng augmentId lạ: ${entry.id}`);
     for (const entry of candidate.itemMatches ?? []) if (!itemIds.has(entry.id)) fail(`candidate dùng itemId lạ: ${entry.id}`);
@@ -497,8 +617,13 @@ async function main() {
   const context = { registry, indexes, known, today };
   const discoveredByUrl = new Map();
   for (const raw of rawResults) {
-    const candidate = classify(raw, context);
+    let candidate = classify(raw, context);
     if (!candidate) continue;
+    const needsExactDetail = raw.platform === "Bilibili"
+      && candidate.championMatches.length === 1
+      && candidate.augmentMatches.length > 0
+      && (candidate.itemMatches.length >= 2 || candidate.status === "known-build");
+    if (needsExactDetail) candidate = classify(await enrichBilibiliCandidate(raw), context);
     const previous = discoveredByUrl.get(candidate.url);
     if (!previous) discoveredByUrl.set(candidate.url, candidate);
     else discoveredByUrl.set(candidate.url, {
@@ -536,7 +661,7 @@ async function main() {
     statusCounts,
     newestPublishedAt: limitedCandidates.map((candidate) => candidate.publishedAt).filter(Boolean).sort().at(-1),
     scanErrors: errors,
-    autoPublish: false,
+    autoPublish: registry.policy.autoPublish,
   };
 
   if (previousReport?.contentHash === contentHash) {

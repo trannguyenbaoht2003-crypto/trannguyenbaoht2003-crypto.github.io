@@ -1,33 +1,36 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const developmentPreviewMeta =
-  /<meta(?=[^>]*\bname=["']codex-preview["'])(?=[^>]*\bcontent=["']development["'])[^>]*>/i;
+const html = await readFile(new URL("../out/index.html", import.meta.url), "utf8");
+const source = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
 
-test("renders development preview metadata", async () => {
-  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
-  workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
-  const { default: worker } = await import(workerUrl.href);
+test("renders the Hai Dau-inspired information architecture", () => {
+  assert.match(html, /Kho tướng/i);
+  assert.match(html, /Lối lên đồ/i);
+  assert.match(html, /Lõi ưu tiên/i);
+  assert.match(html, /Cách chơi/i);
+  assert.match(html, /Nguồn/i);
+});
 
-  const response = await worker.fetch(
-    new Request("http://localhost/", {
-      headers: { accept: "text/html" },
-    }),
-    {
-      ASSETS: {
-        fetch: async () => new Response("Not found", { status: 404 }),
-      },
-    },
-    {
-      waitUntil() {},
-      passThroughOnException() {},
-    },
-  );
+test("explains automatic moderation without presenting engagement as win rate", () => {
+  assert.match(html, /Kiểm duyệt tự động đang bật/i);
+  assert.match(html, /Không phải tỷ lệ thắng/i);
+  assert.match(html, /Hai nguồn độc lập/i);
+  assert.match(html, /Nguồn uy tín.{0,20}phản hồi tích cực/i);
+});
 
-  assert.equal(response.status, 200);
-  assert.match(
-    response.headers.get("content-type") ?? "",
-    /^text\/html\b/i,
-  );
-  assert.match(await response.text(), developmentPreviewMeta);
+test("keeps the champion detail accessible", () => {
+  assert.match(source, /role="dialog"/);
+  assert.match(source, /aria-label="Đóng hướng dẫn"/);
+  assert.match(source, /aria-label="Điều hướng hướng dẫn tướng"/);
+  assert.match(source, /href="#builds"/);
+  assert.match(source, /href="#augments"/);
+  assert.match(source, /href="#notes"/);
+  assert.match(source, /href="#sources"/);
+});
+
+test("does not add an installable app surface", () => {
+  assert.doesNotMatch(html, /rel=["']manifest["']/i);
+  assert.doesNotMatch(source, /serviceWorker|beforeinstallprompt|Cài đặt ứng dụng/i);
 });

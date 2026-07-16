@@ -1,6 +1,8 @@
 import { generatedChampions, sourceSync } from "./generated-guides";
 import communitySourceData from "./community-sources.json";
+import generatedCommunitySourceData from "./generated-community-sources.json";
 import communityWatchReportData from "../community-watch-report.json";
+import communityModerationReportData from "../community-moderation-report.json";
 
 export type Role = "Tất cả" | "Đấu sĩ" | "Xạ thủ" | "Pháp sư" | "Đỡ đòn" | "Sát thủ" | "Hỗ trợ";
 export type Tier = "SSS" | "SS" | "S" | "A" | "B";
@@ -31,7 +33,7 @@ export type CommunitySource = {
 };
 
 export type CommunityRelation = "primary" | "alternative" | "candidate";
-export type CommunityStatus = "Đã đối chiếu" | "Cần kiểm chứng";
+export type CommunityStatus = "Đã đối chiếu" | "Tự động đối chiếu" | "Cần kiểm chứng";
 
 export type CommunityBuild = {
   canonicalKey: string;
@@ -45,6 +47,10 @@ export type CommunityBuild = {
   itemData: ItemAsset[];
   sources: CommunitySource[];
   matchesAlternativeOriginal?: string;
+  approvalLabel?: string;
+  checkedAt?: string;
+  patch?: string;
+  decisionReasons?: string[];
 };
 
 export type ChampionGuide = {
@@ -90,6 +96,14 @@ type RawCommunityRecord = {
   coreCn: string[];
   itemCn: string[];
   sources: CommunitySource[];
+  automation?: {
+    status: "auto-approved" | "needs-verification";
+    approvalPath?: "cross-source" | "trusted-creator";
+    checkedAt: string;
+    patch: string;
+    reasons: string[];
+    score: number;
+  };
 };
 
 type CommunitySourceFile = {
@@ -97,6 +111,13 @@ type CommunitySourceFile = {
   updatedAt: string;
   patchBaseline: string;
   globalSources: CommunitySource[];
+  records: RawCommunityRecord[];
+};
+
+type GeneratedCommunitySourceFile = {
+  schemaVersion: number;
+  updatedAt: string;
+  patchBaseline: string;
   records: RawCommunityRecord[];
 };
 
@@ -111,6 +132,18 @@ type CommunityWatchReport = {
   newestPublishedAt?: string;
   statusCounts: Record<string, number>;
   scanErrors: Array<{ queryId?: string; message?: string }>;
+  autoPublish: boolean;
+};
+
+type CommunityModerationReport = {
+  generatedAt: string;
+  contentHash: string;
+  currentPatch: string;
+  candidateCount: number;
+  decisionCount: number;
+  statusCounts: Record<"auto-approved" | "needs-verification" | "observing" | "rejected", number>;
+  generatedRecordCount: number;
+  skippedCollisionCount: number;
   autoPublish: boolean;
 };
 
@@ -400,7 +433,9 @@ const curatedChampions: ChampionGuide[] = [
 const curatedById = new Map(curatedChampions.map((champion) => [champion.id, champion]));
 
 const rawCommunityData = communitySourceData as unknown as CommunitySourceFile;
+const rawGeneratedCommunityData = generatedCommunitySourceData as unknown as GeneratedCommunitySourceFile;
 const rawCommunityWatchReport = communityWatchReportData as unknown as CommunityWatchReport;
+const rawCommunityModerationReport = communityModerationReportData as unknown as CommunityModerationReport;
 const augmentByOriginal = new Map<string, Augment>();
 const itemByOriginal = new Map<string, ItemAsset>();
 
@@ -414,8 +449,13 @@ for (const guide of generatedChampions) {
 }
 
 const mergedCommunityRecords = new Map<string, RawCommunityRecord>();
+const curatedCommunityKeys = new Set(rawCommunityData.records.map((record) => `${record.championId}:${record.canonicalKey}`));
+const generatedCommunityRecords = rawGeneratedCommunityData.records.filter(
+  (record) => !curatedCommunityKeys.has(`${record.championId}:${record.canonicalKey}`),
+);
+const allCommunityRecords = [...rawCommunityData.records, ...generatedCommunityRecords];
 
-for (const record of rawCommunityData.records) {
+for (const record of allCommunityRecords) {
   const groupKey = `${record.championId}:${record.canonicalKey}`;
   const current = mergedCommunityRecords.get(groupKey);
   if (!current) {
@@ -440,13 +480,27 @@ const communityByChampion = new Map<string, CommunityBuild[]>();
 
 for (const record of mergedCommunityRecords.values()) {
   const isCurrent = record.relation !== "candidate";
+  const automaticStatus = record.automation?.status;
+  const approvalLabel = record.automation?.approvalPath === "cross-source"
+    ? "Hai nguồn độc lập"
+    : record.automation?.approvalPath === "trusted-creator"
+      ? "Nguồn uy tín + phản hồi tích cực"
+      : undefined;
   const communityBuild: CommunityBuild = {
     canonicalKey: record.canonicalKey,
     relation: record.relation,
-    status: isCurrent ? "Đã đối chiếu" : "Cần kiểm chứng",
-    statusNote: isCurrent
-      ? "Tên lối chơi hoặc lõi trung tâm vẫn xuất hiện trong dữ liệu Hải Đấu hiện hành."
-      : `Nguồn cộng đồng chưa được Hải Đấu hiện hành xác nhận sau bản ${rawCommunityData.patchBaseline}.`,
+    status: automaticStatus === "auto-approved"
+      ? "Tự động đối chiếu"
+      : automaticStatus === "needs-verification"
+        ? "Cần kiểm chứng"
+        : isCurrent ? "Đã đối chiếu" : "Cần kiểm chứng",
+    statusNote: automaticStatus === "auto-approved"
+      ? `Đạt luật kiểm duyệt tự động cho bản ${record.automation?.patch}; tương tác chỉ là bằng chứng quan tâm, không phải tỷ lệ thắng.`
+      : automaticStatus === "needs-verification"
+        ? "Từng đạt điều kiện tự động nhưng cần đối chiếu lại với nguồn hoặc bản game hiện hành."
+        : isCurrent
+          ? "Tên lối chơi hoặc lõi trung tâm vẫn xuất hiện trong dữ liệu Hải Đấu hiện hành."
+          : `Nguồn cộng đồng chưa được Hải Đấu hiện hành xác nhận sau bản ${rawCommunityData.patchBaseline}.`,
     title: record.title,
     titleOriginal: record.titleOriginal,
     summary: record.summary,
@@ -454,6 +508,10 @@ for (const record of mergedCommunityRecords.values()) {
     itemData: record.itemCn.map((cn) => itemByOriginal.get(cn) ?? { name: cn, original: cn }),
     sources: record.sources,
     matchesAlternativeOriginal: record.matchesAlternativeOriginal,
+    approvalLabel,
+    checkedAt: record.automation?.checkedAt,
+    patch: record.automation?.patch,
+    decisionReasons: record.automation?.reasons,
   };
   const championBuilds = communityByChampion.get(record.championId) ?? [];
   championBuilds.push(communityBuild);
@@ -478,13 +536,15 @@ export const champions: ChampionGuide[] = generatedChampions.map((generated) => 
 export { sourceSync };
 
 export const communitySourceStats = {
-  updatedAt: rawCommunityData.updatedAt,
-  patchBaseline: rawCommunityData.patchBaseline,
+  updatedAt: [rawCommunityData.updatedAt, rawGeneratedCommunityData.updatedAt].sort().at(-1)!,
+  patchBaseline: rawGeneratedCommunityData.patchBaseline,
   buildCount: mergedCommunityRecords.size,
   championCount: communityByChampion.size,
+  automaticApprovedCount: generatedCommunityRecords.filter((record) => record.automation?.status === "auto-approved").length,
+  automaticNeedsVerificationCount: generatedCommunityRecords.filter((record) => record.automation?.status === "needs-verification").length,
   platformCount: new Set([
     ...rawCommunityData.globalSources.map((source) => source.platform),
-    ...rawCommunityData.records.flatMap((record) => record.sources.map((source) => source.platform)),
+    ...allCommunityRecords.flatMap((record) => record.sources.map((source) => source.platform)),
   ]).size,
   globalSources: rawCommunityData.globalSources,
 } as const;
@@ -499,6 +559,19 @@ export const communityWatchStats = {
   newestPublishedAt: rawCommunityWatchReport.newestPublishedAt,
   scanErrorCount: rawCommunityWatchReport.scanErrors.length,
   autoPublish: rawCommunityWatchReport.autoPublish,
+} as const;
+
+export const communityModerationStats = {
+  generatedAt: rawCommunityModerationReport.generatedAt,
+  currentPatch: rawCommunityModerationReport.currentPatch,
+  candidateCount: rawCommunityModerationReport.candidateCount,
+  decisionCount: rawCommunityModerationReport.decisionCount,
+  automaticApprovedCount: rawCommunityModerationReport.statusCounts["auto-approved"],
+  needsVerificationCount: rawCommunityModerationReport.statusCounts["needs-verification"],
+  observingCount: rawCommunityModerationReport.statusCounts.observing,
+  rejectedCount: rawCommunityModerationReport.statusCounts.rejected,
+  generatedRecordCount: rawCommunityModerationReport.generatedRecordCount,
+  autoPublish: rawCommunityModerationReport.autoPublish,
 } as const;
 
 export const dataDragonVersion = "16.14.1";
