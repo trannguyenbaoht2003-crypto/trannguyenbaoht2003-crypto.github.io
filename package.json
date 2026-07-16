@@ -16,7 +16,8 @@
     "validate:artifact": "bash scripts/validate-artifact.sh",
     "lint": "bash scripts/sites-env.sh -- eslint . --ignore-pattern dist --ignore-pattern .next --ignore-pattern _next --ignore-pattern out --ignore-pattern node_modules",
     "db:generate": "bash scripts/sites-env.sh -- drizzle-kit generate",
-    "sync:data": "node scripts/sync-lolhaidou.mjs && node scripts/collect-community-candidates.mjs && node scripts/validate-community-sources.mjs && node scripts/collect-community-candidates.mjs --validate-only",
+    "sync:public-apis": "node scripts/sync-public-apis.mjs",
+    "sync:data": "node scripts/sync-public-apis.mjs && node scripts/sync-lolhaidou.mjs && node scripts/collect-community-candidates.mjs && node scripts/validate-community-sources.mjs && node scripts/collect-community-candidates.mjs --validate-only",
     "collect:community": "node scripts/collect-community-candidates.mjs",
     "validate:community": "node scripts/validate-community-sources.mjs && node scripts/collect-community-candidates.mjs --validate-only"
   },
@@ -45,5 +46,5 @@
     "wrangler": "4.92.0"
   },
   "type": "module",
-  "displayName": "L\u00f5i \u0110\u1ea5u Tr\u01b0\u1eddng"
+  "displayName": "Lõi Đấu Trường"
 }
