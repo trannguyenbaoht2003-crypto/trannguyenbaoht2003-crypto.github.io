@@ -1,0 +1,379 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-07-16",
+  "patchBaseline": "16.12",
+  "globalSources": [
+    {
+      "platform": "LMHT Trung Quốc",
+      "kind": "Bản cập nhật chính thức",
+      "title": "Hải Đấu cập nhật lớn ngày 11/06 — bản 16.12",
+      "url": "https://lol.qq.com/v/v2/detail.shtml?docid=10342255827868720445",
+      "publishedAt": "2026-06-10",
+      "note": "Mốc phiên bản dùng để buộc các lối chơi cũ phải được đối chiếu lại trước khi nâng thành khuyến nghị hiện hành."
+    },
+    {
+      "platform": "Bilibili",
+      "kind": "Tổng quan lõi mới",
+      "title": "【26.12海克斯大乱斗】61张新增强化符文超详细介绍",
+      "url": "https://www.bilibili.com/video/BV1yfEZ6XE2m/",
+      "publishedAt": "2026-06-11",
+      "note": "Dùng để theo dõi danh mục lõi mới; không tự suy diễn thành lối lên đồ cho từng tướng."
+    },
+    {
+      "platform": "Bilibili",
+      "kind": "Thảo luận meta",
+      "title": "海克斯乱斗3.0 T0英雄有哪些？",
+      "url": "https://www.bilibili.com/video/BV1MLjm6xEUg/",
+      "publishedAt": "2026-06-23",
+      "signal": "Khoảng 43 nghìn lượt xem khi đối chiếu",
+      "note": "Chỉ dùng như tín hiệu tướng/lối chơi đang được quan tâm, không coi là tỷ lệ thắng."
+    },
+    {
+      "platform": "Tieba",
+      "kind": "Thảo luận meta",
+      "title": "海斗2＝3来丢子",
+      "url": "https://c.tieba.baidu.com/p/10339319154?lp=home_main_thread_pb&mo_device=1",
+      "publishedAt": "2026-07-07",
+      "note": "Thảo luận sau bản 16.12 nhận định cấu rỉa, sát thủ và đấu sĩ dễ vận hành hơn; tanker thiếu mở giao tranh và xạ thủ truyền thống có thể khó chơi."
+    },
+    {
+      "platform": "Zhihu",
+      "kind": "Hỏi đáp chuyên sâu",
+      "title": "《英雄联盟》「海克斯大乱斗」模式什么英雄厉害？",
+      "url": "https://www.zhihu.com/question/1964338749736480931",
+      "publishedAt": "2025-11-30",
+      "signal": "503.338 lượt xem · 72 câu trả lời khi đối chiếu",
+      "note": "Nguồn nhiều góc nhìn; từng tổ hợp vẫn phải khớp ID lõi hiện hành và được gắn trạng thái riêng."
+    }
+  ],
+  "records": [
+    {
+      "championId": "brand",
+      "canonicalKey": "infernal-conduit",
+      "relation": "alternative",
+      "matchesAlternativeOriginal": "导管火男",
+      "title": "Hỏa Ngục Dẫn Truyền — xả kỹ năng liên tục",
+      "titleOriginal": "炼狱导管火男",
+      "summary": "Brand dùng kỹ năng và nội tại với tần suất cao để giảm hồi chiêu qua Hỏa Ngục Dẫn Truyền. Nguồn cộng đồng lưu ý trang bị thiêu đốt không tự kích hoạt lõi, nên không được lên đồ đốt chỉ vì kỳ vọng tương tác đó.",
+      "coreCn": ["炼狱导管"],
+      "itemCn": [],
+      "sources": [
+        {
+          "platform": "Zhihu",
+          "kind": "Hỏi đáp chuyên sâu",
+          "title": "《英雄联盟》「海克斯大乱斗」模式什么英雄厉害？",
+          "url": "https://www.zhihu.com/question/1964338749736480931",
+          "publishedAt": "2025-11-30",
+          "signal": "503.338 lượt xem · 72 câu trả lời khi đối chiếu"
+        }
+      ]
+    },
+    {
+      "championId": "brand",
+      "canonicalKey": "infernal-conduit",
+      "relation": "alternative",
+      "matchesAlternativeOriginal": "导管火男",
+      "title": "Hỏa Ngục Dẫn Truyền — xả kỹ năng liên tục",
+      "titleOriginal": "炼狱导管火男",
+      "summary": "Bài phân tích lõi trên Bilibili xếp Hỏa Ngục Dẫn Truyền vào nhóm lựa chọn hồi kỹ năng mạnh cho tướng gây sát thương thường xuyên.",
+      "coreCn": ["炼狱导管"],
+      "itemCn": [],
+      "sources": [
+        {
+          "platform": "Bilibili",
+          "kind": "Bài phân tích lõi",
+          "title": "掌握彩色海克斯：全网最细符文大乱斗详解",
+          "url": "https://www.bilibili.com/opus/1019024361601892357",
+          "publishedAt": "2025-04-02"
+        }
+      ]
+    },
+    {
+      "championId": "jax",
+      "canonicalKey": "hybrid-dual-scaling",
+      "relation": "primary",
+      "title": "Song tu Công — Phép",
+      "titleOriginal": "物法皆修武器",
+      "summary": "Video thực chiến và bài phân tích lõi cùng nhấn mạnh khả năng tích đồng thời SMCK/SMPT của Jax. Đây là cùng lối chính đang có trong Hải Đấu, nên chỉ bổ sung bằng chứng cộng đồng chứ không tạo một build thứ hai.",
+      "coreCn": ["物法皆修"],
+      "itemCn": [],
+      "sources": [
+        {
+          "platform": "Bilibili",
+          "kind": "Video thực chiến",
+          "title": "姿态符文大乱斗：开局物法兼修武器",
+          "url": "https://www.bilibili.com/video/BV1xQ4CzDEZH/",
+          "publishedAt": "2025-10-13",
+          "signal": "Khoảng 32 nghìn lượt xem khi đối chiếu"
+        },
+        {
+          "platform": "Bilibili",
+          "kind": "Bài phân tích lõi",
+          "title": "掌握彩色海克斯：物法皆修",
+          "url": "https://www.bilibili.com/opus/1019024361601892357",
+          "publishedAt": "2025-04-02"
+        }
+      ]
+    },
+    {
+      "championId": "karthus",
+      "canonicalKey": "kill-time-ultimate",
+      "relation": "alternative",
+      "matchesAlternativeOriginal": "极速大招流",
+      "title": "Đến Giờ Đồ Sát — R mở giao tranh",
+      "titleOriginal": "杀戮时间死歌",
+      "summary": "Dùng R để gắn hiệu ứng nổ trễ lên nhiều mục tiêu, sau đó phối hợp các nguồn làm mới/giảm hồi chiêu cuối. Biến thể này đã được gộp với “极速大招流” đang có trong Hải Đấu.",
+      "coreCn": ["杀戮时间到了"],
+      "itemCn": [],
+      "sources": [
+        {
+          "platform": "Zhihu",
+          "kind": "Hỏi đáp chuyên sâu",
+          "title": "死歌 + 杀戮时间",
+          "url": "https://www.zhihu.com/question/1964338749736480931",
+          "publishedAt": "2025-11-30",
+          "signal": "503.338 lượt xem · 72 câu trả lời khi đối chiếu"
+        }
+      ]
+    },
+    {
+      "championId": "gangplank",
+      "canonicalKey": "back-to-basics-barrels",
+      "relation": "alternative",
+      "matchesAlternativeOriginal": "回归基本功船长",
+      "title": "Đơn Giản Hóa — thùng thuốc súng",
+      "titleOriginal": "回归基本功船长",
+      "summary": "Chấp nhận mất R để khuếch đại sát thương Q và thùng. Đây là biến thể trùng tên nguyên bản với Hải Đấu nên được hiển thị một lần, kèm nguồn Zhihu để đối chiếu cách vận hành.",
+      "coreCn": ["回归基本功"],
+      "itemCn": [],
+      "sources": [
+        {
+          "platform": "Zhihu",
+          "kind": "Hỏi đáp chuyên sâu",
+          "title": "船长 + 回归基本功",
+          "url": "https://www.zhihu.com/question/1964338749736480931",
+          "publishedAt": "2025-11-30",
+          "signal": "503.338 lượt xem · 72 câu trả lời khi đối chiếu"
+        }
+      ]
+    },
+    {
+      "championId": "ryze",
+      "canonicalKey": "mana-health-ap-loop",
+      "relation": "primary",
+      "title": "Vòng lặp năng lượng — máu — SMPT",
+      "titleOriginal": "瑞兹属性循环流",
+      "summary": "SMPT tăng năng lượng; Ý Thức Thắng Vật Chất đổi năng lượng thành máu; Huyết Giáp Chúa Tể/Manamune đổi máu và năng lượng thành SMCK; THÍCH ỨNG đổi SMCK trở lại SMPT. Đây là cùng lối chính hiện hành, được gộp làm bằng chứng chéo.",
+      "coreCn": ["物理转魔法", "由心及物", "溢流"],
+      "itemCn": ["时光之杖", "大天使之杖", "魔宗", "霸王血铠", "灭世者的死亡之帽", "裂隙制造者"],
+      "sources": [
+        {
+          "platform": "Zhihu",
+          "kind": "Hỏi đáp chuyên sâu",
+          "title": "瑞兹属性循环流",
+          "url": "https://www.zhihu.com/question/1964338749736480931",
+          "publishedAt": "2025-11-30",
+          "signal": "503.338 lượt xem · 72 câu trả lời khi đối chiếu"
+        }
+      ]
+    },
+    {
+      "championId": "kassadin",
+      "canonicalKey": "ultimate-polymorph",
+      "relation": "candidate",
+      "title": "Ma Pháp Mê Hoặc — R khống chế rồi rút",
+      "titleOriginal": "精怪魔法卡萨丁",
+      "summary": "R áp sát để biến hình mục tiêu, dồn kỹ năng trong thời gian đối phương không thể phản công rồi lùi ra chờ hồi lõi. Chưa trùng biến thể Hải Đấu hiện hành nên phải giữ trạng thái cần kiểm chứng sau 16.12.",
+      "coreCn": ["精怪魔法"],
+      "itemCn": [],
+      "sources": [
+        {
+          "platform": "Zhihu",
+          "kind": "Hỏi đáp chuyên sâu",
+          "title": "卡萨丁 + 群体变羊",
+          "url": "https://www.zhihu.com/question/1964338749736480931",
+          "publishedAt": "2025-11-30",
+          "signal": "503.338 lượt xem · 72 câu trả lời khi đối chiếu"
+        }
+      ]
+    },
+    {
+      "championId": "kassadin",
+      "canonicalKey": "physical-to-magic",
+      "relation": "candidate",
+      "title": "THÍCH ỨNG — chuyển trang bị vật lý thành SMPT",
+      "titleOriginal": "物转卡萨丁",
+      "summary": "Tận dụng trang bị giàu SMCK/năng lượng rồi chuyển sang SMPT để vừa có tài nguyên cho R vừa tăng khả năng thu dọn giao tranh. Nguồn trước 16.12 và chưa trùng biến thể Hải Đấu hiện hành.",
+      "coreCn": ["物理转魔法", "你摸不到", "精怪魔法"],
+      "itemCn": [],
+      "sources": [
+        {
+          "platform": "游侠网",
+          "kind": "Hướng dẫn tướng",
+          "title": "海克斯大乱斗物转卡萨丁怎么玩",
+          "url": "https://gl.ali213.net/html/2026-2/1748405.html",
+          "publishedAt": "2026-02-26"
+        }
+      ]
+    },
+    {
+      "championId": "fiddlesticks",
+      "canonicalKey": "unstoppable-ultimate-drain",
+      "relation": "candidate",
+      "title": "Chiêu Cuối Không Thể Cản Phá — R rồi W",
+      "titleOriginal": "大招免控稻草人",
+      "summary": "Lõi miễn khống chế giúp Fiddlesticks hoàn tất nhịp R–W trong giao tranh đông người thay vì bị ngắt hút máu ngay khi vào. Chưa có tên biến thể tương ứng trong Hải Đấu hiện hành nên chỉ là gợi ý cần thử lại.",
+      "coreCn": ["终极不可阻挡"],
+      "itemCn": [],
+      "sources": [
+        {
+          "platform": "Zhihu",
+          "kind": "Hỏi đáp chuyên sâu",
+          "title": "稻草人 + 大招免控",
+          "url": "https://www.zhihu.com/question/1964338749736480931",
+          "publishedAt": "2025-11-30",
+          "signal": "503.338 lượt xem · 72 câu trả lời khi đối chiếu"
+        }
+      ]
+    },
+    {
+      "championId": "leblanc",
+      "canonicalKey": "cant-touch-ultimate",
+      "relation": "candidate",
+      "title": "Sao Mà Chạm Được — R che nhịp E",
+      "titleOriginal": "妖姬大招无敌",
+      "summary": "Dùng R để nhận miễn nhiễm sát thương trong lúc chờ E trói hoàn tất, giúp LeBlanc vào sâu rồi rút ra an toàn hơn. Đây là tổ hợp cộng đồng trước 16.12, chưa được Hải Đấu hiện hành xác nhận.",
+      "coreCn": ["你摸不到"],
+      "itemCn": [],
+      "sources": [
+        {
+          "platform": "Zhihu",
+          "kind": "Hỏi đáp chuyên sâu",
+          "title": "妖姬 + 大招无敌",
+          "url": "https://www.zhihu.com/question/1964338749736480931",
+          "publishedAt": "2025-11-30",
+          "signal": "503.338 lượt xem · 72 câu trả lời khi đối chiếu"
+        }
+      ]
+    },
+    {
+      "championId": "evelynn",
+      "canonicalKey": "physical-to-magic-assassin",
+      "relation": "candidate",
+      "title": "THÍCH ỨNG — sát thủ vật lý hóa SMPT",
+      "titleOriginal": "物转寡妇",
+      "summary": "Dùng lõi THÍCH ỨNG để chuyển chỉ số vật lý thành SMPT, sau đó tận dụng tàng hình và tốc độ di chuyển cho nhịp vào–ra. Nguồn trước 16.12 và không trùng build chính pháp bạo hiện hành.",
+      "coreCn": ["物理转魔法"],
+      "itemCn": [],
+      "sources": [
+        {
+          "platform": "游侠网",
+          "kind": "Hướng dẫn tướng",
+          "title": "海克斯大乱斗物转寡妇怎么玩",
+          "url": "https://gl.ali213.net/html/2026-3/1748775.html",
+          "publishedAt": "2026-03-01"
+        }
+      ]
+    },
+    {
+      "championId": "jinx",
+      "canonicalKey": "lethality-jeweled-gauntlet",
+      "relation": "alternative",
+      "matchesAlternativeOriginal": "穿甲金克斯",
+      "title": "Xuyên giáp + Găng Bảo Thạch",
+      "titleOriginal": "穿甲金克斯",
+      "summary": "Khuếch đại sát thương kỹ năng bằng Găng Bảo Thạch, chí mạng và xuyên giáp; nguồn cũng ưu tiên Nâng Cấp Vô Cực Kiếm. Biến thể trùng tên Hải Đấu nên chỉ hiển thị một lần.",
+      "coreCn": ["珠光护手", "升级：无尽之刃", "亮出你的剑"],
+      "itemCn": [],
+      "sources": [
+        {
+          "platform": "游侠网",
+          "kind": "Hướng dẫn tướng",
+          "title": "海克斯大乱斗穿甲金克斯怎么玩",
+          "url": "https://gl.ali213.net/html/2026-3/1748421.html",
+          "publishedAt": "2026-03-01"
+        }
+      ]
+    },
+    {
+      "championId": "khazix",
+      "canonicalKey": "jeweled-burst",
+      "relation": "alternative",
+      "matchesAlternativeOriginal": "法爆螳螂",
+      "title": "Pháp bạo Kha'Zix",
+      "titleOriginal": "法爆螳螂",
+      "summary": "Dồn chí mạng kỹ năng quanh Găng Bảo Thạch rồi bổ sung xuyên giáp để tăng sát thương Q lên mục tiêu cô lập. Tên lối chơi trùng biến thể Hải Đấu hiện hành.",
+      "coreCn": ["珠光护手", "升级：无尽之刃"],
+      "itemCn": [],
+      "sources": [
+        {
+          "platform": "游侠网",
+          "kind": "Hướng dẫn tướng",
+          "title": "海克斯大乱斗法爆螳螂怎么玩",
+          "url": "https://gl.ali213.net/html/2026-2/1745719.html",
+          "publishedAt": "2026-02-11"
+        }
+      ]
+    },
+    {
+      "championId": "naafiri",
+      "canonicalKey": "jeweled-burst",
+      "relation": "alternative",
+      "matchesAlternativeOriginal": "法爆狗",
+      "title": "Pháp bạo Naafiri",
+      "titleOriginal": "法爆狗",
+      "summary": "Lấy Găng Bảo Thạch làm lõi, ghép các lựa chọn chí mạng kỹ năng để tạo nhịp lao vào dồn sát thương. Biến thể trùng tên Hải Đấu hiện hành.",
+      "coreCn": ["珠光护手", "升级：无尽之刃"],
+      "itemCn": [],
+      "sources": [
+        {
+          "platform": "游侠网",
+          "kind": "Hướng dẫn tướng",
+          "title": "海克斯大乱斗法爆狗王怎么玩",
+          "url": "https://gl.ali213.net/html/2026-2/1745711.html",
+          "publishedAt": "2026-02-13"
+        }
+      ]
+    },
+    {
+      "championId": "naafiri",
+      "canonicalKey": "ethereal-pack",
+      "relation": "alternative",
+      "matchesAlternativeOriginal": "虚幻武器狗",
+      "title": "Bầy chó Vũ Khí Siêu Nhiên",
+      "titleOriginal": "虚幻武器狗",
+      "summary": "Dùng Vũ Khí Siêu Nhiên để đàn chó kích hoạt hiệu ứng trang bị; nguồn nêu Ngọn Giáo Shojin như trang bị tương tác. Biến thể trùng tên Hải Đấu hiện hành.",
+      "coreCn": ["虚幻武器"],
+      "itemCn": ["朔极之矛"],
+      "sources": [
+        {
+          "platform": "游侠网",
+          "kind": "Hướng dẫn tướng",
+          "title": "海克斯大乱斗法爆狗王怎么玩",
+          "url": "https://gl.ali213.net/html/2026-2/1745711.html",
+          "publishedAt": "2026-02-13"
+        }
+      ]
+    },
+    {
+      "championId": "kaisa",
+      "canonicalKey": "hybrid-on-hit",
+      "relation": "alternative",
+      "matchesAlternativeOriginal": "物法双修卡莎",
+      "title": "Kai'Sa song tu hiệu ứng đòn đánh",
+      "titleOriginal": "物法双修卡莎",
+      "summary": "Duy trì nhịp đánh để tận dụng cả hệ số vật lý lẫn phép; nguồn ưu tiên Vũ Khí Hạng Nhẹ, Vũ Khí Siêu Nhiên và Xạ Thủ Ma Pháp cho nhánh song tu. Tên lối chơi trùng Hải Đấu hiện hành.",
+      "coreCn": ["双刀流", "虚幻武器", "神射法师", "物法皆修"],
+      "itemCn": [],
+      "sources": [
+        {
+          "platform": "3DM",
+          "kind": "Hướng dẫn tướng",
+          "title": "LOL海克斯大乱斗物转卡莎怎么玩",
+          "url": "https://ol.3dmgame.com/gl/332590.html",
+          "publishedAt": "2026-02-12"
+        }
+      ]
+    }
+  ]
+}

@@ -1,4 +1,5 @@
 import { generatedChampions, sourceSync } from "./generated-guides";
+import communitySourceData from "./community-sources.json";
 
 export type Role = "Tất cả" | "Đấu sĩ" | "Xạ thủ" | "Pháp sư" | "Đỡ đòn" | "Sát thủ" | "Hỗ trợ";
 export type Tier = "SSS" | "SS" | "S" | "A" | "B";
@@ -16,6 +17,33 @@ export type ItemAsset = {
   original: string;
   id?: number;
   icon?: string;
+};
+
+export type CommunitySource = {
+  platform: string;
+  kind: string;
+  title: string;
+  url: string;
+  publishedAt?: string;
+  signal?: string;
+  note?: string;
+};
+
+export type CommunityRelation = "primary" | "alternative" | "candidate";
+export type CommunityStatus = "Đã đối chiếu" | "Cần kiểm chứng";
+
+export type CommunityBuild = {
+  canonicalKey: string;
+  relation: CommunityRelation;
+  status: CommunityStatus;
+  statusNote: string;
+  title: string;
+  titleOriginal: string;
+  summary: string;
+  coreAugments: Augment[];
+  itemData: ItemAsset[];
+  sources: CommunitySource[];
+  matchesAlternativeOriginal?: string;
 };
 
 export type ChampionGuide = {
@@ -47,6 +75,28 @@ export type ChampionGuide = {
   sourceNotes?: string[];
   sourceModified?: string;
   source: string;
+  communityBuilds?: CommunityBuild[];
+};
+
+type RawCommunityRecord = {
+  championId: string;
+  canonicalKey: string;
+  relation: CommunityRelation;
+  matchesAlternativeOriginal?: string;
+  title: string;
+  titleOriginal: string;
+  summary: string;
+  coreCn: string[];
+  itemCn: string[];
+  sources: CommunitySource[];
+};
+
+type CommunitySourceFile = {
+  schemaVersion: number;
+  updatedAt: string;
+  patchBaseline: string;
+  globalSources: CommunitySource[];
+  records: RawCommunityRecord[];
 };
 
 const a = (vi: string, cn: string, note?: string): Augment => ({ vi, cn, note });
@@ -334,17 +384,94 @@ const curatedChampions: ChampionGuide[] = [
 
 const curatedById = new Map(curatedChampions.map((champion) => [champion.id, champion]));
 
+const rawCommunityData = communitySourceData as unknown as CommunitySourceFile;
+const augmentByOriginal = new Map<string, Augment>();
+const itemByOriginal = new Map<string, ItemAsset>();
+
+for (const guide of generatedChampions) {
+  for (const augment of [...guide.coreAugments, ...guide.prismatic, ...guide.gold, ...guide.silver]) {
+    if (!augmentByOriginal.has(augment.cn)) augmentByOriginal.set(augment.cn, augment);
+  }
+  for (const item of guide.itemData ?? []) {
+    if (!itemByOriginal.has(item.original)) itemByOriginal.set(item.original, item);
+  }
+}
+
+const mergedCommunityRecords = new Map<string, RawCommunityRecord>();
+
+for (const record of rawCommunityData.records) {
+  const groupKey = `${record.championId}:${record.canonicalKey}`;
+  const current = mergedCommunityRecords.get(groupKey);
+  if (!current) {
+    mergedCommunityRecords.set(groupKey, {
+      ...record,
+      coreCn: [...new Set(record.coreCn)],
+      itemCn: [...new Set(record.itemCn)],
+      sources: [...new Map(record.sources.map((source) => [source.url, source])).values()],
+    });
+    continue;
+  }
+
+  mergedCommunityRecords.set(groupKey, {
+    ...current,
+    coreCn: [...new Set([...current.coreCn, ...record.coreCn])],
+    itemCn: [...new Set([...current.itemCn, ...record.itemCn])],
+    sources: [...new Map([...current.sources, ...record.sources].map((source) => [source.url, source])).values()],
+  });
+}
+
+const communityByChampion = new Map<string, CommunityBuild[]>();
+
+for (const record of mergedCommunityRecords.values()) {
+  const isCurrent = record.relation !== "candidate";
+  const communityBuild: CommunityBuild = {
+    canonicalKey: record.canonicalKey,
+    relation: record.relation,
+    status: isCurrent ? "Đã đối chiếu" : "Cần kiểm chứng",
+    statusNote: isCurrent
+      ? "Tên lối chơi hoặc lõi trung tâm vẫn xuất hiện trong dữ liệu Hải Đấu hiện hành."
+      : `Nguồn cộng đồng chưa được Hải Đấu hiện hành xác nhận sau bản ${rawCommunityData.patchBaseline}.`,
+    title: record.title,
+    titleOriginal: record.titleOriginal,
+    summary: record.summary,
+    coreAugments: record.coreCn.map((cn) => augmentByOriginal.get(cn) ?? { vi: cn, cn }),
+    itemData: record.itemCn.map((cn) => itemByOriginal.get(cn) ?? { name: cn, original: cn }),
+    sources: record.sources,
+    matchesAlternativeOriginal: record.matchesAlternativeOriginal,
+  };
+  const championBuilds = communityByChampion.get(record.championId) ?? [];
+  championBuilds.push(communityBuild);
+  communityByChampion.set(record.championId, championBuilds);
+}
+
 export const champions: ChampionGuide[] = generatedChampions.map((generated) => {
   const curated = curatedById.get(generated.id);
-  if (!curated) return generated;
+  const base = curated
+    ? {
+        ...curated,
+        ...generated,
+        aliases: [...new Set([...generated.aliases, ...curated.aliases])],
+      }
+    : generated;
   return {
-    ...curated,
-    ...generated,
-    aliases: [...new Set([...generated.aliases, ...curated.aliases])],
+    ...base,
+    communityBuilds: communityByChampion.get(generated.id) ?? [],
   };
 });
 
 export { sourceSync };
+
+export const communitySourceStats = {
+  updatedAt: rawCommunityData.updatedAt,
+  patchBaseline: rawCommunityData.patchBaseline,
+  buildCount: mergedCommunityRecords.size,
+  championCount: communityByChampion.size,
+  platformCount: new Set([
+    ...rawCommunityData.globalSources.map((source) => source.platform),
+    ...rawCommunityData.records.flatMap((record) => record.sources.map((source) => source.platform)),
+  ]).size,
+  globalSources: rawCommunityData.globalSources,
+} as const;
 
 export const dataDragonVersion = "16.14.1";
 

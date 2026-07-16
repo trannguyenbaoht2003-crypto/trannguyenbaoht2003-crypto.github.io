@@ -8,6 +8,7 @@ import {
   championIcon,
   championSplash,
   champions,
+  communitySourceStats,
   roles,
   sourceSync,
 } from "./data";
@@ -18,6 +19,12 @@ type InstallPrompt = Event & {
 };
 
 const tierOrder = { SSS: 5, SS: 4, S: 3, A: 2, B: 1 } as const;
+
+function formatSourceDate(value?: string) {
+  if (!value) return "Không ghi ngày";
+  const date = new Date(`${value}T00:00:00+07:00`);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString("vi-VN");
+}
 
 function SearchIcon() {
   return (
@@ -157,6 +164,20 @@ function GuideDrawer({
     });
   }
 
+  const communityBuilds = champion.communityBuilds ?? [];
+  const detailedAlternativeOriginals = new Set(
+    communityBuilds
+      .map((build) => build.matchesAlternativeOriginal)
+      .filter((value): value is string => Boolean(value)),
+  );
+  const visibleAlternatives = champion.alternatives.filter((_, index) => {
+    const original = champion.alternativeOriginals?.[index];
+    return !original || !detailedAlternativeOriginals.has(original);
+  });
+  const visibleAlternativeOriginals = champion.alternativeOriginals?.filter(
+    (original) => !detailedAlternativeOriginals.has(original),
+  ) ?? [];
+
   return (
     <div className="drawer-backdrop" role="presentation" onMouseDown={onClose}>
       <section
@@ -189,6 +210,7 @@ function GuideDrawer({
         <div className="drawer-content">
           <nav className="detail-jump" aria-label="Mục hướng dẫn">
             <a href="#build">Build</a>
+            {communityBuilds.length > 0 && <a href="#community">Cộng đồng TQ</a>}
             <a href="#augments">Lõi ưu tiên</a>
             <a href="#compare">So sánh 3 lõi</a>
             <a href="#notes">Mẹo & tránh bẫy</a>
@@ -232,11 +254,76 @@ function GuideDrawer({
                 </div>
               </div>
             </div>
-            <div className="alternate-builds">
-              <span>Các hướng khác</span>
-              {champion.alternatives.map((item) => <b key={item}>{item}</b>)}
-            </div>
+            {visibleAlternatives.length > 0 && (
+              <div className="alternate-builds">
+                <span>Các hướng khác</span>
+                {visibleAlternatives.map((item) => <b key={item}>{item}</b>)}
+              </div>
+            )}
           </section>
+
+          {communityBuilds.length > 0 && (
+            <section id="community" className="detail-section community-section">
+              <div className="section-heading">
+                <div>
+                  <span className="eyebrow">Bilibili · Zhihu · Tieba · web Trung Quốc</span>
+                  <h3>Lối chơi được cộng đồng nhắc đến</h3>
+                </div>
+                <p>Đã gộp theo tướng + lõi + trang bị</p>
+              </div>
+              <div className="community-caution">
+                <b>Không phải bảng tỷ lệ thắng.</b> “Đã đối chiếu” nghĩa là lối chơi vẫn xuất hiện trong Hải Đấu hiện hành; “Cần kiểm chứng” là ý tưởng cộng đồng chưa có xác nhận sau bản {communitySourceStats.patchBaseline}.
+              </div>
+              <div className="community-build-list">
+                {communityBuilds.map((build) => (
+                  <article className={`community-build-card ${build.status === "Đã đối chiếu" ? "verified" : "review"}`} key={build.canonicalKey}>
+                    <div className="community-build-topline">
+                      <span className="community-relation">
+                        {build.relation === "primary" ? "Đối chiếu build chính" : build.relation === "alternative" ? "Biến thể đã gộp" : "Gợi ý cộng đồng"}
+                      </span>
+                      <span className="community-status" title={build.statusNote}>{build.status}</span>
+                    </div>
+                    <h4>{build.title}</h4>
+                    <small>{build.titleOriginal}</small>
+                    <p>{build.summary}</p>
+                    {build.coreAugments.length > 0 && (
+                      <div className="community-assets">
+                        <span>Lõi</span>
+                        {build.coreAugments.map((augment) => (
+                          <div className="community-asset" key={augment.cn} title={augment.cn}>
+                            {augment.icon ? <img src={augment.icon} alt="" loading="lazy" /> : <i>✦</i>}
+                            <b>{augment.vi}<small>{augment.cn}</small></b>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {build.itemData.length > 0 ? (
+                      <div className="community-assets items">
+                        <span>Đồ được nguồn nêu rõ</span>
+                        {build.itemData.map((item) => (
+                          <div className="community-asset" key={item.original} title={item.original}>
+                            {item.icon ? <img src={item.icon} alt="" loading="lazy" /> : <i>◇</i>}
+                            <b>{item.name}<small>{item.original}</small></b>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="community-no-items">Nguồn này không ghi rõ đủ trang bị bằng chữ; giữ thứ tự đồ Hải Đấu ở phía trên.</p>
+                    )}
+                    <div className="community-source-links">
+                      {build.sources.map((source) => (
+                        <a href={source.url} target="_blank" rel="noreferrer" key={source.url}>
+                          <b>{source.platform}</b>
+                          <span>{source.kind} · {formatSourceDate(source.publishedAt)}</span>
+                          {source.signal && <small>{source.signal}</small>}
+                        </a>
+                      ))}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </section>
+          )}
 
           <section id="augments" className="detail-section">
             <div className="section-heading">
@@ -284,13 +371,13 @@ function GuideDrawer({
             </div>
           </section>
 
-          {(champion.sourceNotes?.length || champion.summaryOriginal || champion.alternativeOriginals?.length) ? (
+          {(champion.sourceNotes?.length || champion.summaryOriginal || visibleAlternativeOriginals.length) ? (
             <details className="original-notes">
               <summary>Nguyên văn Trung Quốc để đối chiếu bản dịch</summary>
               <div>
                 {champion.summaryOriginal && <p>{champion.summaryOriginal}</p>}
                 {champion.sourceNotes?.map((note, index) => <p key={`${index}-${note}`}>{note}</p>)}
-                {champion.alternativeOriginals?.map((note, index) => <p key={`alt-${index}-${note}`}>Biến thể: {note}</p>)}
+                {visibleAlternativeOriginals.map((note, index) => <p key={`alt-${index}-${note}`}>Biến thể: {note}</p>)}
               </div>
             </details>
           ) : null}
@@ -354,7 +441,18 @@ export default function Home() {
       .filter((champion) => !favoritesOnly || favorites.includes(champion.id))
       .filter((champion) => {
         if (!normalized) return true;
-        return [champion.name, champion.title, champion.buildName, ...champion.aliases, ...champion.coreAugments.map((augment) => augment.vi)]
+        return [
+          champion.name,
+          champion.title,
+          champion.buildName,
+          ...champion.aliases,
+          ...champion.coreAugments.map((augment) => augment.vi),
+          ...(champion.communityBuilds ?? []).flatMap((build) => [
+            build.title,
+            build.titleOriginal,
+            ...build.coreAugments.flatMap((augment) => [augment.vi, augment.cn]),
+          ]),
+        ]
           .join(" ")
           .toLocaleLowerCase("vi")
           .includes(normalized);
@@ -391,7 +489,7 @@ export default function Home() {
         <nav>
           <a href="#champions">Tướng</a>
           <a href="#how-to">Cách dùng</a>
-          <a href="#sources">Nguồn dữ liệu</a>
+          <a href="#community-sources">Nguồn cộng đồng</a>
         </nav>
         <button className="install-button" onClick={installApp}><span>↓</span> Cài ứng dụng</button>
       </header>
@@ -416,7 +514,8 @@ export default function Home() {
             </div>
             <div className="hero-proof">
               <span><b>{champions.length}</b> tướng đã biên tập</span>
-              <span><b>3</b> cấp lõi ưu tiên</span>
+              <span><b>{communitySourceStats.buildCount}</b> lối cộng đồng đã gộp</span>
+              <span><b>{communitySourceStats.championCount}</b> tướng có nguồn chéo</span>
               <span><b>0</b> tỷ lệ thắng bịa</span>
             </div>
           </div>
@@ -463,6 +562,28 @@ export default function Home() {
         )}
       </section>
 
+      <section className="community-source-section" id="community-sources">
+        <div className="section-intro">
+          <div>
+            <span className="eyebrow">Nguồn cộng đồng Trung Quốc</span>
+            <h2>Theo dõi rộng, chỉ nhập phần kiểm chứng được</h2>
+            <p>Bilibili, Zhihu, Tieba và các trang hướng dẫn được dùng để phát hiện lối chơi. Tên lõi và trang bị chỉ được đưa vào khi khớp đúng ID dữ liệu game; một tổ hợp trùng nhau trên nhiều nguồn vẫn chỉ tạo một build.</p>
+          </div>
+          <div className="result-count"><b>{communitySourceStats.platformCount}</b><span>nhóm nguồn</span></div>
+        </div>
+        <div className="source-watch-grid">
+          {communitySourceStats.globalSources.map((source) => (
+            <a href={source.url} target="_blank" rel="noreferrer" key={source.url}>
+              <div><span>{source.platform}</span><small>{source.kind}</small></div>
+              <h3>{source.title}</h3>
+              <p>{source.note}</p>
+              <div className="source-watch-meta"><span>{formatSourceDate(source.publishedAt)}</span>{source.signal && <b>{source.signal}</b>}<i>↗</i></div>
+            </a>
+          ))}
+        </div>
+        <p className="community-updated">Danh mục cộng đồng biên tập gần nhất: {formatSourceDate(communitySourceStats.updatedAt)} · Mốc kiểm chứng: bản {communitySourceStats.patchBaseline} trở lên.</p>
+      </section>
+
       <section className="how-section" id="how-to">
         <div className="section-intro compact"><div><span className="eyebrow">Dùng trong 10 giây</span><h2>Không cần tự động nhận diện trận</h2></div></div>
         <div className="how-grid">
@@ -480,8 +601,8 @@ export default function Home() {
 
       <footer id="sources">
         <div className="footer-brand"><span className="brand-mark">✦</span><div><strong>LÕI.META</strong><p>Hướng dẫn ARAM: Mayhem bằng tiếng Việt.</p></div></div>
-        <p className="disclaimer">Dự án cộng đồng, không được Riot Games bảo trợ. Đã đồng bộ {sourceSync.championCount} tướng từ phần công khai của 海斗小助手; tên và ảnh lõi/trang bị được đối chiếu qua dữ liệu client Việt Nam của Riot/CommunityDragon.</p>
-        <div className="footer-links"><a href="https://lolhaidou.cn/" target="_blank" rel="noreferrer">Nguồn hướng dẫn ↗</a><a href="https://developer.riotgames.com/docs/lol" target="_blank" rel="noreferrer">Data Dragon ↗</a><a href="https://www.communitydragon.org/" target="_blank" rel="noreferrer">CommunityDragon ↗</a></div>
+        <p className="disclaimer">Dự án cộng đồng, không được Riot Games bảo trợ. Đã đồng bộ {sourceSync.championCount} tướng từ phần công khai của 海斗小助手; Bilibili, Zhihu, Tieba và các trang hướng dẫn chỉ bổ sung nguồn chéo. Tên và ảnh lõi/trang bị được đối chiếu qua dữ liệu client Việt Nam của Riot/CommunityDragon.</p>
+        <div className="footer-links"><a href="https://lolhaidou.cn/" target="_blank" rel="noreferrer">Hải Đấu ↗</a><a href="#community-sources">Nguồn cộng đồng ↑</a><a href="https://www.communitydragon.org/" target="_blank" rel="noreferrer">CommunityDragon ↗</a></div>
       </footer>
 
       {selected && (
