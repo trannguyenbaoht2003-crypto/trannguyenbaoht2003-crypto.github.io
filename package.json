@@ -10,13 +10,15 @@
     "dev": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vite",
     "build": "bash scripts/build-verified.sh",
     "build:pages": "GITHUB_PAGES=1 next build --webpack && touch out/.nojekyll",
+    "patch:pages-fallback": "node scripts/patch-static-watch-banner.mjs",
     "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
     "test": "npm run build && node --test tests/rendered-html.test.mjs",
     "validate:artifact": "bash scripts/validate-artifact.sh",
     "lint": "bash scripts/sites-env.sh -- eslint . --ignore-pattern dist --ignore-pattern .next --ignore-pattern _next --ignore-pattern out --ignore-pattern node_modules",
     "db:generate": "bash scripts/sites-env.sh -- drizzle-kit generate",
-    "sync:data": "node scripts/sync-lolhaidou.mjs && node scripts/validate-community-sources.mjs",
-    "validate:community": "node scripts/validate-community-sources.mjs"
+    "sync:data": "node scripts/sync-lolhaidou.mjs && node scripts/collect-community-candidates.mjs && node scripts/validate-community-sources.mjs && node scripts/collect-community-candidates.mjs --validate-only",
+    "collect:community": "node scripts/collect-community-candidates.mjs",
+    "validate:community": "node scripts/validate-community-sources.mjs && node scripts/collect-community-candidates.mjs --validate-only"
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",

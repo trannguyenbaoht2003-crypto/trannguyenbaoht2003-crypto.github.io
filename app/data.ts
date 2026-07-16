@@ -1,5 +1,6 @@
 import { generatedChampions, sourceSync } from "./generated-guides";
 import communitySourceData from "./community-sources.json";
+import communityWatchReportData from "../community-watch-report.json";
 
 export type Role = "Tất cả" | "Đấu sĩ" | "Xạ thủ" | "Pháp sư" | "Đỡ đòn" | "Sát thủ" | "Hỗ trợ";
 export type Tier = "SSS" | "SS" | "S" | "A" | "B";
@@ -97,6 +98,20 @@ type CommunitySourceFile = {
   patchBaseline: string;
   globalSources: CommunitySource[];
   records: RawCommunityRecord[];
+};
+
+type CommunityWatchReport = {
+  generatedAt: string;
+  contentHash: string;
+  currentPatch: string;
+  queryCount: number;
+  creatorCount: number;
+  candidateCount: number;
+  reviewCandidateCount: number;
+  newestPublishedAt?: string;
+  statusCounts: Record<string, number>;
+  scanErrors: Array<{ queryId?: string; message?: string }>;
+  autoPublish: boolean;
 };
 
 const a = (vi: string, cn: string, note?: string): Augment => ({ vi, cn, note });
@@ -385,6 +400,7 @@ const curatedChampions: ChampionGuide[] = [
 const curatedById = new Map(curatedChampions.map((champion) => [champion.id, champion]));
 
 const rawCommunityData = communitySourceData as unknown as CommunitySourceFile;
+const rawCommunityWatchReport = communityWatchReportData as unknown as CommunityWatchReport;
 const augmentByOriginal = new Map<string, Augment>();
 const itemByOriginal = new Map<string, ItemAsset>();
 
@@ -471,6 +487,18 @@ export const communitySourceStats = {
     ...rawCommunityData.records.flatMap((record) => record.sources.map((source) => source.platform)),
   ]).size,
   globalSources: rawCommunityData.globalSources,
+} as const;
+
+export const communityWatchStats = {
+  generatedAt: rawCommunityWatchReport.generatedAt,
+  currentPatch: rawCommunityWatchReport.currentPatch,
+  queryCount: rawCommunityWatchReport.queryCount,
+  creatorCount: rawCommunityWatchReport.creatorCount,
+  candidateCount: rawCommunityWatchReport.candidateCount,
+  reviewCandidateCount: rawCommunityWatchReport.reviewCandidateCount,
+  newestPublishedAt: rawCommunityWatchReport.newestPublishedAt,
+  scanErrorCount: rawCommunityWatchReport.scanErrors.length,
+  autoPublish: rawCommunityWatchReport.autoPublish,
 } as const;
 
 export const dataDragonVersion = "16.14.1";

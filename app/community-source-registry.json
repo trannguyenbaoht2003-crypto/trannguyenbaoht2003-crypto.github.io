@@ -1,0 +1,126 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-07-16",
+  "minimumPatch": "16.12",
+  "lookbackDays": 21,
+  "modeKeywords": [
+    "海克斯大乱斗",
+    "海克斯乱斗",
+    "符文大乱斗",
+    "海斗"
+  ],
+  "queries": [
+    {
+      "id": "bilibili-builds",
+      "platform": "Bilibili",
+      "adapter": "bilibili-search",
+      "query": "海克斯大乱斗 玩法",
+      "maxResults": 20
+    },
+    {
+      "id": "bilibili-items",
+      "platform": "Bilibili",
+      "adapter": "bilibili-search",
+      "query": "海克斯大乱斗 出装",
+      "maxResults": 20
+    },
+    {
+      "id": "bilibili-patch",
+      "platform": "Bilibili",
+      "adapter": "bilibili-search",
+      "query": "海克斯大乱斗 新版本",
+      "maxResults": 20
+    },
+    {
+      "id": "douyin-web",
+      "platform": "Douyin",
+      "adapter": "bing-rss",
+      "query": "site:douyin.com 海克斯大乱斗 玩法",
+      "maxResults": 12
+    },
+    {
+      "id": "zhihu-web",
+      "platform": "Zhihu",
+      "adapter": "bing-rss",
+      "query": "site:zhihu.com 海克斯大乱斗 玩法",
+      "maxResults": 12
+    },
+    {
+      "id": "tieba-web",
+      "platform": "Tieba",
+      "adapter": "bing-rss",
+      "query": "site:tieba.baidu.com 海克斯大乱斗 玩法",
+      "maxResults": 12
+    },
+    {
+      "id": "guide-sites-web",
+      "platform": "Web Trung Quốc",
+      "adapter": "bing-rss",
+      "query": "海克斯大乱斗 玩法 出装 游侠 3DM 17173",
+      "maxResults": 15
+    }
+  ],
+  "creators": [
+    {
+      "platform": "Bilibili",
+      "name": "极地iko",
+      "tier": "established"
+    },
+    {
+      "platform": "Bilibili",
+      "name": "PBE联盟",
+      "tier": "established"
+    },
+    {
+      "platform": "Bilibili",
+      "name": "乱斗一番",
+      "tier": "established"
+    },
+    {
+      "platform": "Bilibili",
+      "name": "乱斗仙人",
+      "tier": "watch"
+    },
+    {
+      "platform": "Bilibili",
+      "name": "海斗K头滴神",
+      "tier": "watch"
+    }
+  ],
+  "aliases": {
+    "champions": [
+      { "id": "senna", "names": ["塞纳"] },
+      { "id": "graves", "names": ["男枪"] },
+      { "id": "smolder", "names": ["小火龙"] },
+      { "id": "ashe", "names": ["寒冰"] },
+      { "id": "corki", "names": ["飞机"] },
+      { "id": "vayne", "names": ["VN", "vn"] },
+      { "id": "xayah", "names": ["霞"] },
+      { "id": "kayn", "names": ["蓝凯", "红凯"] },
+      { "id": "brand", "names": ["火男"] },
+      { "id": "khazix", "names": ["螳螂"] },
+      { "id": "malphite", "names": ["石头人"] },
+      { "id": "nasus", "names": ["狗头"] },
+      { "id": "sett", "names": ["腕豪"] },
+      { "id": "fiora", "names": ["剑姬"] }
+    ],
+    "augments": [
+      { "canonicalCn": "虚幻武器", "names": ["虚幻"] },
+      { "canonicalCn": "珠光护手", "names": ["法爆"] },
+      { "canonicalCn": "物理转魔法", "names": ["物转法"] },
+      { "canonicalCn": "双刀流", "names": ["双刀"] },
+      { "canonicalCn": "踢踏舞", "names": ["踏踏舞"] }
+    ],
+    "items": [
+      { "canonicalCn": "虚空之杖", "names": ["法穿棒"] }
+    ]
+  },
+  "policy": {
+    "autoPublish": false,
+    "requireExactGameId": true,
+    "minimumReviewScore": 75,
+    "crossSourceWindowDays": 45,
+    "maxInboxItems": 500,
+    "storeFullArticleOrTranscript": false
+  }
+}

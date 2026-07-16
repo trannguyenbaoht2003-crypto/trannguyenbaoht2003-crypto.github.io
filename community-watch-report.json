@@ -1,0 +1,24 @@
+{
+  "generatedAt": "2026-07-16T08:14:46.950Z",
+  "contentHash": "ab4d466ed4bc2edf6c32837c68c0e89fd210033d1e87c253ccafba7796106341",
+  "currentPatch": "16.14",
+  "queryCount": 7,
+  "creatorCount": 5,
+  "candidateCount": 56,
+  "newCandidateCount": 0,
+  "updatedCandidateCount": 1,
+  "reviewCandidateCount": 12,
+  "statusCounts": {
+    "known-source": 0,
+    "known-build": 0,
+    "cross-source-review": 0,
+    "ready-for-review": 12,
+    "needs-details": 26,
+    "needs-champion": 17,
+    "patch-watch": 1,
+    "stale": 0
+  },
+  "newestPublishedAt": "2026-07-16",
+  "scanErrors": [],
+  "autoPublish": false
+}

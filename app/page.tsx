@@ -9,6 +9,7 @@ import {
   championSplash,
   champions,
   communitySourceStats,
+  communityWatchStats,
   roles,
   sourceSync,
 } from "./data";
@@ -570,6 +571,19 @@ export default function Home() {
             <p>Bilibili, Zhihu, Tieba và các trang hướng dẫn được dùng để phát hiện lối chơi. Tên lõi và trang bị chỉ được đưa vào khi khớp đúng ID dữ liệu game; một tổ hợp trùng nhau trên nhiều nguồn vẫn chỉ tạo một build.</p>
           </div>
           <div className="result-count"><b>{communitySourceStats.platformCount}</b><span>nhóm nguồn</span></div>
+        </div>
+        <div className="automation-watch">
+          <div className="automation-watch-copy">
+            <span className="eyebrow">Bộ theo dõi tự động · Bản {communityWatchStats.currentPatch}</span>
+            <h3>Tìm ứng viên trước, con người xác minh trước khi đăng</h3>
+            <p>Hệ thống quét metadata công khai từ {communityWatchStats.queryCount} truy vấn và theo dõi {communityWatchStats.creatorCount} tác giả. Không vượt đăng nhập/CAPTCHA, không lưu nguyên bài hoặc transcript và không coi lượt xem là tỷ lệ thắng.</p>
+            <small>Lần quét gần nhất: {formatSourceDate(communityWatchStats.generatedAt.slice(0, 10))}{communityWatchStats.scanErrorCount > 0 ? ` · ${communityWatchStats.scanErrorCount} nguồn tạm lỗi` : " · tất cả truy vấn phản hồi"}</small>
+          </div>
+          <div className="automation-watch-metrics" aria-label="Trạng thái hàng chờ cộng đồng">
+            <span><b>{communityWatchStats.candidateCount}</b><small>URL đã gộp trùng</small></span>
+            <span><b>{communityWatchStats.reviewCandidateCount}</b><small>ứng viên có ID chờ duyệt</small></span>
+            <span><b>{communityWatchStats.autoPublish ? "Bật" : "0"}</b><small>tự động công khai</small></span>
+          </div>
         </div>
         <div className="source-watch-grid">
           {communitySourceStats.globalSources.map((source) => (

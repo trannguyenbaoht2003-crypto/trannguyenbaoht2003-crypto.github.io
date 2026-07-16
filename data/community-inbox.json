@@ -1,0 +1,1886 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-07-16",
+  "candidates": [
+    {
+      "id": "candidate-f5fa9ffc84e29a77",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV13bN96DEF8/",
+      "title": "海克斯大乱斗第13期：明探险家·伊泽瑞尔「虚幻武器谁能解释下？」",
+      "author": "乱斗仙人",
+      "publishedAt": "2026-07-16",
+      "signal": "5 lượt xem · 3 lượt thích · 0 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-patch"
+      ],
+      "championMatches": [
+        {
+          "id": "ezreal",
+          "cn": "伊泽瑞尔",
+          "match": "伊泽瑞尔",
+          "vi": "Ezreal",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/81.png"
+        }
+      ],
+      "augmentMatches": [
+        {
+          "id": 1029,
+          "cn": "虚幻武器",
+          "match": "虚幻武器",
+          "vi": "Vũ Khí Siêu Nhiên",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/ux/cherry/augments/icons/etherealweapon_small.png"
+        }
+      ],
+      "itemMatches": [],
+      "signature": "ezreal:1029:",
+      "score": 80,
+      "status": "ready-for-review",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nhận dạng Ezreal",
+        "1 lõi khớp ID game",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-3617bf8f07406d7a",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1CHNE6BEBc/",
+      "title": "飞身踢塞纳，MD这β海克斯打出伤害不斩人的，玩的憋气（37杀+大腿）",
+      "author": "海斗K头滴神",
+      "publishedAt": "2026-07-16",
+      "signal": "117 lượt xem · 4 lượt thích · 0 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-patch"
+      ],
+      "championMatches": [
+        {
+          "id": "senna",
+          "cn": "赛娜",
+          "match": "塞纳",
+          "vi": "Senna",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/235.png"
+        }
+      ],
+      "augmentMatches": [
+        {
+          "id": 2006,
+          "cn": "飞身踢",
+          "match": "飞身踢",
+          "vi": "Đá Bay",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/ux/kiwi/augments/icons/dropkick_small.png"
+        }
+      ],
+      "itemMatches": [],
+      "score": 80,
+      "status": "ready-for-review",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nhận dạng Senna",
+        "1 lõi khớp ID game",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16",
+      "signature": "senna:2006:"
+    },
+    {
+      "id": "candidate-6b9f6d12837e64c6",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1XdKg6TEvq/",
+      "title": "万血熊大熊二？空投熊安妮！",
+      "author": "螃蟹俄洛伊",
+      "publishedAt": "2026-07-16",
+      "signal": "866 lượt xem · 18 lượt thích · 0 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-patch"
+      ],
+      "championMatches": [
+        {
+          "id": "annie",
+          "cn": "安妮",
+          "match": "安妮",
+          "vi": "Annie",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/1.png"
+        }
+      ],
+      "augmentMatches": [
+        {
+          "id": 2031,
+          "cn": "空投熊",
+          "match": "空投熊",
+          "vi": "Thả Gấu",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/ux/cherry/augments/icons/drop_bear_small.png"
+        }
+      ],
+      "itemMatches": [],
+      "signature": "annie:2031:",
+      "score": 80,
+      "status": "ready-for-review",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nhận dạng Annie",
+        "1 lõi khớp ID game",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-3a37b9aade573cfd",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1ayNE6XErV/",
+      "title": "卡莎，大后期经典巨杀跟法穿棒一块出，大后期还是需要双穿的（27杀）",
+      "author": "海斗K头滴神",
+      "publishedAt": "2026-07-16",
+      "signal": "137 lượt xem · 2 lượt thích · 1 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-patch"
+      ],
+      "championMatches": [
+        {
+          "id": "kaisa",
+          "cn": "卡莎",
+          "match": "卡莎",
+          "vi": "Kai'Sa",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/145.png"
+        }
+      ],
+      "augmentMatches": [],
+      "itemMatches": [
+        {
+          "id": 3135,
+          "cn": "虚空之杖",
+          "match": "法穿棒",
+          "vi": "Trượng Hư Vô",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/items/icons2d/3135_mage_t3_voidstaff.png"
+        }
+      ],
+      "score": 65,
+      "status": "needs-details",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nhận dạng Kai'Sa",
+        "1 trang bị khớp ID game",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16",
+      "signature": "kaisa::3135"
+    },
+    {
+      "id": "candidate-5057a3fa583c0b85",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1CnNE6uEDr/",
+      "title": "37杀男枪，现在亮剑无尽配两个暴击已经是标配了吗？（37杀+大腿）",
+      "author": "海斗K头滴神",
+      "publishedAt": "2026-07-16",
+      "signal": "31 lượt xem · 1 lượt thích · 0 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-patch"
+      ],
+      "championMatches": [
+        {
+          "id": "graves",
+          "cn": "格雷福斯",
+          "match": "男枪",
+          "vi": "Graves",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/104.png"
+        }
+      ],
+      "augmentMatches": [],
+      "itemMatches": [],
+      "score": 55,
+      "status": "needs-details",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nhận dạng Graves",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-6676b77004635d51",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1XyNE6XENt/",
+      "title": "39杀小火龙，没有法爆也能C，爆率海克斯多可以不考虑吸蓝刀（39杀+大腿）",
+      "author": "海斗K头滴神",
+      "publishedAt": "2026-07-16",
+      "signal": "181 lượt xem · 5 lượt thích · 0 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-patch"
+      ],
+      "championMatches": [
+        {
+          "id": "smolder",
+          "cn": "斯莫德",
+          "match": "小火龙",
+          "vi": "Smolder",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/901.png"
+        }
+      ],
+      "augmentMatches": [],
+      "itemMatches": [],
+      "score": 55,
+      "status": "needs-details",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nhận dạng Smolder",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-522f700d9fc3174a",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1QcNj65EQ6/",
+      "title": "VN，踏踏舞+双刀，对面看情况不对直接8分点了不让爽（14杀+大腿）",
+      "author": "海斗K头滴神",
+      "publishedAt": "2026-07-15",
+      "signal": "472 lượt xem · 4 lượt thích · 0 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-patch"
+      ],
+      "championMatches": [
+        {
+          "id": "vayne",
+          "cn": "薇恩",
+          "match": "VN",
+          "vi": "Vayne",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/67.png"
+        }
+      ],
+      "augmentMatches": [
+        {
+          "id": 1081,
+          "cn": "踢踏舞",
+          "match": "踏踏舞",
+          "vi": "Vũ Công Thiết Hài",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/ux/cherry/augments/icons/tapdancer_small.png"
+        },
+        {
+          "id": 1225,
+          "cn": "双刀流",
+          "match": "双刀",
+          "vi": "Vũ Khí Hạng Nhẹ",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/ux/cherry/augments/icons/dualwield_small.png"
+        }
+      ],
+      "itemMatches": [],
+      "score": 80,
+      "status": "ready-for-review",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nhận dạng Vayne",
+        "2 lõi khớp ID game",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16",
+      "signature": "vayne:1081-1225:"
+    },
+    {
+      "id": "candidate-0b711f6e7ff866df",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1RXNL6SEyM/",
+      "title": "小火龙，大腿局，法爆火龙大战4刺客，还是无限q剑圣和身法凯隐（23杀+大腿）",
+      "author": "海斗K头滴神",
+      "publishedAt": "2026-07-15",
+      "signal": "447 lượt xem · 4 lượt thích · 0 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-patch"
+      ],
+      "championMatches": [
+        {
+          "id": "smolder",
+          "cn": "斯莫德",
+          "match": "小火龙",
+          "vi": "Smolder",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/901.png"
+        }
+      ],
+      "augmentMatches": [
+        {
+          "id": 1048,
+          "cn": "珠光护手",
+          "match": "法爆",
+          "vi": "Găng Bảo Thạch",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/ux/cherry/augments/icons/jeweledgauntlet_small.png"
+        }
+      ],
+      "itemMatches": [],
+      "score": 80,
+      "status": "ready-for-review",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nhận dạng Smolder",
+        "1 lõi khớp ID game",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16",
+      "signature": "smolder:1048:"
+    },
+    {
+      "id": "candidate-b1364fc25027cc57",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1vBNE6oEoT/",
+      "title": "霞，54%伤害占比，顶级法爆ad，qer全吃法爆增伤，伤害根本看不懂（23杀+五杀）",
+      "author": "海斗K头滴神",
+      "publishedAt": "2026-07-15",
+      "signal": "281 lượt xem · 5 lượt thích · 0 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-patch"
+      ],
+      "championMatches": [
+        {
+          "id": "xayah",
+          "cn": "霞",
+          "match": "霞",
+          "vi": "Xayah",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/498.png"
+        }
+      ],
+      "augmentMatches": [
+        {
+          "id": 1048,
+          "cn": "珠光护手",
+          "match": "法爆",
+          "vi": "Găng Bảo Thạch",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/ux/cherry/augments/icons/jeweledgauntlet_small.png"
+        }
+      ],
+      "itemMatches": [],
+      "score": 80,
+      "status": "ready-for-review",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nhận dạng Xayah",
+        "1 lõi khớp ID game",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16",
+      "signature": "xayah:1048:"
+    },
+    {
+      "id": "candidate-1c310a3bd3f1952f",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV177NY6BED8/",
+      "title": "新版海斗寒冰无敌玩法",
+      "author": "乱斗螃蟹",
+      "publishedAt": "2026-07-15",
+      "signal": "561 lượt xem · 14 lượt thích · 1 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-builds",
+        "bilibili-patch"
+      ],
+      "championMatches": [
+        {
+          "id": "ashe",
+          "cn": "艾希",
+          "match": "寒冰",
+          "vi": "Ashe",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/22.png"
+        }
+      ],
+      "augmentMatches": [],
+      "itemMatches": [],
+      "score": 55,
+      "status": "needs-details",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nhận dạng Ashe",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-ac24fbdb2968ff80",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1ayNE6XEgS/",
+      "title": "飞机，其实飞机池子挺杂的，能刷到ap的海克斯，不是很推荐玩（32杀）",
+      "author": "海斗K头滴神",
+      "publishedAt": "2026-07-15",
+      "signal": "333 lượt xem · 5 lượt thích · 0 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-patch"
+      ],
+      "championMatches": [
+        {
+          "id": "corki",
+          "cn": "库奇",
+          "match": "飞机",
+          "vi": "Corki",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/42.png"
+        }
+      ],
+      "augmentMatches": [],
+      "itemMatches": [],
+      "score": 55,
+      "status": "needs-details",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nhận dạng Corki",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-767a09822ceb1a59",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1DwNq6NEnm/",
+      "title": "新版本必须要玩的海克斯，轻松万血",
+      "author": "下雨天-海斗版",
+      "publishedAt": "2026-07-15",
+      "signal": "164 lượt xem · 1 lượt thích · 0 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-patch"
+      ],
+      "championMatches": [],
+      "augmentMatches": [
+        {
+          "id": 2006,
+          "cn": "飞身踢",
+          "match": "飞身踢",
+          "vi": "Đá Bay",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/ux/kiwi/augments/icons/dropkick_small.png"
+        }
+      ],
+      "itemMatches": [],
+      "score": 55,
+      "status": "needs-champion",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "1 lõi khớp ID game",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-ba6a7d9049fbf1d1",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1GZNL67Efb/",
+      "title": "金克丝，其实金局金克丝没那么刮痧，只要启动了伤害就够使（34杀+双五杀）",
+      "author": "海斗K头滴神",
+      "publishedAt": "2026-07-15",
+      "signal": "650 lượt xem · 9 lượt thích · 0 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-patch"
+      ],
+      "championMatches": [
+        {
+          "id": "jinx",
+          "cn": "金克丝",
+          "match": "金克丝",
+          "vi": "Jinx",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/222.png"
+        }
+      ],
+      "augmentMatches": [],
+      "itemMatches": [],
+      "score": 55,
+      "status": "needs-details",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nhận dạng Jinx",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-b76e98020acd1a09",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1ivNE6fEdn/",
+      "title": "韦鲁斯，现在爆率海克斯随便来两个，穿甲韦鲁斯也能满爆打后期了（29杀）",
+      "author": "海斗K头滴神",
+      "publishedAt": "2026-07-15",
+      "signal": "263 lượt xem · 6 lượt thích · 1 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-patch"
+      ],
+      "championMatches": [
+        {
+          "id": "varus",
+          "cn": "韦鲁斯",
+          "match": "韦鲁斯",
+          "vi": "Varus",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/110.png"
+        }
+      ],
+      "augmentMatches": [],
+      "itemMatches": [],
+      "score": 55,
+      "status": "needs-details",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nhận dạng Varus",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-44e2cb25e9d45d44",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1RXNL6SEBN/",
+      "title": "泽丽，这仨海克斯就是泽丽金彩局最胡的三个海克斯了，挑不出更好用的了（33杀+五杀）",
+      "author": "海斗K头滴神",
+      "publishedAt": "2026-07-15",
+      "signal": "762 lượt xem · 3 lượt thích · 0 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-patch"
+      ],
+      "championMatches": [
+        {
+          "id": "zeri",
+          "cn": "泽丽",
+          "match": "泽丽",
+          "vi": "Zeri",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/221.png"
+        }
+      ],
+      "augmentMatches": [],
+      "itemMatches": [],
+      "score": 55,
+      "status": "needs-details",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nhận dạng Zeri",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-02d07972676fbba6",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1tvN962EEz/",
+      "title": "海克斯大乱斗第12期：流光镜影·梅尔「键盘有点发烫！」",
+      "author": "乱斗仙人",
+      "publishedAt": "2026-07-15",
+      "signal": "237 lượt xem · 5 lượt thích · 0 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-patch"
+      ],
+      "championMatches": [
+        {
+          "id": "mel",
+          "cn": "流光镜影",
+          "match": "流光镜影",
+          "vi": "Mel",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/800.png"
+        }
+      ],
+      "augmentMatches": [],
+      "itemMatches": [],
+      "score": 55,
+      "status": "needs-details",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nhận dạng Mel",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-8022bbc4ea4f4129",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1WaNi6RERu/",
+      "title": "26.14海斗改动解析：飞身踢究极削弱！位面转移改动是福是祸？",
+      "author": "海斗教主张无忌",
+      "publishedAt": "2026-07-15",
+      "patchHint": "26.14",
+      "signal": "23686 lượt xem · 391 lượt thích · 16 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-patch"
+      ],
+      "championMatches": [],
+      "augmentMatches": [
+        {
+          "id": 2006,
+          "cn": "飞身踢",
+          "match": "飞身踢",
+          "vi": "Đá Bay",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/ux/kiwi/augments/icons/dropkick_small.png"
+        }
+      ],
+      "itemMatches": [],
+      "score": 55,
+      "status": "patch-watch",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "1 lõi khớp ID game",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-7079204277aa9081",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1XyNE6XEhM/",
+      "title": "韦鲁斯，亮剑最喜欢对面打车轮战了，添油战术坦克就是给我回血的（30杀+五杀）",
+      "author": "海斗K头滴神",
+      "publishedAt": "2026-07-15",
+      "signal": "276 lượt xem · 6 lượt thích · 0 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-patch"
+      ],
+      "championMatches": [
+        {
+          "id": "varus",
+          "cn": "韦鲁斯",
+          "match": "韦鲁斯",
+          "vi": "Varus",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/110.png"
+        }
+      ],
+      "augmentMatches": [],
+      "itemMatches": [],
+      "score": 55,
+      "status": "needs-details",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nhận dạng Varus",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-2e2e82be9275251d",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1zfNv67Een/",
+      "title": "蓝凯是区？那我是区长了！",
+      "author": "螃蟹俄洛伊",
+      "publishedAt": "2026-07-15",
+      "signal": "3763 lượt xem · 25 lượt thích · 2 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-patch"
+      ],
+      "championMatches": [
+        {
+          "id": "kayn",
+          "cn": "凯隐",
+          "match": "蓝凯",
+          "vi": "Kayn",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/141.png"
+        }
+      ],
+      "augmentMatches": [],
+      "itemMatches": [],
+      "score": 55,
+      "status": "needs-details",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nhận dạng Kayn",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-16b978c57b1b6e28",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1zhNE6aEuZ/",
+      "title": "37杀阿克尚，池子干净程度仅次于VN，适配度也高，也属于无尽特效都能用的（37杀+双五杀）",
+      "author": "海斗K头滴神",
+      "publishedAt": "2026-07-15",
+      "signal": "260 lượt xem · 5 lượt thích · 0 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-patch"
+      ],
+      "championMatches": [
+        {
+          "id": "akshan",
+          "cn": "阿克尚",
+          "match": "阿克尚",
+          "vi": "Akshan",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/166.png"
+        }
+      ],
+      "augmentMatches": [],
+      "itemMatches": [],
+      "score": 55,
+      "status": "needs-details",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nhận dạng Akshan",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-c002b53073a33891",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1ztNt6xEEa/",
+      "title": "盘点海斗强势英雄玩法-秘术冲拳AP大卑",
+      "author": "海斗教主张无忌",
+      "publishedAt": "2026-07-14",
+      "signal": "455 lượt xem · 18 lượt thích · 2 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-builds"
+      ],
+      "championMatches": [
+        {
+          "id": "belveth",
+          "cn": "卑尔维斯",
+          "match": "卑尔维斯",
+          "vi": "Bel'Veth",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/200.png"
+        }
+      ],
+      "augmentMatches": [
+        {
+          "id": 1058,
+          "cn": "秘术冲拳",
+          "match": "秘术冲拳",
+          "vi": "Cú Đấm Thần Bí",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/ux/cherry/augments/icons/mysticpunch_small.png"
+        }
+      ],
+      "itemMatches": [],
+      "signature": "belveth:1058:",
+      "score": 80,
+      "status": "ready-for-review",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nhận dạng Bel'Veth",
+        "1 lõi khớp ID game",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-5ddb1378b51989d7",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1LFNR68EAg/",
+      "title": "出装对一半，海克斯对一半，等于全对！",
+      "author": "癫火莎弥拉",
+      "publishedAt": "2026-07-14",
+      "signal": "1304 lượt xem · 18 lượt thích · 0 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-items"
+      ],
+      "championMatches": [],
+      "augmentMatches": [],
+      "itemMatches": [],
+      "score": 30,
+      "status": "needs-champion",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-a08669762e13c722",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1azNU6BE4m/",
+      "title": "海克斯大乱斗牙仙子阿萝拉教学，高容错出装，一套秒满血！",
+      "author": "声沙Hoarse",
+      "publishedAt": "2026-07-13",
+      "signal": "843 lượt xem · 16 lượt thích · 1 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-items"
+      ],
+      "championMatches": [
+        {
+          "id": "aurora",
+          "cn": "阿萝拉",
+          "match": "阿萝拉",
+          "vi": "Aurora",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/893.png"
+        }
+      ],
+      "augmentMatches": [
+        {
+          "id": 2083,
+          "cn": "牙仙子",
+          "match": "牙仙子",
+          "vi": "Tiên Răng",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/ux/kiwi/augments/icons/questburstingteeth_small.png"
+        }
+      ],
+      "itemMatches": [],
+      "signature": "aurora:2083:",
+      "score": 80,
+      "status": "ready-for-review",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nhận dạng Aurora",
+        "1 lõi khớp ID game",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-04bbbfe387d894ba",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV12rNy6DEoX/",
+      "title": "物理转魔法的正确出装，成就六边形法师",
+      "author": "乱斗-不良人",
+      "publishedAt": "2026-07-13",
+      "signal": "51484 lượt xem · 772 lượt thích · 143 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-items"
+      ],
+      "championMatches": [],
+      "augmentMatches": [
+        {
+          "id": 1205,
+          "cn": "物理转魔法",
+          "match": "物理转魔法",
+          "vi": "THÍCH ỨNG",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/ux/cherry/augments/icons/adapt_small.png"
+        }
+      ],
+      "itemMatches": [],
+      "score": 55,
+      "status": "needs-champion",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "1 lõi khớp ID game",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-47945bcbf45da5c7",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1qpN26rEp5/",
+      "title": "神级德玛西亚之力 盖伦海克斯暴力出装QE秒",
+      "author": "浪里_小白狼",
+      "publishedAt": "2026-07-13",
+      "signal": "197 lượt xem · 3 lượt thích · 0 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-items"
+      ],
+      "championMatches": [
+        {
+          "id": "garen",
+          "cn": "德玛西亚之力",
+          "match": "德玛西亚之力",
+          "vi": "Garen",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/86.png"
+        }
+      ],
+      "augmentMatches": [],
+      "itemMatches": [],
+      "score": 55,
+      "status": "needs-details",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nhận dạng Garen",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-d6964814ee37678b",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1ZiNC6NE3Y/",
+      "title": "海克斯大乱斗AD:出装和海克斯应该怎么选？",
+      "author": "癫火莎弥拉",
+      "publishedAt": "2026-07-13",
+      "signal": "1067 lượt xem · 17 lượt thích · 1 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-items"
+      ],
+      "championMatches": [],
+      "augmentMatches": [],
+      "itemMatches": [],
+      "score": 30,
+      "status": "needs-champion",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-6992a45059fa1339",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1iAN36BEWd/",
+      "title": "海克斯大乱斗地形专家巨魔教学，出装海克斯符文推荐，胶黏对手折磨到死！",
+      "author": "声沙Hoarse",
+      "publishedAt": "2026-07-12",
+      "signal": "283 lượt xem · 9 lượt thích · 0 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-items"
+      ],
+      "championMatches": [
+        {
+          "id": "trundle",
+          "cn": "巨魔之王",
+          "match": "巨魔之王",
+          "vi": "Trundle",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/48.png"
+        }
+      ],
+      "augmentMatches": [
+        {
+          "id": 2129,
+          "cn": "地形专家",
+          "match": "地形专家",
+          "vi": "Kiến Tạo Địa Hình",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/ux/cherry/augments/icons/lightningstrikes_small.png"
+        }
+      ],
+      "itemMatches": [],
+      "signature": "trundle:2129:",
+      "score": 80,
+      "status": "ready-for-review",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nhận dạng Trundle",
+        "1 lõi khớp ID game",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-d0ecfdbaf14fe5bc",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1GXN36NEzX/",
+      "title": "英雄联盟海克斯大乱斗 学了绝活哥卡萨丁的出装，爱上卡萨丁了",
+      "author": "一起去踩水坑嗎",
+      "publishedAt": "2026-07-12",
+      "signal": "1050 lượt xem · 13 lượt thích · 2 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-items"
+      ],
+      "championMatches": [
+        {
+          "id": "kassadin",
+          "cn": "卡萨丁",
+          "match": "卡萨丁",
+          "vi": "Kassadin",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/38.png"
+        }
+      ],
+      "augmentMatches": [],
+      "itemMatches": [],
+      "score": 55,
+      "status": "needs-details",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nhận dạng Kassadin",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-1c28a98698a96476",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1HLNA6tEqR/",
+      "title": "海斗螳螂的3种玩法，妈妈他在天上飞！",
+      "author": "海斗小助手",
+      "publishedAt": "2026-07-11",
+      "signal": "1242 lượt xem · 19 lượt thích · 6 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-builds"
+      ],
+      "championMatches": [
+        {
+          "id": "khazix",
+          "cn": "卡兹克",
+          "match": "螳螂",
+          "vi": "Kha'Zix",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/121.png"
+        }
+      ],
+      "augmentMatches": [],
+      "itemMatches": [],
+      "score": 55,
+      "status": "needs-details",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nhận dạng Kha'Zix",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-4b837aabd37626ef",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1L4NW66EW3/",
+      "title": "海斗真的永远不要出卢登吗？这件装备似乎有点被妖魔化了",
+      "author": "取个合适的名称吧_",
+      "publishedAt": "2026-07-11",
+      "signal": "5531 lượt xem · 24 lượt thích · 1 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-items"
+      ],
+      "championMatches": [],
+      "augmentMatches": [],
+      "itemMatches": [
+        {
+          "id": 4645,
+          "cn": "影焰",
+          "match": "影焰",
+          "vi": "Ngọn Lửa Hắc Hóa",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/items/icons2d/4645_shadowflame.png"
+        },
+        {
+          "id": 6692,
+          "cn": "星蚀",
+          "match": "星蚀",
+          "vi": "Nguyệt Đao",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/items/icons2d/6692_assassin_t4_eclipse.png"
+        }
+      ],
+      "score": 40,
+      "status": "needs-champion",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "2 trang bị khớp ID game",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-f3644d545995b9e3",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV15ENJ68Esj/",
+      "title": "海斗3.0:无限技能的四种玩法！达成条件以及出装思路！",
+      "author": "可乐乱斗",
+      "publishedAt": "2026-07-10",
+      "signal": "5137 lượt xem · 51 lượt thích · 34 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-builds",
+        "bilibili-items"
+      ],
+      "championMatches": [],
+      "augmentMatches": [
+        {
+          "id": 1045,
+          "cn": "炼狱导管",
+          "match": "炼狱导管",
+          "vi": "Hỏa Ngục Dẫn Truyền",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/ux/cherry/augments/icons/infernalconduit_small.png"
+        },
+        {
+          "id": 2087,
+          "cn": "大法师",
+          "match": "大法师",
+          "vi": "Đại Pháp Sư",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/ux/cherry/augments/icons/eureka_small.png"
+        },
+        {
+          "id": 2123,
+          "cn": "超负荷",
+          "match": "超负荷",
+          "vi": "Quá Tải Sát Thương",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/ux/kiwi/augments/icons/genericabilityaugmenticon_prismatic.png"
+        }
+      ],
+      "itemMatches": [],
+      "score": 55,
+      "status": "needs-champion",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "3 lõi khớp ID game",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-ca70e3c024159021",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1uYNH6ZEWz/",
+      "title": "海克斯大乱斗个人推荐薇恩出装",
+      "author": "Rainbow_ice7",
+      "publishedAt": "2026-07-10",
+      "signal": "205 lượt xem · 2 lượt thích · 0 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-items"
+      ],
+      "championMatches": [
+        {
+          "id": "vayne",
+          "cn": "薇恩",
+          "match": "薇恩",
+          "vi": "Vayne",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/67.png"
+        }
+      ],
+      "augmentMatches": [],
+      "itemMatches": [],
+      "score": 55,
+      "status": "needs-details",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nhận dạng Vayne",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-28ed427a9a17cb21",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1EQN76FE89/",
+      "title": "热血传奇：【光辉纪元】全网最爽1.76暗黑大作，几百种铭文+符文组合，超级BUFF进阶玩法，特殊组合，职业觉醒，多种玩法自己发掘体验，一切靠打轻松爽玩！！",
+      "author": "传奇嫖得爽",
+      "publishedAt": "2026-07-10",
+      "signal": "121 lượt xem · 2 lượt thích · 1 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-builds"
+      ],
+      "championMatches": [],
+      "augmentMatches": [],
+      "itemMatches": [],
+      "score": 30,
+      "status": "needs-champion",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-23866d4597ff6d00",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1ucMY6cEXy/",
+      "title": "芸阿娜大优势出装，8分钟就这三件套T1整队来了都嘚瑟一下（30杀+双五杀）",
+      "author": "海斗K头滴神",
+      "publishedAt": "2026-07-09",
+      "signal": "1957 lượt xem · 10 lượt thích · 0 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-items"
+      ],
+      "championMatches": [
+        {
+          "id": "yunara",
+          "cn": "芸阿娜",
+          "match": "芸阿娜",
+          "vi": "Yunara",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/804.png"
+        }
+      ],
+      "augmentMatches": [],
+      "itemMatches": [],
+      "score": 55,
+      "status": "needs-details",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nhận dạng Yunara",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-42f54e879a85a97d",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV15VMV6nEJZ/",
+      "title": "过早出魔宗是最大的陷阱，人马全流派玩法",
+      "author": "炭烧魚",
+      "publishedAt": "2026-07-08",
+      "signal": "49827 lượt xem · 862 lượt thích · 184 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-builds",
+        "bilibili-items"
+      ],
+      "championMatches": [],
+      "augmentMatches": [
+        {
+          "id": 1058,
+          "cn": "秘术冲拳",
+          "match": "秘术冲拳",
+          "vi": "Cú Đấm Thần Bí",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/ux/cherry/augments/icons/mysticpunch_small.png"
+        },
+        {
+          "id": 2076,
+          "cn": "保持坚定",
+          "match": "保持坚定",
+          "vi": "Giữ Vững Quyết Tâm",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/ux/kiwi/augments/icons/genericabilityaugmenticon_silver.png"
+        }
+      ],
+      "itemMatches": [
+        {
+          "id": 3004,
+          "cn": "魔宗",
+          "match": "魔宗",
+          "vi": "Kiếm Manamune",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/items/icons2d/3004_marksman_t3_manamune.png"
+        }
+      ],
+      "score": 65,
+      "status": "needs-champion",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "2 lõi khớp ID game",
+        "1 trang bị khớp ID game",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-a85b36a850015960",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1DnMV6yEDp/",
+      "title": "无限www吸血鬼！符文炼狱导管+150技能极速即可解锁新欢乐玩法！#海克斯大乱斗",
+      "author": "LOL阿阳哥搞笑王子",
+      "publishedAt": "2026-07-08",
+      "signal": "1533 lượt xem · 29 lượt thích · 1 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-builds"
+      ],
+      "championMatches": [],
+      "augmentMatches": [
+        {
+          "id": 1045,
+          "cn": "炼狱导管",
+          "match": "炼狱导管",
+          "vi": "Hỏa Ngục Dẫn Truyền",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/ux/cherry/augments/icons/infernalconduit_small.png"
+        }
+      ],
+      "itemMatches": [],
+      "score": 55,
+      "status": "needs-champion",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "1 lõi khớp ID game",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-208ea2cfe170d367",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1pDMg6tE9S/",
+      "title": "无限e流星雨女枪！折磨！海克斯选择和出装思路，带你看流星雨~",
+      "author": "往尘dd",
+      "publishedAt": "2026-07-08",
+      "signal": "153626 lượt xem · 2339 lượt thích · 308 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-items"
+      ],
+      "championMatches": [],
+      "augmentMatches": [
+        {
+          "id": 2087,
+          "cn": "大法师",
+          "match": "大法师",
+          "vi": "Đại Pháp Sư",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/ux/cherry/augments/icons/eureka_small.png"
+        }
+      ],
+      "itemMatches": [],
+      "score": 55,
+      "status": "needs-champion",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "1 lõi khớp ID game",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-295a7179e792b309",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1fUMi69EH3/",
+      "title": "海克斯大乱斗3.0软辅海克斯及出装选取思路",
+      "author": "抱鸡飞蛋",
+      "publishedAt": "2026-07-08",
+      "signal": "3171 lượt xem · 37 lượt thích · 22 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-items"
+      ],
+      "championMatches": [],
+      "augmentMatches": [],
+      "itemMatches": [],
+      "score": 30,
+      "status": "needs-champion",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-6b1fe4a6b11d03ac",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1ibMv6UE7G/",
+      "title": "海克斯大乱斗炸弹人3套玩法推荐",
+      "author": "海斗小助手",
+      "publishedAt": "2026-07-07",
+      "signal": "836 lượt xem · 25 lượt thích · 2 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-builds"
+      ],
+      "championMatches": [
+        {
+          "id": "ziggs",
+          "cn": "爆破鬼才",
+          "match": "爆破鬼才",
+          "vi": "Ziggs",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/115.png"
+        }
+      ],
+      "augmentMatches": [],
+      "itemMatches": [],
+      "score": 55,
+      "status": "needs-details",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nhận dạng Ziggs",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-c8c8573da8327b09",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1sHMt63EBk/",
+      "title": "洛克的正确玩法",
+      "author": "天使说的世界",
+      "publishedAt": "2026-07-07",
+      "signal": "157 lượt xem · 12 lượt thích · 0 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-builds"
+      ],
+      "championMatches": [
+        {
+          "id": "huijinqumoren",
+          "cn": "洛克",
+          "match": "洛克",
+          "vi": "Locke",
+          "icon": "/placeholder-champion.svg"
+        }
+      ],
+      "augmentMatches": [],
+      "itemMatches": [],
+      "score": 55,
+      "status": "needs-details",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nhận dạng Locke",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-e868f0ff6fc4e63a",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1uKMx6CEPt/",
+      "title": "奶枪物法皆修邪修玩法",
+      "author": "乱斗螃蟹",
+      "publishedAt": "2026-07-07",
+      "signal": "2829 lượt xem · 22 lượt thích · 3 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-builds"
+      ],
+      "championMatches": [],
+      "augmentMatches": [
+        {
+          "id": 1054,
+          "cn": "物法皆修",
+          "match": "物法皆修",
+          "vi": "Chúa Tể Tay Đôi",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/ux/cherry/augments/icons/masterofduality_small.png"
+        },
+        {
+          "id": 1081,
+          "cn": "踢踏舞",
+          "match": "踢踏舞",
+          "vi": "Vũ Công Thiết Hài",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/ux/cherry/augments/icons/tapdancer_small.png"
+        }
+      ],
+      "itemMatches": [],
+      "score": 55,
+      "status": "needs-champion",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "2 lõi khớp ID game",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-e206433367f38bd1",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV13AT964E6q/",
+      "title": "海克斯大乱斗锐雯4套玩法推荐",
+      "author": "海斗小助手",
+      "publishedAt": "2026-07-06",
+      "signal": "1615 lượt xem · 22 lượt thích · 7 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-builds"
+      ],
+      "championMatches": [
+        {
+          "id": "riven",
+          "cn": "锐雯",
+          "match": "锐雯",
+          "vi": "Riven",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/92.png"
+        }
+      ],
+      "augmentMatches": [],
+      "itemMatches": [],
+      "score": 55,
+      "status": "needs-details",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nhận dạng Riven",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-94002449d1bcec93",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1DvTm6uETb/",
+      "title": "海克斯大乱斗奎桑提的2种推荐玩法",
+      "author": "海斗小助手",
+      "publishedAt": "2026-07-05",
+      "signal": "3051 lượt xem · 50 lượt thích · 9 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-builds"
+      ],
+      "championMatches": [
+        {
+          "id": "ksante",
+          "cn": "奎桑提",
+          "match": "奎桑提",
+          "vi": "K'Sante",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/897.png"
+        }
+      ],
+      "augmentMatches": [],
+      "itemMatches": [],
+      "score": 55,
+      "status": "needs-details",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nhận dạng K'Sante",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-fb7c83755333637b",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1RETC6eEQv/",
+      "title": "牙仙子的正确玩法出装",
+      "author": "乱斗-不良人",
+      "publishedAt": "2026-07-05",
+      "signal": "33709 lượt xem · 698 lượt thích · 315 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-builds",
+        "bilibili-items"
+      ],
+      "championMatches": [],
+      "augmentMatches": [
+        {
+          "id": 2083,
+          "cn": "牙仙子",
+          "match": "牙仙子",
+          "vi": "Tiên Răng",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/ux/kiwi/augments/icons/questburstingteeth_small.png"
+        }
+      ],
+      "itemMatches": [],
+      "score": 55,
+      "status": "needs-champion",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "1 lõi khớp ID game",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-fbe442d55e32a72e",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1ioTC6BE2u/",
+      "title": "海克斯大乱斗就不能好好玩，你自己全程不敢失误认真玩，队友根本不尊重你，以后海斗只玩快乐玩法再也不c了，加入队友一起摆烂",
+      "author": "雏田-接代肝代打",
+      "publishedAt": "2026-07-05",
+      "signal": "137 lượt xem · 10 lượt thích · 1 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-builds"
+      ],
+      "championMatches": [],
+      "augmentMatches": [],
+      "itemMatches": [],
+      "score": 30,
+      "status": "needs-champion",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-2ef14ca8e323aa43",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1PmMM6QEY7/",
+      "title": "符文大乱斗最阴玩法！对面胡牌直接重开！队友玩的很舒服！",
+      "author": "Mr狂赵",
+      "publishedAt": "2026-07-05",
+      "signal": "29547 lượt xem · 442 lượt thích · 21 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-builds"
+      ],
+      "championMatches": [],
+      "augmentMatches": [],
+      "itemMatches": [],
+      "score": 30,
+      "status": "needs-champion",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-6b6deef77e064277",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1UGMT6dETe/",
+      "title": "海克斯大乱斗：无限飞弹的唯一玩法揭秘",
+      "author": "大汉只是个外号",
+      "publishedAt": "2026-07-05",
+      "signal": "143569 lượt xem · 3994 lượt thích · 409 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-builds"
+      ],
+      "championMatches": [],
+      "augmentMatches": [],
+      "itemMatches": [],
+      "score": 30,
+      "status": "needs-champion",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-3dd2164dfccb1d0c",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1XNMT6hE8B/",
+      "title": "新英雄拉完了，唯一玩法揭秘，海克斯信息差！",
+      "author": "大汉只是个外号",
+      "publishedAt": "2026-07-05",
+      "signal": "245328 lượt xem · 4307 lượt thích · 182 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-builds"
+      ],
+      "championMatches": [],
+      "augmentMatches": [],
+      "itemMatches": [],
+      "score": 30,
+      "status": "needs-champion",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-eb1696d6b20e45ca",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV18tMK6oEdT/",
+      "title": "男枪怎样出装打成型的大肉",
+      "author": "日尽水长去",
+      "publishedAt": "2026-07-04",
+      "signal": "1929 lượt xem · 24 lượt thích · 0 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-items"
+      ],
+      "championMatches": [
+        {
+          "id": "graves",
+          "cn": "格雷福斯",
+          "match": "男枪",
+          "vi": "Graves",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/104.png"
+        }
+      ],
+      "augmentMatches": [],
+      "itemMatches": [],
+      "score": 55,
+      "status": "needs-details",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nhận dạng Graves",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-62ce827d237509e7",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1UmMA6jEXb/",
+      "title": "海克斯大乱斗派克的3种玩法",
+      "author": "海斗小助手",
+      "publishedAt": "2026-07-04",
+      "signal": "887 lượt xem · 22 lượt thích · 2 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-builds"
+      ],
+      "championMatches": [
+        {
+          "id": "pyke",
+          "cn": "派克",
+          "match": "派克",
+          "vi": "Pyke",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/555.png"
+        }
+      ],
+      "augmentMatches": [],
+      "itemMatches": [],
+      "score": 55,
+      "status": "needs-details",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nhận dạng Pyke",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-6eb760a41ab74213",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1byTb6nErw/",
+      "title": "海克斯大乱斗雪人的三种玩法",
+      "author": "海斗小助手",
+      "publishedAt": "2026-07-03",
+      "signal": "989 lượt xem · 11 lượt thích · 0 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-builds"
+      ],
+      "championMatches": [
+        {
+          "id": "nunu",
+          "cn": "努努和威朗普",
+          "match": "努努和威朗普",
+          "vi": "Nunu & Willump",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/20.png"
+        }
+      ],
+      "augmentMatches": [],
+      "itemMatches": [],
+      "score": 55,
+      "status": "needs-details",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nhận dạng Nunu & Willump",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-9bf94222ee526223",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1vETn6KEDG/",
+      "title": "海克斯大乱斗心之钢坦克教学，海克斯符文出装推荐，学会你也能飞身踢秒脆皮，高压锅主宰比赛！",
+      "author": "声沙Hoarse",
+      "publishedAt": "2026-07-02",
+      "signal": "4532 lượt xem · 36 lượt thích · 12 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-items"
+      ],
+      "championMatches": [
+        {
+          "id": "skarner",
+          "cn": "斯卡纳",
+          "match": "斯卡纳",
+          "vi": "Skarner",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/72.png"
+        }
+      ],
+      "augmentMatches": [
+        {
+          "id": 1353,
+          "cn": "坦克引擎",
+          "match": "坦克引擎",
+          "vi": "Động Cơ Đỡ Đòn",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/ux/cherry/augments/icons/tank_engine_small.png"
+        },
+        {
+          "id": 2006,
+          "cn": "飞身踢",
+          "match": "飞身踢",
+          "vi": "Đá Bay",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/ux/kiwi/augments/icons/dropkick_small.png"
+        },
+        {
+          "id": 2102,
+          "cn": "高压锅",
+          "match": "高压锅",
+          "vi": "Lò Luyện Áp Suất",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/ux/kiwi/augments/icons/questpressurecooker_small.png"
+        }
+      ],
+      "itemMatches": [
+        {
+          "id": 3084,
+          "cn": "心之钢",
+          "match": "心之钢",
+          "vi": "Trái Tim Khổng Thần",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/items/icons2d/3084_tank_t4_heartsteel.png"
+        }
+      ],
+      "signature": "skarner:1353-2006-2102:3084",
+      "score": 90,
+      "status": "ready-for-review",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nhận dạng Skarner",
+        "3 lõi khớp ID game",
+        "1 trang bị khớp ID game",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-9807fefc4804b387",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1pfT76GEcA/",
+      "title": "芸阿娜拿到易损这样出装暴击飞弹的数量能最大化！【海克斯大乱斗3.0】",
+      "author": "乱斗陀螺王-今井",
+      "publishedAt": "2026-07-02",
+      "signal": "394724 lượt xem · 5733 lượt thích · 1421 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-items"
+      ],
+      "championMatches": [
+        {
+          "id": "yunara",
+          "cn": "芸阿娜",
+          "match": "芸阿娜",
+          "vi": "Yunara",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/804.png"
+        }
+      ],
+      "augmentMatches": [
+        {
+          "id": 1092,
+          "cn": "易损",
+          "match": "易损",
+          "vi": "Yếu Điểm",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/ux/cherry/augments/icons/vulnerability_small.png"
+        }
+      ],
+      "itemMatches": [],
+      "signature": "yunara:1092:",
+      "score": 80,
+      "status": "ready-for-review",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nhận dạng Yunara",
+        "1 lõi khớp ID game",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-2c102c8fb9da00cc",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV11ST767Efe/",
+      "title": "盘点海克斯大乱斗中奥恩不当陀螺的3套玩法",
+      "author": "海斗小助手",
+      "publishedAt": "2026-07-02",
+      "signal": "677 lượt xem · 9 lượt thích · 2 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-builds"
+      ],
+      "championMatches": [
+        {
+          "id": "ornn",
+          "cn": "奥恩",
+          "match": "奥恩",
+          "vi": "Ornn",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/516.png"
+        }
+      ],
+      "augmentMatches": [],
+      "itemMatches": [],
+      "score": 55,
+      "status": "needs-details",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nhận dạng Ornn",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-533bf61ef2c911bf",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1EoKD6ZEdK/",
+      "title": "43杀卡莎，卡莎的好处就是可以根据海克斯出装，像这局虚幻+尤里卡就直接转ap（43杀+五杀）",
+      "author": "海斗K头滴神",
+      "publishedAt": "2026-07-01",
+      "signal": "656 lượt xem · 2 lượt thích · 1 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-items"
+      ],
+      "championMatches": [
+        {
+          "id": "kaisa",
+          "cn": "卡莎",
+          "match": "卡莎",
+          "vi": "Kai'Sa",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/145.png"
+        }
+      ],
+      "augmentMatches": [
+        {
+          "id": 1030,
+          "cn": "尤里卡",
+          "match": "尤里卡",
+          "vi": "Eureka",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/ux/cherry/augments/icons/eureka_small.png"
+        },
+        {
+          "id": 1029,
+          "cn": "虚幻武器",
+          "match": "虚幻",
+          "vi": "Vũ Khí Siêu Nhiên",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/ux/cherry/augments/icons/etherealweapon_small.png"
+        }
+      ],
+      "itemMatches": [],
+      "signature": "kaisa:1029-1030:",
+      "score": 80,
+      "status": "ready-for-review",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nhận dạng Kai'Sa",
+        "2 lõi khớp ID game",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    },
+    {
+      "id": "candidate-bf0f92220bf80105",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1xwTw6NEPY/",
+      "title": "海克斯大乱斗拉克丝3种不同玩法推荐",
+      "author": "海斗小助手",
+      "publishedAt": "2026-06-30",
+      "signal": "2908 lượt xem · 61 lượt thích · 15 lượt lưu",
+      "sourceQueryIds": [
+        "bilibili-items"
+      ],
+      "championMatches": [
+        {
+          "id": "lux",
+          "cn": "拉克丝",
+          "match": "拉克丝",
+          "vi": "Lux",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/99.png"
+        }
+      ],
+      "augmentMatches": [],
+      "itemMatches": [],
+      "score": 55,
+      "status": "needs-details",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nhận dạng Lux",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16"
+    }
+  ]
+}

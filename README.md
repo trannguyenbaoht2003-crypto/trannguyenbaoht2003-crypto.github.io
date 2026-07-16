@@ -5,6 +5,32 @@ Website công khai: <https://trannguyenbaoht2003-crypto.github.io/>
 Repository này tự động build và phát hành bản tĩnh lên GitHub Pages khi nhánh
 `main` được cập nhật.
 
+## Đồng bộ dữ liệu ARAM: Mayhem
+
+Dự án dùng ba lớp dữ liệu, không tự bịa tỷ lệ thắng:
+
+- Hải Đấu công khai để đối chiếu danh sách tướng và hướng dẫn hiện hành.
+- Riot Data Dragon/CommunityDragon để khóa đúng ID, tên tiếng Việt và ảnh của tướng, lõi, trang bị.
+- Metadata công khai từ Bilibili, Zhihu, Tieba, Douyin và các trang hướng dẫn Trung Quốc để phát hiện lối chơi mới. Không vượt đăng nhập/CAPTCHA và không lưu nguyên bài hoặc transcript.
+
+Các lệnh chính:
+
+```bash
+npm run collect:community   # cập nhật hàng chờ ứng viên cộng đồng
+npm run validate:community  # kiểm tra nguồn, ID và quy tắc gộp trùng
+npm run sync:data           # chạy toàn bộ quy trình Hải Đấu + cộng đồng
+```
+
+Nguồn như Douyin có thể không hiện qua tìm kiếm web. Khi đó, thêm URL và phần mô tả ngắn nhìn thấy công khai theo mẫu `data/community-manual-input.example.json`, rồi chạy:
+
+```bash
+npm run collect:community -- --input data/community-manual-input.json
+```
+
+Ứng viên được lưu tại `data/community-inbox.json`; báo cáo và hash nằm trong `community-watch-report.json`. Trạng thái `ready-for-review` hoặc `cross-source-review` chỉ có nghĩa là máy đã nhận diện được tổ hợp bằng ID và đủ điều kiện để con người kiểm tra URL. `patch-watch` là tin thay đổi bản cần đọc. Mọi trạng thái khác tiếp tục nằm trong hàng chờ.
+
+`autoPublish` luôn để `false`: ứng viên không tự biến thành build trên web. Chỉ sau khi đối chiếu nội dung, bản game, ID và tín hiệu nguồn, build đã gộp trùng mới được thêm vào `app/community-sources.json`.
+
 ## Nền tảng kỹ thuật
 
 A clean full-stack starter running on

@@ -146,6 +146,16 @@ button { color: inherit; }
 
 .community-source-section { border-top: 1px solid var(--line); scroll-margin-top: 70px; }
 .community-source-section .section-intro p { max-width: 810px; }
+.community-source-section::before { content: "BỘ THEO DÕI TỰ ĐỘNG · BẢN 16.14\A 56 URL đã gộp · 12 ứng viên có ID chờ duyệt · 0 tự động công khai\A Chỉ dùng metadata công khai; không vượt đăng nhập/CAPTCHA và không coi lượt xem là tỷ lệ thắng."; display: block; margin-bottom: 18px; padding: 20px 22px; border: 1px solid rgba(57,216,230,.24); border-radius: 15px; background: linear-gradient(105deg, rgba(57,216,230,.08), rgba(113,84,217,.07)); color: #9db1bc; white-space: pre-line; font-size: 11px; font-weight: 600; line-height: 1.8; }
+.community-source-section:has(.automation-watch)::before { display: none; }
+.automation-watch { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(360px, .65fr); gap: 24px; align-items: center; margin-bottom: 18px; padding: 24px; border: 1px solid rgba(57,216,230,.24); border-radius: 15px; background: linear-gradient(105deg, rgba(57,216,230,.08), rgba(113,84,217,.07)); }
+.automation-watch-copy h3 { margin: 8px 0; font-size: 20px; }
+.automation-watch-copy p { margin: 0; color: #9db1bc; font-size: 12px; line-height: 1.65; }
+.automation-watch-copy small { display: block; margin-top: 12px; color: #6f8998; font-size: 9px; }
+.automation-watch-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.automation-watch-metrics > span { min-width: 0; display: flex; flex-direction: column; justify-content: center; min-height: 88px; padding: 12px; border: 1px solid var(--line); border-radius: 11px; background: rgba(7,18,27,.72); text-align: center; }
+.automation-watch-metrics b { color: var(--cyan); font-size: 22px; font-family: var(--font-geist-mono), monospace; }
+.automation-watch-metrics small { margin-top: 5px; color: #78909d; font-size: 9px; line-height: 1.35; }
 .source-watch-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 13px; }
 .source-watch-grid > a { min-width: 0; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 13px; background: var(--surface); padding: 18px; transition: border-color .2s, transform .2s; }
 .source-watch-grid > a:hover { border-color: var(--line-strong); transform: translateY(-3px); }
@@ -319,6 +329,8 @@ footer { border-top: 1px solid var(--line); width: min(1240px, calc(100% - 48px)
   .card-footer button { font-size: 0; }
   .card-footer button span { font-size: 15px; }
   .how-grid { grid-template-columns: 1fr; gap: 10px; }
+  .automation-watch { grid-template-columns: 1fr; padding: 18px; }
+  .automation-watch-metrics { grid-template-columns: repeat(3, 1fr); }
   .source-watch-grid { grid-template-columns: 1fr; }
   .install-guide { width: min(100% - 30px, 620px); grid-template-columns: auto 1fr; padding: 22px; margin-bottom: 65px; gap: 16px; }
   .install-guide button { grid-column: 1 / -1; }
