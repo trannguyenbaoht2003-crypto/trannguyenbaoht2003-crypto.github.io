@@ -4,6 +4,12 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 import { parseSignalMetrics, weightedEngagementRate } from "./lib/community-moderation.mjs";
+import {
+  EVIDENCE_CLASSIFIER_REVISION,
+  commentEvidenceState,
+  countIndependentSources,
+  extractBilibiliPublicEvidence,
+} from "./lib/community-evidence-v2.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const REGISTRY_PATH = path.join(ROOT, "app/community-source-registry.json");
@@ -28,6 +34,8 @@ const FETCH_HEADERS = {
 };
 const VALID_AUTHOR_TIERS = new Set(["established", "watch", "unlisted"]);
 const VALID_ACCESS_STATES = new Set(["ok", "temporary-error", "locked", "captcha", "private"]);
+const VALID_COMMENT_ACCESS_STATES = new Set(["ok", "insufficient-total", "temporary-error", "not-requested"]);
+const VALID_COMMENT_EVIDENCE_STATES = new Set(["positive", "negative", "mixed", "insufficient"]);
 
 function fail(message) {
   throw new Error(`Bộ theo dõi cộng đồng: ${message}`);
@@ -203,28 +211,71 @@ function bilibiliVideoId(url) {
   return String(url ?? "").match(/\/(BV[\w]+)/i)?.[1];
 }
 
-async function enrichBilibiliCandidate(raw) {
+async function enrichBilibiliCandidate(raw, registry) {
   const bvid = bilibiliVideoId(raw.url);
   if (!bvid) return raw;
   try {
-    const payload = await request(
-      `https://api.bilibili.com/x/web-interface/view?bvid=${encodeURIComponent(bvid)}`,
-      "json",
-      { "user-agent": "Mozilla/5.0", referer: raw.url },
-    );
-    if (payload.code !== 0 || !payload.data?.stat) throw new Error(payload.message || "phản hồi chi tiết Bilibili không hợp lệ");
-    const stat = payload.data.stat;
-    const metrics = {
-      views: finiteMetric(stat.view) ?? raw.metrics?.views,
-      likes: finiteMetric(stat.like) ?? raw.metrics?.likes,
-      coins: finiteMetric(stat.coin),
-      favorites: finiteMetric(stat.favorite) ?? raw.metrics?.favorites,
-      comments: finiteMetric(stat.reply),
-    };
+    const headers = { "user-agent": "Mozilla/5.0", referer: raw.url };
+    const [detailPayload, tagResult] = await Promise.all([
+      request(`https://api.bilibili.com/x/web-interface/view?bvid=${encodeURIComponent(bvid)}`, "json", headers),
+      request(`https://api.bilibili.com/x/tag/archive/tags?bvid=${encodeURIComponent(bvid)}`, "json", headers)
+        .then((payload) => ({ ok: payload.code === 0 && Array.isArray(payload.data), payload }))
+        .catch(() => ({ ok: false })),
+    ]);
+    if (detailPayload.code !== 0 || !detailPayload.data?.stat) {
+      throw new Error(detailPayload.message || "phản hồi chi tiết Bilibili không hợp lệ");
+    }
+
+    const maximumCommentSample = registry.policy.evidenceV2.maximumPublicCommentSample;
+    const totalComments = finiteMetric(detailPayload.data.stat.reply) ?? 0;
+    let replies;
+    let commentAccessState = "not-requested";
+    if (totalComments < registry.policy.moderation.minimumCommentSample) {
+      commentAccessState = "insufficient-total";
+    } else {
+      const params = new URLSearchParams({
+        type: "1",
+        oid: String(detailPayload.data.aid),
+        mode: "3",
+        next: "0",
+        ps: String(maximumCommentSample),
+      });
+      try {
+        const replyPayload = await request(`https://api.bilibili.com/x/v2/reply/main?${params}`, "json", headers);
+        if (replyPayload.code !== 0 || !Array.isArray(replyPayload.data?.replies)) {
+          throw new Error(replyPayload.message || "phản hồi bình luận Bilibili không hợp lệ");
+        }
+        replies = replyPayload.data.replies;
+        commentAccessState = "ok";
+      } catch {
+        commentAccessState = "temporary-error";
+      }
+    }
+
+    const evidence = extractBilibiliPublicEvidence({
+      bvid,
+      fallback: raw,
+      detail: detailPayload.data,
+      tags: tagResult.ok ? tagResult.payload.data : [],
+      replies,
+      maximumCommentSample,
+    });
     return {
       ...raw,
-      metrics,
-      signal: signalFromMetrics(metrics),
+      title: evidence.title || raw.title,
+      author: evidence.author || raw.author,
+      publishedAt: evidence.publishedAt || raw.publishedAt,
+      description: evidence.matchingText || raw.description,
+      metrics: evidence.metrics,
+      signal: signalFromMetrics(evidence.metrics),
+      comments: evidence.comments,
+      commentAccessState,
+      evidenceVersion: evidence.evidenceVersion,
+      evidenceClassifierRevision: evidence.classifierRevision,
+      evidenceFields: evidence.evidenceFields,
+      sourceContentId: evidence.sourceContentId,
+      sourceArchiveId: evidence.sourceArchiveId,
+      sourceAuthorId: evidence.sourceAuthorId,
       accessState: "ok",
     };
   } catch {
@@ -373,6 +424,8 @@ function classify(raw, context) {
     ...parseSignalMetrics(raw.signal),
     ...(raw.metrics ?? {}),
   };
+  const comments = raw.comments && typeof raw.comments === "object" ? raw.comments : undefined;
+  const commentsState = commentEvidenceState(comments, context.registry.policy.moderation);
   const patchHint = text.match(/\b(?:16|26)\.\d{1,2}\b/)?.[0];
   const ageDays = raw.publishedAt
     ? Math.floor((Date.now() - Date.parse(`${raw.publishedAt}T00:00:00Z`)) / 86_400_000)
@@ -412,7 +465,16 @@ function classify(raw, context) {
     modeValid,
     disqualifiers,
     engagementState: engagementPass(metrics, context.registry),
+    commentEvidenceState: commentsState,
+    comments,
+    commentAccessState: raw.commentAccessState,
     currentEnough,
+    evidenceVersion: raw.evidenceVersion,
+    evidenceClassifierRevision: raw.evidenceClassifierRevision,
+    evidenceFields: [...new Set(raw.evidenceFields ?? [])].sort(),
+    sourceContentId: raw.sourceContentId,
+    sourceArchiveId: raw.sourceArchiveId,
+    sourceAuthorId: raw.sourceAuthorId,
     sourceQueryIds: [raw.sourceQueryId].filter(Boolean),
     championMatches: champions,
     augmentMatches: augments,
@@ -459,10 +521,9 @@ function applyCrossSourceStatus(candidates, registry) {
     groups.set(candidate.signature, group);
   }
   for (const group of groups.values()) {
-    const sourceIdentities = new Set(group.map((candidate) => `${candidate.platform}:${normalize(candidate.author ?? candidate.url)}`));
     const dates = group.map((candidate) => Date.parse(`${candidate.publishedAt ?? candidate.firstSeenAt}T00:00:00Z`)).filter(Number.isFinite);
     const withinWindow = !dates.length || (Math.max(...dates) - Math.min(...dates)) / 86_400_000 <= registry.policy.crossSourceWindowDays;
-    if (sourceIdentities.size < 2 || !withinWindow) continue;
+    if (countIndependentSources(group) < 2 || !withinWindow) continue;
     for (const candidate of group) {
       candidate.status = "cross-source-review";
       candidate.score = Math.max(candidate.score, 80);
@@ -487,7 +548,13 @@ function normalizeCandidate(candidate) {
     modeValid: candidate.modeValid,
     disqualifiers: [...(candidate.disqualifiers ?? [])].sort(),
     engagementState: candidate.engagementState,
+    commentEvidenceState: candidate.commentEvidenceState,
     currentEnough: candidate.currentEnough,
+    evidenceVersion: candidate.evidenceVersion,
+    evidenceClassifierRevision: candidate.evidenceClassifierRevision,
+    sourceContentId: candidate.sourceContentId,
+    sourceArchiveId: candidate.sourceArchiveId,
+    sourceAuthorId: candidate.sourceAuthorId,
     sourceQueryIds: [...(candidate.sourceQueryIds ?? [])].sort(),
     championMatches: (candidate.championMatches ?? []).map(({ id, cn, vi, icon }) => ({ id, cn, vi, icon })).sort((a, b) => String(a.id).localeCompare(String(b.id))),
     augmentMatches: (candidate.augmentMatches ?? []).map(({ id, cn, vi, icon }) => ({ id, cn, vi, icon })).sort((a, b) => a.id - b.id),
@@ -507,6 +574,20 @@ function validateRegistry(registry) {
   if (registry.policy?.autoPublish !== true) fail("autoPublish phải bật để runner áp dụng luật kiểm duyệt tự động");
   const moderation = registry.policy?.moderation;
   if (!moderation) fail("danh mục nguồn thiếu policy.moderation");
+  const evidenceV2 = registry.policy?.evidenceV2;
+  if (evidenceV2?.enabled !== true) fail("policy.evidenceV2.enabled phải bật");
+  if (!Number.isInteger(evidenceV2.classifierRevision) || evidenceV2.classifierRevision < 1) {
+    fail("evidenceV2.classifierRevision phải là số nguyên dương");
+  }
+  if (evidenceV2.classifierRevision !== EVIDENCE_CLASSIFIER_REVISION) {
+    fail(`evidenceV2.classifierRevision phải bằng ${EVIDENCE_CLASSIFIER_REVISION}`);
+  }
+  if (!Number.isInteger(evidenceV2.maximumBilibiliEnrichmentsPerRun) || evidenceV2.maximumBilibiliEnrichmentsPerRun < 1) {
+    fail("maximumBilibiliEnrichmentsPerRun phải là số nguyên dương");
+  }
+  if (!Number.isInteger(evidenceV2.maximumPublicCommentSample) || evidenceV2.maximumPublicCommentSample < 1 || evidenceV2.maximumPublicCommentSample > 50) {
+    fail("maximumPublicCommentSample phải nằm trong 1..50");
+  }
   for (const key of ["crossSourceMinimumScore", "trustedCreatorMinimumScore"]) {
     if (!Number.isFinite(moderation[key]) || moderation[key] < 0 || moderation[key] > 100) fail(`ngưỡng ${key} phải nằm trong 0..100`);
   }
@@ -551,12 +632,24 @@ function validateInbox(inbox, indexes) {
     if (candidate.accessState !== undefined && !VALID_ACCESS_STATES.has(candidate.accessState)) fail(`candidate có accessState lạ: ${candidate.accessState}`);
     if (candidate.modeValid !== undefined && typeof candidate.modeValid !== "boolean") fail(`candidate có modeValid không hợp lệ: ${candidate.id}`);
     if (candidate.engagementState !== undefined && typeof candidate.engagementState !== "boolean") fail(`candidate có engagementState không hợp lệ: ${candidate.id}`);
+    if (candidate.commentAccessState !== undefined && !VALID_COMMENT_ACCESS_STATES.has(candidate.commentAccessState)) fail(`candidate có commentAccessState lạ: ${candidate.id}`);
+    if (candidate.commentEvidenceState !== undefined && !VALID_COMMENT_EVIDENCE_STATES.has(candidate.commentEvidenceState)) fail(`candidate có commentEvidenceState lạ: ${candidate.id}`);
+    if (candidate.evidenceVersion !== undefined && candidate.evidenceVersion !== 2) fail(`candidate có evidenceVersion lạ: ${candidate.id}`);
+    if (candidate.evidenceClassifierRevision !== undefined && (!Number.isInteger(candidate.evidenceClassifierRevision) || candidate.evidenceClassifierRevision < 1)) fail(`candidate có evidenceClassifierRevision lạ: ${candidate.id}`);
+    if (candidate.evidenceFields !== undefined && !Array.isArray(candidate.evidenceFields)) fail(`candidate có evidenceFields không hợp lệ: ${candidate.id}`);
     if (candidate.disqualifiers !== undefined && !Array.isArray(candidate.disqualifiers)) fail(`candidate có disqualifiers không hợp lệ: ${candidate.id}`);
     if (candidate.metrics !== undefined) {
       if (!candidate.metrics || typeof candidate.metrics !== "object" || Array.isArray(candidate.metrics)) fail(`candidate có metrics không hợp lệ: ${candidate.id}`);
       for (const [key, value] of Object.entries(candidate.metrics)) {
         if (!["views", "likes", "coins", "favorites", "comments"].includes(key)) fail(`candidate có metric lạ: ${key}`);
         if (!Number.isFinite(value) || value < 0) fail(`candidate có metric âm hoặc không phải số: ${candidate.id}.${key}`);
+      }
+    }
+    if (candidate.comments !== undefined) {
+      if (!candidate.comments || typeof candidate.comments !== "object" || Array.isArray(candidate.comments)) fail(`candidate có comments không hợp lệ: ${candidate.id}`);
+      for (const [key, value] of Object.entries(candidate.comments)) {
+        if (!["positive", "negative", "neutral", "meaningful", "sampled"].includes(key)) fail(`candidate có comment metric lạ: ${key}`);
+        if (!Number.isFinite(value) || value < 0) fail(`candidate có comment metric âm hoặc không phải số: ${candidate.id}.${key}`);
       }
     }
     for (const entry of candidate.championMatches ?? []) if (!championIds.has(entry.id)) fail(`candidate dùng championId lạ: ${entry.id}`);
@@ -616,14 +709,29 @@ async function main() {
 
   const context = { registry, indexes, known, today };
   const discoveredByUrl = new Map();
+  const bilibiliEvidenceCache = new Map();
+  let bilibiliEnrichmentCount = 0;
   for (const raw of rawResults) {
     let candidate = classify(raw, context);
+    const candidateUrl = canonicalUrl(raw.url);
+    const hasChampionHint = findTerms([raw.title, raw.description].filter(Boolean).join(" · "), indexes.champions, 1).length === 1;
+    const canEnrich = raw.platform === "Bilibili"
+      && Boolean(candidateUrl)
+      && hasChampionHint
+      && !new Set(["known-source", "known-build", "stale"]).has(candidate?.status);
+    if (canEnrich) {
+      let enrichedPromise = bilibiliEvidenceCache.get(candidateUrl);
+      if (!enrichedPromise && bilibiliEnrichmentCount < registry.policy.evidenceV2.maximumBilibiliEnrichmentsPerRun) {
+        enrichedPromise = enrichBilibiliCandidate(raw, registry);
+        bilibiliEvidenceCache.set(candidateUrl, enrichedPromise);
+        bilibiliEnrichmentCount += 1;
+      }
+      if (enrichedPromise) {
+        const enriched = await enrichedPromise;
+        candidate = classify({ ...enriched, sourceQueryId: raw.sourceQueryId }, context);
+      }
+    }
     if (!candidate) continue;
-    const needsExactDetail = raw.platform === "Bilibili"
-      && candidate.championMatches.length === 1
-      && candidate.augmentMatches.length > 0
-      && (candidate.itemMatches.length >= 2 || candidate.status === "known-build");
-    if (needsExactDetail) candidate = classify(await enrichBilibiliCandidate(raw), context);
     const previous = discoveredByUrl.get(candidate.url);
     if (!previous) discoveredByUrl.set(candidate.url, candidate);
     else discoveredByUrl.set(candidate.url, {

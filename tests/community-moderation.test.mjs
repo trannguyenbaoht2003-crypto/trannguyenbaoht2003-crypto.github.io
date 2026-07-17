@@ -87,8 +87,8 @@ test("calculates weighted engagement without treating it as win rate", () => {
 test("approves two independent sources with the same exact build", () => {
   const result = moderateCandidates({
     candidates: [
-      fixture({ id: "candidate-a", url: "https://a.example/1", author: "A", platform: "Bilibili" }),
-      fixture({ id: "candidate-b", url: "https://b.example/2", author: "B", platform: "Zhihu" }),
+      fixture({ id: "candidate-a", url: "https://a.example/1", author: "A", platform: "Bilibili", title: "瑞兹双核心实战玩法" }),
+      fixture({ id: "candidate-b", url: "https://b.example/2", author: "B", platform: "Zhihu", title: "符文法师无限法力构筑" }),
     ],
     policy,
     currentPatch: "16.14",
@@ -119,6 +119,38 @@ test("does not count two URLs by the same author as independent", () => {
   assert.equal(result.decisions[0].approvalPath, undefined);
 });
 
+test("does not count a mirrored title under another author as an independent source", () => {
+  const result = moderateCandidates({
+    candidates: [
+      fixture({ id: "candidate-a", url: "https://a.example/1", author: "A", platform: "Bilibili", title: "瑞兹无限法力玩法！" }),
+      fixture({ id: "candidate-b", url: "https://b.example/2", author: "B", platform: "Zhihu", title: "瑞兹 无限法力玩法" }),
+    ],
+    policy,
+    currentPatch: "16.14",
+    now: "2026-07-16T12:00:00.000Z",
+    previousDecisions: [],
+  });
+
+  assert.equal(result.decisions[0].status, "observing");
+  assert.equal(result.decisions[0].approvalPath, undefined);
+});
+
+test("uses a stable platform author id when a creator changes display name", () => {
+  const result = moderateCandidates({
+    candidates: [
+      fixture({ id: "candidate-a", url: "https://a.example/1", author: "Tên cũ", sourceAuthorId: "42", title: "瑞兹双核心实战玩法" }),
+      fixture({ id: "candidate-b", url: "https://a.example/2", author: "Tên mới", sourceAuthorId: "42", title: "符文法师无限法力构筑" }),
+    ],
+    policy,
+    currentPatch: "16.14",
+    now: "2026-07-16T12:00:00.000Z",
+    previousDecisions: [],
+  });
+
+  assert.equal(result.decisions[0].status, "observing");
+  assert.equal(result.decisions[0].approvalPath, undefined);
+});
+
 test("approves an established creator with strong public engagement", () => {
   const decision = evaluateCandidate(
     fixture({ authorTier: "established" }),
@@ -128,6 +160,7 @@ test("approves an established creator with strong public engagement", () => {
   assert.equal(decision.status, "auto-approved");
   assert.equal(decision.approvalPath, "trusted-creator");
   assert.ok(decision.score >= 90);
+  assert.ok(decision.reasons.includes("Tương tác công khai đạt ngưỡng"));
 });
 
 test("rejects high views with weak engagement", () => {

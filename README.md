@@ -14,6 +14,12 @@ Dự án tách dữ liệu thành ba lớp:
 
 Quy trình không vượt đăng nhập/CAPTCHA, không truy cập phần khóa trong WeChat mini-program, không lưu nguyên bài, transcript hoặc nội dung bình luận. Lượt xem và tương tác chỉ là bằng chứng quan tâm dùng trong kiểm duyệt, không phải tỷ lệ thắng.
 
+### Bằng chứng tự động v2
+
+V2 làm giàu ứng viên Bilibili bằng các endpoint công khai cho metadata video, tag và phản hồi cấp cao nhất. Mỗi lượt quét chỉ làm giàu tối đa 30 video; phản hồi chỉ được đọc khi tổng bình luận đủ ngưỡng kiểm duyệt và tối đa 20 mục. Pipeline loại bỏ toàn bộ văn bản sau khi phân loại, chỉ lưu số đếm `positive`, `negative`, `neutral`, `meaningful` và `sampled`.
+
+ID video, ID archive và ID tác giả công khai được giữ để gộp trùng ổn định. Hai URL không được tính là hai nguồn độc lập nếu trùng tác giả, trùng ID tác giả nền tảng hoặc có tiêu đề chuẩn hóa giống nhau. Dao động lượt xem và số tương tác không làm đổi `contentHash`; chỉ việc vượt ngưỡng tương tác/phản hồi hoặc thay đổi ID, trạng thái và quyết định mới được coi là có ý nghĩa.
+
 ## Kiểm duyệt tự động
 
 `policy.autoPublish=true` chỉ cho phép runner xuất bản khi mọi hàng rào cứng đều đạt:

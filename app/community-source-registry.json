@@ -134,6 +134,12 @@
     "crossSourceWindowDays": 45,
     "maxInboxItems": 500,
     "storeFullArticleOrTranscript": false,
+    "evidenceV2": {
+      "enabled": true,
+      "classifierRevision": 1,
+      "maximumBilibiliEnrichmentsPerRun": 30,
+      "maximumPublicCommentSample": 20
+    },
     "moderation": {
       "crossSourceMinimumScore": 85,
       "trustedCreatorMinimumScore": 90,

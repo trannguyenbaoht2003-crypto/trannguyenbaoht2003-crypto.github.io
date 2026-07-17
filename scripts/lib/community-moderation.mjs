@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 
+import { countIndependentSources } from "./community-evidence-v2.mjs";
+
 const VOLATILE_KEYS = new Set([
   "checkedAt",
   "generatedAt",
@@ -15,13 +17,6 @@ const VOLATILE_KEYS = new Set([
 function finite(value) {
   const number = Number(value);
   return Number.isFinite(number) && number >= 0 ? number : undefined;
-}
-
-function normalizedText(value = "") {
-  return String(value)
-    .normalize("NFKC")
-    .toLocaleLowerCase("zh-CN")
-    .replace(/[\s\p{P}\p{S}]/gu, "");
 }
 
 function patchMinor(value) {
@@ -43,15 +38,6 @@ function sourceAgeHours(candidate, now) {
   const current = Date.parse(now);
   if (!Number.isFinite(published) || !Number.isFinite(current)) return 0;
   return Math.max(0, (current - published) / 3_600_000);
-}
-
-function sourceIdentity(candidate) {
-  if (candidate.author) return normalizedText(candidate.author);
-  try {
-    return new URL(candidate.url).hostname.toLocaleLowerCase("en-US");
-  } catch {
-    return normalizedText(candidate.url);
-  }
 }
 
 function jaccard(left, right) {
@@ -230,7 +216,7 @@ export function evaluateCandidate(candidate, context) {
   const reasons = [];
   if (independentSourceCount >= 2) reasons.push("Hai nguồn độc lập xác nhận cùng tổ hợp");
   if (candidate.authorTier === "established") reasons.push("Tác giả nằm trong danh sách nguồn uy tín");
-  reasons.push(engagementPass ? "Phản hồi công khai đạt ngưỡng tích cực" : "Tương tác tích cực chưa đạt ngưỡng");
+  reasons.push(engagementPass ? "Tương tác công khai đạt ngưỡng" : "Tương tác tích cực chưa đạt ngưỡng");
   if (commentsPositive) reasons.push("Bình luận công khai nghiêng tích cực");
 
   if (commentsNegative) {
@@ -311,7 +297,7 @@ export function moderateCandidates({ candidates, policy, currentPatch, now, prev
   const previousBySignature = new Map(previousDecisions.map((decision) => [decision.signature, decision]));
   const decisions = groups.map((group) => {
     const sources = [...new Map(group.map((candidate) => [candidate.url, decisionSource(candidate)])).values()];
-    const identities = new Set(group.map(sourceIdentity));
+    const independentSourceCount = countIndependentSources(group);
     const representative = [...group].sort((left, right) => {
       if (left.authorTier === right.authorTier) return weightedEngagementRate(right.metrics) - weightedEngagementRate(left.metrics);
       return left.authorTier === "established" ? -1 : 1;
@@ -323,7 +309,7 @@ export function moderateCandidates({ candidates, policy, currentPatch, now, prev
         policy,
         currentPatch,
         now,
-        independentSourceCount: identities.size,
+        independentSourceCount,
         previousDecision: previousBySignature.get(signature),
       },
     );
