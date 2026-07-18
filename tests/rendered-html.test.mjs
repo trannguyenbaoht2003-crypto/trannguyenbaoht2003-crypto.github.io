@@ -20,6 +20,13 @@ test("explains automatic moderation without presenting engagement as win rate", 
   assert.match(html, /Nguồn uy tín.{0,20}phản hồi tích cực/i);
 });
 
+test("publishes the Evidence v3 audit status without exposing raw evidence", () => {
+  assert.match(html, /Evidence v3/i);
+  assert.match(html, /nguồn v3/i);
+  assert.match(html, /ảnh đã băm/i);
+  assert.doesNotMatch(html, /matchingText|rawSubtitle|pageHtml/i);
+});
+
 test("keeps the champion detail accessible", () => {
   assert.match(source, /role="dialog"/);
   assert.match(source, /aria-label="Đóng hướng dẫn"/);

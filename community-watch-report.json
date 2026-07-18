@@ -1,24 +1,33 @@
 {
-  "generatedAt": "2026-07-17T14:50:12.863Z",
-  "contentHash": "e0fd005de79efedaf4fd8a13998b89959c199aa493ee8f9b9301350ec0f5ac07",
+  "generatedAt": "2026-07-18T07:08:40.891Z",
+  "contentHash": "88b7eda89f6325613e77f739d2d4ae0a19ac3fcb5a5d9f0cb142d4457421e513",
   "currentPatch": "16.14",
   "queryCount": 7,
   "creatorCount": 5,
-  "candidateCount": 112,
-  "newCandidateCount": 0,
-  "updatedCandidateCount": 30,
-  "reviewCandidateCount": 18,
+  "candidateCount": 120,
+  "newCandidateCount": 1,
+  "updatedCandidateCount": 4,
+  "reviewCandidateCount": 0,
+  "evidenceV3": {
+    "candidateCount": 30,
+    "completeSignatureCount": 0,
+    "subtitleEvidenceCount": 0,
+    "publicPageMetadataCount": 0,
+    "publicImageEvidenceCount": 8,
+    "imageReviewQueueCount": 7,
+    "translationReviewQueueCount": 2
+  },
   "statusCounts": {
     "known-source": 0,
     "known-build": 0,
     "cross-source-review": 0,
-    "ready-for-review": 18,
-    "needs-details": 49,
-    "needs-champion": 40,
+    "ready-for-review": 0,
+    "needs-details": 73,
+    "needs-champion": 42,
     "patch-watch": 3,
     "stale": 2
   },
-  "newestPublishedAt": "2026-07-17",
+  "newestPublishedAt": "2026-07-18",
   "scanErrors": [],
   "autoPublish": true
 }

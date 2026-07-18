@@ -129,6 +129,15 @@ type CommunityWatchReport = {
   creatorCount: number;
   candidateCount: number;
   reviewCandidateCount: number;
+  evidenceV3?: {
+    candidateCount: number;
+    completeSignatureCount: number;
+    subtitleEvidenceCount: number;
+    publicPageMetadataCount: number;
+    publicImageEvidenceCount: number;
+    imageReviewQueueCount: number;
+    translationReviewQueueCount: number;
+  };
   newestPublishedAt?: string;
   statusCounts: Record<string, number>;
   scanErrors: Array<{ queryId?: string; message?: string }>;
@@ -556,6 +565,15 @@ export const communityWatchStats = {
   creatorCount: rawCommunityWatchReport.creatorCount,
   candidateCount: rawCommunityWatchReport.candidateCount,
   reviewCandidateCount: rawCommunityWatchReport.reviewCandidateCount,
+  evidenceV3: rawCommunityWatchReport.evidenceV3 ?? {
+    candidateCount: 0,
+    completeSignatureCount: 0,
+    subtitleEvidenceCount: 0,
+    publicPageMetadataCount: 0,
+    publicImageEvidenceCount: 0,
+    imageReviewQueueCount: 0,
+    translationReviewQueueCount: 0,
+  },
   newestPublishedAt: rawCommunityWatchReport.newestPublishedAt,
   scanErrorCount: rawCommunityWatchReport.scanErrors.length,
   autoPublish: rawCommunityWatchReport.autoPublish,

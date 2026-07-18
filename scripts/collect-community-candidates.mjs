@@ -5,11 +5,23 @@ import path from "node:path";
 
 import { parseSignalMetrics, weightedEngagementRate } from "./lib/community-moderation.mjs";
 import {
-  EVIDENCE_CLASSIFIER_REVISION,
+  EVIDENCE_CLASSIFIER_REVISION as EVIDENCE_V2_CLASSIFIER_REVISION,
   commentEvidenceState,
   countIndependentSources,
   extractBilibiliPublicEvidence,
 } from "./lib/community-evidence-v2.mjs";
+import {
+  EVIDENCE_V3_CLASSIFIER_REVISION,
+  buildEvidenceSignatures,
+  enforceEvidenceV3Signature,
+  extractBilibiliSubtitleText,
+  extractPublicPageMetadata,
+  hasRawEvidencePayload,
+  publicImageEvidenceId,
+  selectPublicChineseSubtitleTrack,
+  summarizeEntityEvidence,
+  summarizeSubtitleEvidence,
+} from "./lib/community-evidence-v3.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const REGISTRY_PATH = path.join(ROOT, "app/community-source-registry.json");
@@ -36,6 +48,9 @@ const VALID_AUTHOR_TIERS = new Set(["established", "watch", "unlisted"]);
 const VALID_ACCESS_STATES = new Set(["ok", "temporary-error", "locked", "captcha", "private"]);
 const VALID_COMMENT_ACCESS_STATES = new Set(["ok", "insufficient-total", "temporary-error", "not-requested"]);
 const VALID_COMMENT_EVIDENCE_STATES = new Set(["positive", "negative", "mixed", "insufficient"]);
+const VALID_SUBTITLE_ACCESS_STATES = new Set(["ok", "not-available", "temporary-error", "not-requested"]);
+const VALID_IMAGE_EVIDENCE_STATES = new Set(["ok", "not-available", "temporary-error", "not-requested"]);
+const VALID_EVIDENCE_REVIEW_STATES = new Set(["complete", "image-review-required", "translation-review-required", "incomplete"]);
 
 function fail(message) {
   throw new Error(`Bộ theo dõi cộng đồng: ${message}`);
@@ -173,6 +188,27 @@ async function request(url, responseType = "json", headers = {}) {
   throw lastError;
 }
 
+async function requestPublicBilibiliImageId(rawUrl, { maximumBytes, headers = {} } = {}) {
+  const url = new URL(String(rawUrl).replace(/^http:/i, "https:"));
+  if (url.protocol !== "https:" || !(url.hostname === "hdslb.com" || url.hostname.endsWith(".hdslb.com"))) {
+    throw new Error("máy chủ ảnh Bilibili không nằm trong danh sách công khai cho phép");
+  }
+  const limit = Math.max(1, Number(maximumBytes) || 5_000_000);
+  const response = await fetch(url, {
+    headers: { ...FETCH_HEADERS, ...headers, accept: "image/*" },
+    signal: AbortSignal.timeout(18_000),
+  });
+  if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+  if (!String(response.headers.get("content-type") ?? "").toLocaleLowerCase("en-US").startsWith("image/")) {
+    throw new Error("phản hồi ảnh Bilibili không đúng content-type");
+  }
+  const declaredLength = Number(response.headers.get("content-length"));
+  if (Number.isFinite(declaredLength) && declaredLength > limit) throw new Error("ảnh Bilibili vượt giới hạn kích thước");
+  const bytes = Buffer.from(await response.arrayBuffer());
+  if (bytes.length > limit) throw new Error("ảnh Bilibili vượt giới hạn kích thước");
+  return publicImageEvidenceId(bytes);
+}
+
 async function collectBilibili(query) {
   const params = new URLSearchParams({
     search_type: "video",
@@ -211,7 +247,7 @@ function bilibiliVideoId(url) {
   return String(url ?? "").match(/\/(BV[\w]+)/i)?.[1];
 }
 
-async function enrichBilibiliCandidate(raw, registry) {
+async function enrichBilibiliCandidate(raw, registry, { allowSubtitle = false, allowPublicImage = false } = {}) {
   const bvid = bilibiliVideoId(raw.url);
   if (!bvid) return raw;
   try {
@@ -260,19 +296,82 @@ async function enrichBilibiliCandidate(raw, registry) {
       replies,
       maximumCommentSample,
     });
+
+    const evidenceV3 = registry.policy.evidenceV3;
+    let subtitleEvidence;
+    let subtitleText = "";
+    let subtitleAccessState = allowSubtitle ? "not-available" : "not-requested";
+    if (allowSubtitle && detailPayload.data.cid) {
+      try {
+        const playerPayload = await request(
+          `https://api.bilibili.com/x/player/v2?bvid=${encodeURIComponent(bvid)}&cid=${encodeURIComponent(detailPayload.data.cid)}`,
+          "json",
+          headers,
+        );
+        const track = selectPublicChineseSubtitleTrack(playerPayload);
+        if (track) {
+          const subtitlePayload = await request(track.url, "json", headers);
+          const transientSubtitle = extractBilibiliSubtitleText(subtitlePayload, {
+            maximumSegments: evidenceV3.maximumSubtitleSegments,
+            maximumCharacters: evidenceV3.maximumSubtitleCharacters,
+          });
+          subtitleEvidence = summarizeSubtitleEvidence(transientSubtitle);
+          subtitleText = transientSubtitle.matchingText;
+          subtitleAccessState = subtitleEvidence.state;
+        }
+      } catch {
+        subtitleAccessState = "temporary-error";
+      }
+    }
+
+    let imageEvidenceState = detailPayload.data.pic ? (allowPublicImage ? "temporary-error" : "not-requested") : "not-available";
+    const sourceImageIds = [];
+    if (allowPublicImage && detailPayload.data.pic) {
+      try {
+        const imageId = await requestPublicBilibiliImageId(detailPayload.data.pic, {
+          maximumBytes: evidenceV3.maximumPublicImageBytes,
+          headers,
+        });
+        sourceImageIds.push(imageId);
+        imageEvidenceState = "ok";
+      } catch {
+        imageEvidenceState = "temporary-error";
+      }
+    }
+
+    const tagNames = (tagResult.ok ? tagResult.payload.data : []).map((tag) => tag?.tag_name).filter(Boolean);
+    const pageParts = (Array.isArray(detailPayload.data.pages) ? detailPayload.data.pages : []).map((page) => page?.part).filter(Boolean);
+    const evidenceChannels = {
+      title: evidence.title || raw.title,
+      description: plain(detailPayload.data.desc || raw.description),
+      dynamic: plain(detailPayload.data.dynamic),
+      parts: plain(pageParts.join(" · ")),
+      tags: plain(tagNames.join(" · ")),
+      subtitle: subtitleText,
+    };
+    const evidenceFields = [
+      ...evidence.evidenceFields,
+      subtitleText ? "subtitle" : undefined,
+      sourceImageIds.length ? "public-image" : undefined,
+    ].filter(Boolean);
     return {
       ...raw,
       title: evidence.title || raw.title,
       author: evidence.author || raw.author,
       publishedAt: evidence.publishedAt || raw.publishedAt,
       description: evidence.matchingText || raw.description,
+      evidenceChannels,
       metrics: evidence.metrics,
       signal: signalFromMetrics(evidence.metrics),
       comments: evidence.comments,
       commentAccessState,
-      evidenceVersion: evidence.evidenceVersion,
-      evidenceClassifierRevision: evidence.classifierRevision,
-      evidenceFields: evidence.evidenceFields,
+      evidenceVersion: 3,
+      evidenceClassifierRevision: EVIDENCE_V3_CLASSIFIER_REVISION,
+      evidenceFields,
+      subtitleAccessState,
+      subtitleEvidence,
+      imageEvidenceState,
+      sourceImageIds,
       sourceContentId: evidence.sourceContentId,
       sourceArchiveId: evidence.sourceArchiveId,
       sourceAuthorId: evidence.sourceAuthorId,
@@ -280,6 +379,52 @@ async function enrichBilibiliCandidate(raw, registry) {
     };
   } catch {
     return { ...raw, accessState: "temporary-error" };
+  }
+}
+
+async function enrichPublicPageCandidate(raw) {
+  try {
+    const html = await request(raw.url, "text");
+    const metadata = extractPublicPageMetadata(html, { url: raw.url, fallback: raw });
+    if (metadata.accessState !== "ok") {
+      return {
+        ...raw,
+        accessState: metadata.accessState,
+        evidenceVersion: 3,
+        evidenceClassifierRevision: EVIDENCE_V3_CLASSIFIER_REVISION,
+        evidenceFields: metadata.evidenceFields,
+        sourceContentId: metadata.sourceContentId,
+        pageMetadataAccessState: metadata.accessState,
+      };
+    }
+    return {
+      ...raw,
+      title: metadata.title || raw.title,
+      author: metadata.author || raw.author,
+      publishedAt: metadata.publishedAt || raw.publishedAt,
+      description: metadata.matchingText || raw.description,
+      evidenceChannels: {
+        title: metadata.title || raw.title,
+        "search-snippet": raw.description,
+        "page-metadata": metadata.matchingText,
+      },
+      evidenceVersion: 3,
+      evidenceClassifierRevision: EVIDENCE_V3_CLASSIFIER_REVISION,
+      evidenceFields: metadata.evidenceFields,
+      sourceContentId: metadata.sourceContentId,
+      pageMetadataAccessState: "ok",
+      imageEvidenceState: metadata.imageUrls.length ? "not-requested" : "not-available",
+      sourceImageReferenceIds: metadata.imageUrls.map((url) => `ref:${hash(url).slice(0, 24)}`),
+      accessState: "ok",
+    };
+  } catch {
+    return {
+      ...raw,
+      accessState: "temporary-error",
+      pageMetadataAccessState: "temporary-error",
+      evidenceVersion: 3,
+      evidenceClassifierRevision: EVIDENCE_V3_CLASSIFIER_REVISION,
+    };
   }
 }
 
@@ -391,19 +536,36 @@ function buildKnownSets(community, indexes) {
   return { sourceUrls, buildSignatures };
 }
 
-function entitySignature(champions, augments, items) {
-  if (!champions.length || (!augments.length && !items.length)) return undefined;
-  return [
-    champions.map((entry) => entry.id).sort().join("-"),
-    augments.map((entry) => entry.id).sort((a, b) => a - b).join("-"),
-    items.map((entry) => entry.id).sort((a, b) => a - b).join("-"),
-  ].join(":");
+function evidenceChannels(raw) {
+  const configured = raw.evidenceChannels && typeof raw.evidenceChannels === "object"
+    ? Object.entries(raw.evidenceChannels)
+    : [];
+  const rows = configured.length
+    ? configured
+    : [["title", raw.title], ["description", raw.description]];
+  return rows
+    .map(([channel, value]) => ({ channel: plain(channel), text: plain(value) }))
+    .filter((row) => row.channel && row.text);
+}
+
+function classifyEvidenceChannels(rows, indexes) {
+  return summarizeEntityEvidence(rows.map((row) => {
+    const negatedAugments = negatedTermIds(row.text, indexes.augments);
+    const negatedItems = negatedTermIds(row.text, indexes.items);
+    return {
+      channel: row.channel,
+      champions: findTerms(row.text, indexes.champions),
+      augments: findTerms(row.text, indexes.augments).filter((entry) => !negatedAugments.has(entry.id)),
+      items: findTerms(row.text, indexes.items).filter((entry) => !negatedItems.has(entry.id)),
+    };
+  }));
 }
 
 function classify(raw, context) {
   const url = canonicalUrl(raw.url);
   if (!url) return undefined;
-  const text = [raw.title, raw.description].filter(Boolean).join(" · ");
+  const channels = evidenceChannels(raw);
+  const text = channels.map((row) => row.text).join(" · ");
   const normalizedText = normalize(text);
   const hasModeKeyword = context.registry.modeKeywords.some((keyword) => normalizedText.includes(normalize(keyword)));
   if (!hasModeKeyword) return undefined;
@@ -412,13 +574,12 @@ function classify(raw, context) {
   const disqualifiers = (context.registry.disqualifierKeywords ?? [])
     .filter((keyword) => normalizedText.includes(normalize(keyword)));
 
-  const champions = findTerms(raw.title, context.indexes.champions, 1);
-  if (!champions.length) champions.push(...findTerms(raw.description, context.indexes.champions, 1));
-  const negatedAugments = negatedTermIds(raw.title, context.indexes.augments);
-  const negatedItems = negatedTermIds(raw.title, context.indexes.items);
-  const augments = findTerms(text, context.indexes.augments).filter((entry) => !negatedAugments.has(entry.id));
-  const items = findTerms(text, context.indexes.items).filter((entry) => !negatedItems.has(entry.id));
-  const signature = entitySignature(champions, augments, items);
+  const entities = classifyEvidenceChannels(channels, context.indexes);
+  const champions = entities.championMatches;
+  const augments = entities.augmentMatches;
+  const items = entities.itemMatches;
+  const signatures = buildEvidenceSignatures({ champions, augments, items });
+  const { signature, partialSignature } = signatures;
   const tier = sourceTier(context.registry, raw.platform, raw.author);
   const metrics = {
     ...parseSignalMetrics(raw.signal),
@@ -433,7 +594,8 @@ function classify(raw, context) {
   const currentEnough = ageDays === undefined || ageDays <= context.registry.lookbackDays;
   const reasons = ["Có từ khóa Hải Đấu/ARAM Mayhem"];
   let score = 20;
-  if (champions.length) { score += 25; reasons.push(`Nhận dạng ${champions.map((entry) => entry.vi).join(", ")}`); }
+  if (champions.length === 1) { score += 25; reasons.push(`Nhận dạng ${champions[0].vi}`); }
+  else if (champions.length > 1) reasons.push("Có nhiều tướng trong bằng chứng; cần đối chiếu bản dịch/ngữ cảnh");
   if (augments.length) { score += 25; reasons.push(`${augments.length} lõi khớp ID game`); }
   if (items.length) { score += 10; reasons.push(`${items.length} trang bị khớp ID game`); }
   if (tier === "established") { score += 10; reasons.push("Tác giả nằm trong danh sách đã có nguồn đối chiếu"); }
@@ -443,12 +605,23 @@ function classify(raw, context) {
   let status = "needs-champion";
   if (context.known.sourceUrls.has(url)) status = "known-source";
   else if (isBeforePatch(patchHint, context.registry.minimumPatch) || (ageDays !== undefined && ageDays > context.registry.lookbackDays)) status = "stale";
-  else if (champions.length && signature && context.known.buildSignatures.has(signature)) status = "known-build";
+  else if (champions.length === 1 && signature && context.known.buildSignatures.has(signature)) status = "known-build";
   else if (!champions.length && patchHint) status = "patch-watch";
   else if (!champions.length) status = "needs-champion";
-  else if (!augments.length && !items.length) status = "needs-details";
-  else if (score >= context.registry.policy.minimumReviewScore && (augments.length > 0 || items.length >= 2)) status = "ready-for-review";
+  else if (!signature) status = "needs-details";
+  else if (score >= context.registry.policy.minimumReviewScore) status = "ready-for-review";
   else status = "needs-details";
+
+  const sourceImageIds = [...new Set(raw.sourceImageIds ?? [])].sort();
+  const sourceImageReferenceIds = [...new Set(raw.sourceImageReferenceIds ?? [])].sort();
+  const evidenceReviewState = signature
+    ? "complete"
+    : champions.length > 1
+      ? "translation-review-required"
+      : (sourceImageIds.length || sourceImageReferenceIds.length)
+        ? "image-review-required"
+        : "incomplete";
+  if (evidenceReviewState === "image-review-required") reasons.push("Ảnh công khai chỉ lưu mã tham chiếu; cần OCR/đối chiếu thủ công trước khi duyệt");
 
   return {
     id: `candidate-${hash(url).slice(0, 16)}`,
@@ -472,6 +645,15 @@ function classify(raw, context) {
     evidenceVersion: raw.evidenceVersion,
     evidenceClassifierRevision: raw.evidenceClassifierRevision,
     evidenceFields: [...new Set(raw.evidenceFields ?? [])].sort(),
+    entityEvidence: entities.entityEvidence,
+    partialSignature,
+    evidenceReviewState,
+    subtitleAccessState: raw.subtitleAccessState,
+    subtitleEvidence: raw.subtitleEvidence,
+    pageMetadataAccessState: raw.pageMetadataAccessState,
+    imageEvidenceState: raw.imageEvidenceState,
+    sourceImageIds,
+    sourceImageReferenceIds,
     sourceContentId: raw.sourceContentId,
     sourceArchiveId: raw.sourceArchiveId,
     sourceAuthorId: raw.sourceAuthorId,
@@ -552,6 +734,16 @@ function normalizeCandidate(candidate) {
     currentEnough: candidate.currentEnough,
     evidenceVersion: candidate.evidenceVersion,
     evidenceClassifierRevision: candidate.evidenceClassifierRevision,
+    evidenceFields: [...(candidate.evidenceFields ?? [])].sort(),
+    entityEvidence: candidate.entityEvidence,
+    partialSignature: candidate.partialSignature,
+    evidenceReviewState: candidate.evidenceReviewState,
+    subtitleAccessState: candidate.subtitleAccessState,
+    subtitleEvidence: candidate.subtitleEvidence,
+    pageMetadataAccessState: candidate.pageMetadataAccessState,
+    imageEvidenceState: candidate.imageEvidenceState,
+    sourceImageIds: [...(candidate.sourceImageIds ?? [])].sort(),
+    sourceImageReferenceIds: [...(candidate.sourceImageReferenceIds ?? [])].sort(),
     sourceContentId: candidate.sourceContentId,
     sourceArchiveId: candidate.sourceArchiveId,
     sourceAuthorId: candidate.sourceAuthorId,
@@ -579,8 +771,8 @@ function validateRegistry(registry) {
   if (!Number.isInteger(evidenceV2.classifierRevision) || evidenceV2.classifierRevision < 1) {
     fail("evidenceV2.classifierRevision phải là số nguyên dương");
   }
-  if (evidenceV2.classifierRevision !== EVIDENCE_CLASSIFIER_REVISION) {
-    fail(`evidenceV2.classifierRevision phải bằng ${EVIDENCE_CLASSIFIER_REVISION}`);
+  if (evidenceV2.classifierRevision !== EVIDENCE_V2_CLASSIFIER_REVISION) {
+    fail(`evidenceV2.classifierRevision phải bằng ${EVIDENCE_V2_CLASSIFIER_REVISION}`);
   }
   if (!Number.isInteger(evidenceV2.maximumBilibiliEnrichmentsPerRun) || evidenceV2.maximumBilibiliEnrichmentsPerRun < 1) {
     fail("maximumBilibiliEnrichmentsPerRun phải là số nguyên dương");
@@ -588,6 +780,25 @@ function validateRegistry(registry) {
   if (!Number.isInteger(evidenceV2.maximumPublicCommentSample) || evidenceV2.maximumPublicCommentSample < 1 || evidenceV2.maximumPublicCommentSample > 50) {
     fail("maximumPublicCommentSample phải nằm trong 1..50");
   }
+  const evidenceV3 = registry.policy?.evidenceV3;
+  if (evidenceV3?.enabled !== true) fail("policy.evidenceV3.enabled phải bật");
+  if (evidenceV3.classifierRevision !== EVIDENCE_V3_CLASSIFIER_REVISION) {
+    fail(`evidenceV3.classifierRevision phải bằng ${EVIDENCE_V3_CLASSIFIER_REVISION}`);
+  }
+  for (const key of [
+    "maximumBilibiliEnrichmentsPerRun",
+    "maximumBilibiliSubtitleFetchesPerRun",
+    "maximumPublicImageFetchesPerRun",
+    "maximumPublicPageEnrichmentsPerRun",
+    "maximumSubtitleSegments",
+    "maximumSubtitleCharacters",
+    "maximumPublicImageBytes",
+  ]) {
+    if (!Number.isInteger(evidenceV3[key]) || evidenceV3[key] < 1) fail(`evidenceV3.${key} phải là số nguyên dương`);
+  }
+  if (evidenceV3.maximumSubtitleSegments > 500) fail("maximumSubtitleSegments không được vượt 500");
+  if (evidenceV3.maximumSubtitleCharacters > 50_000) fail("maximumSubtitleCharacters không được vượt 50000");
+  if (evidenceV3.storeRawEvidenceText !== false) fail("evidenceV3.storeRawEvidenceText phải tắt");
   for (const key of ["crossSourceMinimumScore", "trustedCreatorMinimumScore"]) {
     if (!Number.isFinite(moderation[key]) || moderation[key] < 0 || moderation[key] > 100) fail(`ngưỡng ${key} phải nằm trong 0..100`);
   }
@@ -634,9 +845,33 @@ function validateInbox(inbox, indexes) {
     if (candidate.engagementState !== undefined && typeof candidate.engagementState !== "boolean") fail(`candidate có engagementState không hợp lệ: ${candidate.id}`);
     if (candidate.commentAccessState !== undefined && !VALID_COMMENT_ACCESS_STATES.has(candidate.commentAccessState)) fail(`candidate có commentAccessState lạ: ${candidate.id}`);
     if (candidate.commentEvidenceState !== undefined && !VALID_COMMENT_EVIDENCE_STATES.has(candidate.commentEvidenceState)) fail(`candidate có commentEvidenceState lạ: ${candidate.id}`);
-    if (candidate.evidenceVersion !== undefined && candidate.evidenceVersion !== 2) fail(`candidate có evidenceVersion lạ: ${candidate.id}`);
+    if (candidate.evidenceVersion !== undefined && !new Set([2, 3]).has(candidate.evidenceVersion)) fail(`candidate có evidenceVersion lạ: ${candidate.id}`);
     if (candidate.evidenceClassifierRevision !== undefined && (!Number.isInteger(candidate.evidenceClassifierRevision) || candidate.evidenceClassifierRevision < 1)) fail(`candidate có evidenceClassifierRevision lạ: ${candidate.id}`);
     if (candidate.evidenceFields !== undefined && !Array.isArray(candidate.evidenceFields)) fail(`candidate có evidenceFields không hợp lệ: ${candidate.id}`);
+    if (candidate.evidenceReviewState !== undefined && !VALID_EVIDENCE_REVIEW_STATES.has(candidate.evidenceReviewState)) fail(`candidate có evidenceReviewState lạ: ${candidate.id}`);
+    if (candidate.subtitleAccessState !== undefined && !VALID_SUBTITLE_ACCESS_STATES.has(candidate.subtitleAccessState)) fail(`candidate có subtitleAccessState lạ: ${candidate.id}`);
+    if (candidate.imageEvidenceState !== undefined && !VALID_IMAGE_EVIDENCE_STATES.has(candidate.imageEvidenceState)) fail(`candidate có imageEvidenceState lạ: ${candidate.id}`);
+    if (candidate.pageMetadataAccessState !== undefined && !VALID_ACCESS_STATES.has(candidate.pageMetadataAccessState)) fail(`candidate có pageMetadataAccessState lạ: ${candidate.id}`);
+    if (candidate.partialSignature !== undefined && typeof candidate.partialSignature !== "string") fail(`candidate có partialSignature lạ: ${candidate.id}`);
+    if (candidate.subtitleEvidence !== undefined) {
+      if (!candidate.subtitleEvidence || typeof candidate.subtitleEvidence !== "object" || Array.isArray(candidate.subtitleEvidence)) fail(`candidate có subtitleEvidence không hợp lệ: ${candidate.id}`);
+      if (!new Set(["ok", "not-available"]).has(candidate.subtitleEvidence.state)) fail(`candidate có subtitleEvidence.state lạ: ${candidate.id}`);
+      if (!new Set(["0", "1-20", "21-100", "101+"]).has(candidate.subtitleEvidence.segmentCountBucket)) fail(`candidate có segmentCountBucket lạ: ${candidate.id}`);
+      if (typeof candidate.subtitleEvidence.truncated !== "boolean") fail(`candidate có subtitleEvidence.truncated lạ: ${candidate.id}`);
+    }
+    for (const imageId of candidate.sourceImageIds ?? []) if (!/^sha256:[a-f0-9]{24}$/.test(imageId)) fail(`candidate có sourceImageId lạ: ${candidate.id}`);
+    for (const imageId of candidate.sourceImageReferenceIds ?? []) if (!/^ref:[a-f0-9]{24}$/.test(imageId)) fail(`candidate có sourceImageReferenceId lạ: ${candidate.id}`);
+    if (candidate.entityEvidence !== undefined) {
+      for (const key of ["champions", "augments", "items"]) {
+        if (!Array.isArray(candidate.entityEvidence[key])) fail(`candidate thiếu entityEvidence.${key}: ${candidate.id}`);
+        for (const entry of candidate.entityEvidence[key]) {
+          if (entry?.id === undefined || !Array.isArray(entry.channels) || entry.channels.some((channel) => typeof channel !== "string")) {
+            fail(`candidate có entityEvidence.${key} lạ: ${candidate.id}`);
+          }
+        }
+      }
+      if (hasRawEvidencePayload(candidate.entityEvidence)) fail(`candidate lưu văn bản bằng chứng ngoài schema: ${candidate.id}`);
+    }
     if (candidate.disqualifiers !== undefined && !Array.isArray(candidate.disqualifiers)) fail(`candidate có disqualifiers không hợp lệ: ${candidate.id}`);
     if (candidate.metrics !== undefined) {
       if (!candidate.metrics || typeof candidate.metrics !== "object" || Array.isArray(candidate.metrics)) fail(`candidate có metrics không hợp lệ: ${candidate.id}`);
@@ -710,7 +945,11 @@ async function main() {
   const context = { registry, indexes, known, today };
   const discoveredByUrl = new Map();
   const bilibiliEvidenceCache = new Map();
+  const publicPageEvidenceCache = new Map();
   let bilibiliEnrichmentCount = 0;
+  let bilibiliSubtitleFetchCount = 0;
+  let publicImageFetchCount = 0;
+  let publicPageEnrichmentCount = 0;
   for (const raw of rawResults) {
     let candidate = classify(raw, context);
     const candidateUrl = canonicalUrl(raw.url);
@@ -721,10 +960,30 @@ async function main() {
       && !new Set(["known-source", "known-build", "stale"]).has(candidate?.status);
     if (canEnrich) {
       let enrichedPromise = bilibiliEvidenceCache.get(candidateUrl);
-      if (!enrichedPromise && bilibiliEnrichmentCount < registry.policy.evidenceV2.maximumBilibiliEnrichmentsPerRun) {
-        enrichedPromise = enrichBilibiliCandidate(raw, registry);
+      if (!enrichedPromise && bilibiliEnrichmentCount < registry.policy.evidenceV3.maximumBilibiliEnrichmentsPerRun) {
+        const allowSubtitle = bilibiliSubtitleFetchCount < registry.policy.evidenceV3.maximumBilibiliSubtitleFetchesPerRun;
+        const allowPublicImage = publicImageFetchCount < registry.policy.evidenceV3.maximumPublicImageFetchesPerRun;
+        enrichedPromise = enrichBilibiliCandidate(raw, registry, { allowSubtitle, allowPublicImage });
         bilibiliEvidenceCache.set(candidateUrl, enrichedPromise);
         bilibiliEnrichmentCount += 1;
+        if (allowSubtitle) bilibiliSubtitleFetchCount += 1;
+        if (allowPublicImage) publicImageFetchCount += 1;
+      }
+      if (enrichedPromise) {
+        const enriched = await enrichedPromise;
+        candidate = classify({ ...enriched, sourceQueryId: raw.sourceQueryId }, context);
+      }
+    }
+    const canEnrichPublicPage = raw.platform !== "Bilibili"
+      && Boolean(candidateUrl)
+      && hasChampionHint
+      && !new Set(["known-source", "known-build", "stale"]).has(candidate?.status);
+    if (canEnrichPublicPage) {
+      let enrichedPromise = publicPageEvidenceCache.get(candidateUrl);
+      if (!enrichedPromise && publicPageEnrichmentCount < registry.policy.evidenceV3.maximumPublicPageEnrichmentsPerRun) {
+        enrichedPromise = enrichPublicPageCandidate(raw);
+        publicPageEvidenceCache.set(candidateUrl, enrichedPromise);
+        publicPageEnrichmentCount += 1;
       }
       if (enrichedPromise) {
         const enriched = await enrichedPromise;
@@ -742,6 +1001,7 @@ async function main() {
   }
 
   const merged = mergeCandidates(inbox.candidates, [...discoveredByUrl.values()]);
+  merged.candidates = merged.candidates.map(enforceEvidenceV3Signature);
   applyCrossSourceStatus(merged.candidates, registry);
   merged.candidates.sort((left, right) =>
     String(right.publishedAt ?? right.firstSeenAt).localeCompare(String(left.publishedAt ?? left.firstSeenAt))
@@ -766,6 +1026,15 @@ async function main() {
     newCandidateCount: merged.newCount,
     updatedCandidateCount: merged.updatedCount,
     reviewCandidateCount: statusCounts["ready-for-review"] + statusCounts["cross-source-review"],
+    evidenceV3: {
+      candidateCount: limitedCandidates.filter((candidate) => candidate.evidenceVersion === 3).length,
+      completeSignatureCount: limitedCandidates.filter((candidate) => candidate.evidenceVersion === 3 && candidate.evidenceReviewState === "complete").length,
+      subtitleEvidenceCount: limitedCandidates.filter((candidate) => candidate.subtitleAccessState === "ok").length,
+      publicPageMetadataCount: limitedCandidates.filter((candidate) => candidate.pageMetadataAccessState === "ok").length,
+      publicImageEvidenceCount: limitedCandidates.filter((candidate) => candidate.imageEvidenceState === "ok").length,
+      imageReviewQueueCount: limitedCandidates.filter((candidate) => candidate.evidenceVersion === 3 && candidate.evidenceReviewState === "image-review-required").length,
+      translationReviewQueueCount: limitedCandidates.filter((candidate) => candidate.evidenceVersion === 3 && candidate.evidenceReviewState === "translation-review-required").length,
+    },
     statusCounts,
     newestPublishedAt: limitedCandidates.map((candidate) => candidate.publishedAt).filter(Boolean).sort().at(-1),
     scanErrors: errors,

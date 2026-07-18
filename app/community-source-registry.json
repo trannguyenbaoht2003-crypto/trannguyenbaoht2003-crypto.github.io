@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-16",
+  "updatedAt": "2026-07-18",
   "minimumPatch": "16.12",
   "lookbackDays": 21,
   "modeKeywords": [
@@ -124,7 +124,11 @@
       { "canonicalCn": "踢踏舞", "names": ["踏踏舞"] }
     ],
     "items": [
-      { "canonicalCn": "虚空之杖", "names": ["法穿棒"] }
+      { "canonicalCn": "虚空之杖", "names": ["法穿棒"] },
+      { "canonicalCn": "三相之力", "names": ["三项"] },
+      { "canonicalCn": "疾射火炮", "names": ["火炮"] },
+      { "canonicalCn": "多米尼克领主的致意", "names": ["大穿"] },
+      { "canonicalCn": "夺萃之镰", "names": ["吸蓝刀"] }
     ]
   },
   "policy": {
@@ -139,6 +143,18 @@
       "classifierRevision": 1,
       "maximumBilibiliEnrichmentsPerRun": 30,
       "maximumPublicCommentSample": 20
+    },
+    "evidenceV3": {
+      "enabled": true,
+      "classifierRevision": 1,
+      "maximumBilibiliEnrichmentsPerRun": 30,
+      "maximumBilibiliSubtitleFetchesPerRun": 20,
+      "maximumPublicImageFetchesPerRun": 12,
+      "maximumPublicPageEnrichmentsPerRun": 15,
+      "maximumSubtitleSegments": 200,
+      "maximumSubtitleCharacters": 12000,
+      "maximumPublicImageBytes": 5000000,
+      "storeRawEvidenceText": false
     },
     "moderation": {
       "crossSourceMinimumScore": 85,

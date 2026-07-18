@@ -20,6 +20,12 @@ V2 làm giàu ứng viên Bilibili bằng các endpoint công khai cho metadata 
 
 ID video, ID archive và ID tác giả công khai được giữ để gộp trùng ổn định. Hai URL không được tính là hai nguồn độc lập nếu trùng tác giả, trùng ID tác giả nền tảng hoặc có tiêu đề chuẩn hóa giống nhau. Dao động lượt xem và số tương tác không làm đổi `contentHash`; chỉ việc vượt ngưỡng tương tác/phản hồi hoặc thay đổi ID, trạng thái và quyết định mới được coi là có ý nghĩa.
 
+### Bằng chứng tự động v3
+
+V3 tách nội dung công khai thành từng kênh bằng chứng (`title`, `description`, `tags`, `parts`, `subtitle`, `search-snippet`, `page-metadata`) rồi chỉ lưu ID thực thể và tên kênh đã khớp. Phụ đề Bilibili chỉ được đọc khi endpoint player công khai cung cấp track tiếng Trung; metadata Open Graph/JSON-LD được dùng để bổ sung tác giả/ngày cho các trang công khai. CAPTCHA, yêu cầu đăng nhập và trang riêng tư đều dừng tại chỗ.
+
+Ảnh bìa Bilibili được đọc theo quota/kích thước và chỉ lưu mã băm; ảnh metadata của trang ngoài chỉ lưu mã tham chiếu. Pipeline không lưu HTML, mô tả nguồn, phụ đề, transcript hay nội dung ảnh. `signature` chỉ được tạo khi có đúng một tướng, ít nhất một lõi và ít nhất hai trang bị khớp ID game. Phần thiếu chỉ vào hàng chờ đối chiếu ảnh/bản dịch, không được tự duyệt hoặc nhóm thành bằng chứng chéo.
+
 ## Kiểm duyệt tự động
 
 `policy.autoPublish=true` chỉ cho phép runner xuất bản khi mọi hàng rào cứng đều đạt:
