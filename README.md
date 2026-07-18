@@ -26,6 +26,19 @@ V3 tách nội dung công khai thành từng kênh bằng chứng (`title`, `des
 
 Ảnh bìa Bilibili được đọc theo quota/kích thước và chỉ lưu mã băm; ảnh metadata của trang ngoài chỉ lưu mã tham chiếu. Pipeline không lưu HTML, mô tả nguồn, phụ đề, transcript hay nội dung ảnh. `signature` chỉ được tạo khi có đúng một tướng, ít nhất một lõi và ít nhất hai trang bị khớp ID game. Phần thiếu chỉ vào hàng chờ đối chiếu ảnh/bản dịch, không được tự duyệt hoặc nhóm thành bằng chứng chéo.
 
+### Bảng duyệt Evidence v3.1
+
+Trang công khai `/review/` chỉ hiển thị metadata an toàn của ứng viên cần đối chiếu ảnh hoặc bản dịch. Người duyệt mở URL nguồn, chọn đúng một tướng, ít nhất một lõi và ít nhất hai trang bị từ catalog ID/ảnh client hiện hành, xác nhận đã đối chiếu rồi tải `evidence-v31-review-package.json`.
+
+Trang không có token, request ghi hoặc quyền tự đăng. Gói chỉ chứa candidate ID, URL và ID game có cấu trúc; không chứa ghi chú tự do, HTML, mô tả, phụ đề, bình luận hoặc ảnh nguồn. Để nhập gói vào repository:
+
+```bash
+npm run review:apply -- /đường/dẫn/evidence-v31-review-package.json
+npm run sync:data
+```
+
+CLI từ chối toàn bộ gói nếu URL không còn khớp candidate, ID không tồn tại, mảng ID bị trùng, tổ hợp chưa đủ hoặc chưa xác nhận. Lựa chọn được lưu nguyên tử trong `data/community-review-overrides.json`; nó không được tính là nguồn độc lập và không thể hồi sinh nguồn stale, locked, CAPTCHA, private, sai mode, lỗi thời hoặc có nội dung bị loại. Moderation vẫn là cổng xuất bản cuối cùng.
+
 ## Kiểm duyệt tự động
 
 `policy.autoPublish=true` chỉ cho phép runner xuất bản khi mọi hàng rào cứng đều đạt:
@@ -46,6 +59,7 @@ Một build từng được duyệt sẽ chuyển thành **Cần kiểm chứng*
 ## Tệp audit
 
 - `data/community-inbox.json`: hàng chờ ứng viên đã nhận dạng.
+- `data/community-review-overrides.json`: lựa chọn ID Evidence v3.1 đã nhập và còn hiệu lực.
 - `data/community-evidence.json`: bằng chứng đủ trạng thái để runner xem xét.
 - `data/community-decisions.json`: quyết định, lý do, đường duyệt và lịch sử hạ trạng thái.
 - `app/generated-community-sources.json`: chỉ các build tự động được phép hiển thị hoặc đang cần kiểm chứng.
@@ -62,6 +76,7 @@ npm run collect:community    # thu thập metadata công khai vào inbox
 npm run moderate:community   # đánh giá và sinh dữ liệu tự động
 npm run validate:community   # kiểm tra schema, gộp trùng, ID và ảnh client
 npm run sync:data            # đồng bộ Riot/Hải Đấu/cộng đồng rồi kiểm duyệt
+npm run review:apply -- FILE # nhập gói Evidence v3.1 đã tải từ /review/
 npm run test:moderation      # kiểm thử luật duyệt và hạ trạng thái
 npm test                     # kiểm thử luật + build GitHub Pages + HTML
 npm run lint                 # kiểm tra mã nguồn

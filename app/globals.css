@@ -157,6 +157,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, summary:focus-visibl
 .moderation-rules span { min-height: 36px; padding: 0 11px; display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--line); border-radius: 999px; background: rgba(5,11,24,.38); color: var(--muted); font-size: 11px; }
 .moderation-rules svg { width: 15px; height: 15px; color: var(--green); }
 .moderation-rules span:last-child svg { color: var(--gold); }
+.review-workbench-link { width: fit-content; min-height: 42px; margin-top: 13px; padding: 0 13px; display: inline-flex; align-items: center; gap: 8px; border: 1px solid rgba(56, 189, 248, .42); border-radius: 10px; background: rgba(56, 189, 248, .09); color: var(--cyan-soft); font-size: 11px; font-weight: 800; }
+.review-workbench-link:hover { border-color: var(--cyan); background: rgba(56, 189, 248, .14); }
+.review-workbench-link svg { width: 15px; height: 15px; }
 .automation-metrics { margin-top: 16px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .automation-metrics span { padding: 12px; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 10px; background: rgba(5,11,24,.34); }
 .automation-metrics b { color: var(--cyan-soft); font-size: 20px; font-variant-numeric: tabular-nums; }

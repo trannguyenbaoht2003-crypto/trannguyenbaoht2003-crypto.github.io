@@ -22,6 +22,11 @@ import {
   summarizeEntityEvidence,
   summarizeSubtitleEvidence,
 } from "./lib/community-evidence-v3.mjs";
+import {
+  applyReviewOverrides,
+  buildReviewCatalog,
+  validateReviewOverrides,
+} from "./lib/community-review-v31.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const REGISTRY_PATH = path.join(ROOT, "app/community-source-registry.json");
@@ -29,6 +34,7 @@ const COMMUNITY_PATH = path.join(ROOT, "app/community-sources.json");
 const GUIDES_PATH = path.join(ROOT, "app/generated-guides.ts");
 const DATA_PATH = path.join(ROOT, "app/data.ts");
 const INBOX_PATH = path.join(ROOT, "data/community-inbox.json");
+const REVIEW_OVERRIDES_PATH = path.join(ROOT, "data/community-review-overrides.json");
 const REPORT_PATH = path.join(ROOT, "community-watch-report.json");
 const VALID_STATUSES = new Set([
   "known-source",
@@ -751,6 +757,10 @@ function normalizeCandidate(candidate) {
     championMatches: (candidate.championMatches ?? []).map(({ id, cn, vi, icon }) => ({ id, cn, vi, icon })).sort((a, b) => String(a.id).localeCompare(String(b.id))),
     augmentMatches: (candidate.augmentMatches ?? []).map(({ id, cn, vi, icon }) => ({ id, cn, vi, icon })).sort((a, b) => a.id - b.id),
     itemMatches: (candidate.itemMatches ?? []).map(({ id, cn, vi, icon }) => ({ id, cn, vi, icon })).sort((a, b) => a.id - b.id),
+    reviewOverride: candidate.reviewOverride ? {
+      evidenceVersion: candidate.reviewOverride.evidenceVersion,
+      attested: candidate.reviewOverride.attested,
+    } : undefined,
     signature: candidate.signature,
     score: candidate.score,
     status: candidate.status,
@@ -853,6 +863,18 @@ function validateInbox(inbox, indexes) {
     if (candidate.imageEvidenceState !== undefined && !VALID_IMAGE_EVIDENCE_STATES.has(candidate.imageEvidenceState)) fail(`candidate có imageEvidenceState lạ: ${candidate.id}`);
     if (candidate.pageMetadataAccessState !== undefined && !VALID_ACCESS_STATES.has(candidate.pageMetadataAccessState)) fail(`candidate có pageMetadataAccessState lạ: ${candidate.id}`);
     if (candidate.partialSignature !== undefined && typeof candidate.partialSignature !== "string") fail(`candidate có partialSignature lạ: ${candidate.id}`);
+    if (candidate.reviewOverride !== undefined) {
+      const keys = Object.keys(candidate.reviewOverride).sort();
+      if (JSON.stringify(keys) !== JSON.stringify(["attested", "evidenceVersion", "reviewedAt"])) {
+        fail(`candidate có reviewOverride ngoài schema: ${candidate.id}`);
+      }
+      if (candidate.reviewOverride.evidenceVersion !== "3.1" || candidate.reviewOverride.attested !== true) {
+        fail(`candidate có reviewOverride không hợp lệ: ${candidate.id}`);
+      }
+      if (typeof candidate.reviewOverride.reviewedAt !== "string" || Number.isNaN(Date.parse(candidate.reviewOverride.reviewedAt))) {
+        fail(`candidate có reviewOverride.reviewedAt không hợp lệ: ${candidate.id}`);
+      }
+    }
     if (candidate.subtitleEvidence !== undefined) {
       if (!candidate.subtitleEvidence || typeof candidate.subtitleEvidence !== "object" || Array.isArray(candidate.subtitleEvidence)) fail(`candidate có subtitleEvidence không hợp lệ: ${candidate.id}`);
       if (!new Set(["ok", "not-available"]).has(candidate.subtitleEvidence.state)) fail(`candidate có subtitleEvidence.state lạ: ${candidate.id}`);
@@ -899,23 +921,26 @@ async function main() {
   const validateOnly = process.argv.includes("--validate-only");
   const inputIndex = process.argv.indexOf("--input");
   const inputPath = inputIndex >= 0 ? path.resolve(ROOT, process.argv[inputIndex + 1]) : undefined;
-  const [registryText, communityText, guidesText, dataText, inboxText] = await Promise.all([
+  const [registryText, communityText, guidesText, dataText, inboxText, reviewOverridesText] = await Promise.all([
     readFile(REGISTRY_PATH, "utf8"),
     readFile(COMMUNITY_PATH, "utf8"),
     readFile(GUIDES_PATH, "utf8"),
     readFile(DATA_PATH, "utf8"),
     readFile(INBOX_PATH, "utf8"),
+    readFile(REVIEW_OVERRIDES_PATH, "utf8"),
   ]);
   const registry = JSON.parse(registryText);
   const community = JSON.parse(communityText);
   const guides = parseGuides(guidesText);
   const inbox = JSON.parse(inboxText);
   const indexes = buildIndexes(guides, registry);
+  const reviewCatalog = buildReviewCatalog(guides);
+  const reviewOverrides = validateReviewOverrides(JSON.parse(reviewOverridesText), { catalog: reviewCatalog });
   validateRegistry(registry);
   validateInbox(inbox, indexes);
 
   if (validateOnly) {
-    console.log(`Đã kiểm tra danh mục ${registry.queries.length} truy vấn, ${registry.creators.length} tác giả và ${inbox.candidates.length} ứng viên.`);
+    console.log(`Đã kiểm tra danh mục ${registry.queries.length} truy vấn, ${registry.creators.length} tác giả, ${inbox.candidates.length} ứng viên và ${reviewOverrides.reviews.length} override Evidence v3.1.`);
     return;
   }
 
@@ -1001,6 +1026,7 @@ async function main() {
   }
 
   const merged = mergeCandidates(inbox.candidates, [...discoveredByUrl.values()]);
+  merged.candidates = applyReviewOverrides(merged.candidates, reviewOverrides, reviewCatalog);
   merged.candidates = merged.candidates.map(enforceEvidenceV3Signature);
   applyCrossSourceStatus(merged.candidates, registry);
   merged.candidates.sort((left, right) =>

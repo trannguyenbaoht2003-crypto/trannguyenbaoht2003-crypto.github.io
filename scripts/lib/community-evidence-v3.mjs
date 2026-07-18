@@ -13,6 +13,7 @@ const EVIDENCE_CHANNELS = new Set([
   "subtitle",
   "search-snippet",
   "page-metadata",
+  "reviewer-selection",
 ]);
 
 function plain(value = "") {

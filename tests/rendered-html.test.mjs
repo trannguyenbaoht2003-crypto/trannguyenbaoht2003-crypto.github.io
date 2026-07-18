@@ -4,6 +4,9 @@ import test from "node:test";
 
 const html = await readFile(new URL("../out/index.html", import.meta.url), "utf8");
 const source = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+const reviewHtml = await readFile(new URL("../out/review/index.html", import.meta.url), "utf8").catch(() => "");
+const reviewPageSource = await readFile(new URL("../app/review/page.tsx", import.meta.url), "utf8").catch(() => "");
+const reviewClientSource = await readFile(new URL("../app/review/ReviewWorkbench.tsx", import.meta.url), "utf8").catch(() => "");
 
 test("renders the Hai Dau-inspired information architecture", () => {
   assert.match(html, /Kho tướng/i);
@@ -40,4 +43,31 @@ test("keeps the champion detail accessible", () => {
 test("does not add an installable app surface", () => {
   assert.doesNotMatch(html, /rel=["']manifest["']/i);
   assert.doesNotMatch(source, /serviceWorker|beforeinstallprompt|Cài đặt ứng dụng/i);
+});
+
+test("renders the public Evidence v3.1 review workbench with exact-ID controls", () => {
+  assert.match(reviewHtml, /Bảng duyệt Evidence v3\.1/i);
+  assert.match(reviewHtml, /11 ứng viên/i);
+  assert.match(reviewHtml, /Chờ đối chiếu ảnh/i);
+  assert.match(reviewHtml, /Chờ đối chiếu bản dịch/i);
+  assert.match(reviewHtml, /Chọn đúng 1 tướng/i);
+  assert.match(reviewHtml, /Ít nhất 1 lõi/i);
+  assert.match(reviewHtml, /Ít nhất 2 trang bị/i);
+  assert.match(reviewHtml, /Tôi đã đối chiếu/i);
+  assert.match(reviewHtml, /Tải gói JSON/i);
+  assert.match(reviewHtml, /Không tự động đăng/i);
+});
+
+test("exports a local structured package without authenticated browser writes", () => {
+  assert.match(reviewClientSource, /new Blob\(/);
+  assert.match(reviewClientSource, /evidence-v31-review-package\.json/);
+  assert.match(reviewClientSource, /schemaVersion:\s*1/);
+  assert.match(reviewClientSource, /evidenceVersion:\s*["']3\.1["']/);
+  assert.doesNotMatch(reviewClientSource, /\bfetch\s*\(|authorization|github[_-]?token|localStorage/i);
+  assert.doesNotMatch(`${reviewHtml}\n${reviewPageSource}`, /matchingText|rawSubtitle|pageHtml|transcript/i);
+});
+
+test("links the public guide to the Evidence v3.1 workbench", () => {
+  assert.match(html, /href=["']\/review\/["']/i);
+  assert.match(html, /Mở bảng duyệt Evidence v3\.1/i);
 });
