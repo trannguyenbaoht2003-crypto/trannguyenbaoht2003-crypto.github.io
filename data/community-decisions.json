@@ -1,7 +1,60 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-18T07:13:02.498Z",
+  "updatedAt": "2026-07-18T11:04:55.429Z",
   "currentPatch": "16.14",
-  "contentHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-  "decisions": []
+  "contentHash": "6c212bf5af2e34782cf5f78cbbe09f82167e4cfe90021376d9aa8148dbe417a4",
+  "decisions": [
+    {
+      "signature": "belveth:1058:3065-3430-4633",
+      "championId": "belveth",
+      "augmentIds": [
+        1058
+      ],
+      "itemIds": [
+        4633,
+        3430,
+        3065
+      ],
+      "status": "observing",
+      "score": 65,
+      "hardGateFailures": [],
+      "reasons": [
+        "Tương tác tích cực chưa đạt ngưỡng"
+      ],
+      "sources": [
+        {
+          "platform": "Bilibili",
+          "url": "https://www.bilibili.com/video/BV1ztNt6xEEa/",
+          "title": "盘点海斗强势英雄玩法-秘术冲拳AP大卑",
+          "author": "海斗教主张无忌",
+          "publishedAt": "2026-07-14",
+          "metrics": {
+            "views": 610,
+            "likes": 19,
+            "coins": 4,
+            "favorites": 2,
+            "comments": 1
+          }
+        }
+      ],
+      "metrics": {
+        "views": 610,
+        "likes": 19,
+        "coins": 4,
+        "favorites": 2,
+        "comments": 1
+      },
+      "comments": {
+        "positive": 0,
+        "negative": 0,
+        "neutral": 0,
+        "meaningful": 0,
+        "positiveRatio": 0,
+        "negativeRatio": 0
+      },
+      "patch": "16.14",
+      "checkedAt": "2026-07-18T11:04:55.429Z",
+      "consecutiveFailures": 0
+    }
+  ]
 }

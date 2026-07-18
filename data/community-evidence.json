@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-18T07:13:02.498Z",
+  "updatedAt": "2026-07-18T11:04:55.429Z",
   "currentPatch": "16.14",
   "eligibleStatuses": [
     "ready-for-review",
@@ -124,6 +124,145 @@
       "complete": false,
       "partialSignature": ":2006:",
       "evidenceReviewState": "incomplete"
+    },
+    {
+      "id": "candidate-c002b53073a33891",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1ztNt6xEEa/",
+      "title": "盘点海斗强势英雄玩法-秘术冲拳AP大卑",
+      "author": "海斗教主张无忌",
+      "publishedAt": "2026-07-14",
+      "signal": "610 lượt xem · 19 lượt thích · 4 coin · 2 lượt lưu · 1 bình luận",
+      "sourceQueryIds": [
+        "bilibili-builds"
+      ],
+      "championMatches": [
+        {
+          "id": "belveth",
+          "vi": "Bel'Veth",
+          "cn": "卑尔维斯",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/200.png"
+        }
+      ],
+      "augmentMatches": [
+        {
+          "id": 1058,
+          "vi": "Cú Đấm Thần Bí",
+          "cn": "秘术冲拳",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/ux/cherry/augments/icons/mysticpunch_small.png"
+        }
+      ],
+      "itemMatches": [
+        {
+          "id": 4633,
+          "vi": "Quyền Trượng Ác Thần",
+          "cn": "裂隙制造者",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/items/icons2d/4633_mage_t4_riftmaker.png"
+        },
+        {
+          "id": 3430,
+          "vi": "Nghi Thức Suy Vong",
+          "cn": "毁坏仪式",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/items/icons2d/3430_riteofruin.png"
+        },
+        {
+          "id": 3065,
+          "vi": "Giáp Tâm Linh",
+          "cn": "振奋盔甲",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/items/icons2d/3065_tank_t3_spiritvisage.png"
+        }
+      ],
+      "score": 80,
+      "status": "ready-for-review",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nhận dạng Bel'Veth",
+        "1 lõi khớp ID game",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành",
+        "Ảnh công khai chỉ lưu mã tham chiếu; cần OCR/đối chiếu thủ công trước khi duyệt",
+        "Evidence v3.1 đã đối chiếu thủ công theo ID và ảnh client hiện hành"
+      ],
+      "firstSeenAt": "2026-07-16",
+      "metrics": {
+        "views": 610,
+        "likes": 19,
+        "coins": 4,
+        "favorites": 2,
+        "comments": 1
+      },
+      "authorTier": "unlisted",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "currentEnough": true,
+      "commentEvidenceState": "insufficient",
+      "commentAccessState": "insufficient-total",
+      "evidenceVersion": 3,
+      "evidenceFields": [
+        "description",
+        "parts",
+        "public-image",
+        "tags",
+        "title"
+      ],
+      "sourceContentId": "BV1ztNt6xEEa",
+      "sourceArchiveId": "116918572880920",
+      "sourceAuthorId": "277442250",
+      "evidenceClassifierRevision": 1,
+      "entityEvidence": {
+        "champions": [
+          {
+            "id": "belveth",
+            "channels": [
+              "reviewer-selection"
+            ]
+          }
+        ],
+        "augments": [
+          {
+            "id": 1058,
+            "channels": [
+              "reviewer-selection"
+            ]
+          }
+        ],
+        "items": [
+          {
+            "id": 3065,
+            "channels": [
+              "reviewer-selection"
+            ]
+          },
+          {
+            "id": 3430,
+            "channels": [
+              "reviewer-selection"
+            ]
+          },
+          {
+            "id": 4633,
+            "channels": [
+              "reviewer-selection"
+            ]
+          }
+        ]
+      },
+      "partialSignature": "belveth:1058:3065-3430-4633",
+      "evidenceReviewState": "complete",
+      "subtitleAccessState": "not-available",
+      "imageEvidenceState": "ok",
+      "sourceImageIds": [
+        "sha256:9d7f0d79678d6107ad4268f3"
+      ],
+      "sourceImageReferenceIds": [],
+      "complete": true,
+      "signature": "belveth:1058:3065-3430-4633",
+      "reviewOverride": {
+        "evidenceVersion": "3.1",
+        "reviewedAt": "2026-07-18T11:00:56.757Z",
+        "attested": true
+      }
     }
   ]
 }

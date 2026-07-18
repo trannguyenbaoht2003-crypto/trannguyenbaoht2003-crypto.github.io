@@ -3,15 +3,108 @@
   "updatedAt": "2026-07-18",
   "candidates": [
     {
+      "id": "candidate-594901b1dc70d213",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1BGN96aEXM/",
+      "title": "海克斯大乱斗第15期：爆破鬼才·吉格斯「没有切后排才能丢」",
+      "author": "乱斗仙人",
+      "publishedAt": "2026-07-18",
+      "signal": "85 lượt xem · 3 lượt thích · 0 coin · 0 lượt lưu · 0 bình luận",
+      "metrics": {
+        "views": 85,
+        "likes": 3,
+        "coins": 0,
+        "favorites": 0,
+        "comments": 0
+      },
+      "authorTier": "watch",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "commentEvidenceState": "insufficient",
+      "commentAccessState": "insufficient-total",
+      "currentEnough": true,
+      "evidenceVersion": 3,
+      "evidenceClassifierRevision": 1,
+      "evidenceFields": [
+        "description",
+        "parts",
+        "tags",
+        "title"
+      ],
+      "entityEvidence": {
+        "champions": [
+          {
+            "id": "ziggs",
+            "channels": [
+              "parts",
+              "title"
+            ]
+          }
+        ],
+        "augments": [
+          {
+            "id": 2104,
+            "channels": [
+              "parts"
+            ]
+          }
+        ],
+        "items": []
+      },
+      "partialSignature": "ziggs:2104:",
+      "evidenceReviewState": "incomplete",
+      "subtitleAccessState": "not-requested",
+      "imageEvidenceState": "not-requested",
+      "sourceImageIds": [],
+      "sourceImageReferenceIds": [],
+      "sourceContentId": "BV1BGN96aEXM",
+      "sourceArchiveId": "116917096481913",
+      "sourceAuthorId": "3546683310868621",
+      "sourceQueryIds": [
+        "bilibili-patch"
+      ],
+      "championMatches": [
+        {
+          "id": "ziggs",
+          "cn": "爆破鬼才",
+          "match": "爆破鬼才",
+          "vi": "Ziggs",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/115.png"
+        }
+      ],
+      "augmentMatches": [
+        {
+          "id": 2104,
+          "cn": "灵魄炸弹",
+          "match": "灵魄炸弹",
+          "vi": "Tinh Linh Cầu",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/ux/kiwi/augments/icons/spiritbomb_small.png"
+        }
+      ],
+      "itemMatches": [],
+      "score": 80,
+      "status": "needs-details",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nhận dạng Ziggs",
+        "1 lõi khớp ID game",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-18",
+      "complete": false
+    },
+    {
       "id": "candidate-9ac5cef76a1ddf64",
       "platform": "Bilibili",
       "url": "https://www.bilibili.com/video/BV1CjNU6WEE1/",
       "title": "57杀飞机，4次五杀，亮剑法爆一起来的话，前期选亮剑，中后期选法爆（57杀+4次五杀）",
       "author": "海斗K头滴神",
       "publishedAt": "2026-07-18",
-      "signal": "177 lượt xem · 2 lượt thích · 0 coin · 1 lượt lưu · 0 bình luận",
+      "signal": "377 lượt xem · 2 lượt thích · 0 coin · 1 lượt lưu · 0 bình luận",
       "metrics": {
-        "views": 177,
+        "views": 377,
         "likes": 2,
         "coins": 0,
         "favorites": 1,
@@ -105,9 +198,9 @@
       "title": "泽丽，科学狂人也算半个ad海克斯了，变小能拉扯，变大有伤害容错（31杀+五杀）",
       "author": "海斗K头滴神",
       "publishedAt": "2026-07-18",
-      "signal": "57 lượt xem · 1 lượt thích · 0 coin · 0 lượt lưu · 0 bình luận",
+      "signal": "172 lượt xem · 1 lượt thích · 0 coin · 0 lượt lưu · 0 bình luận",
       "metrics": {
-        "views": 57,
+        "views": 172,
         "likes": 1,
         "coins": 0,
         "favorites": 0,
@@ -195,19 +288,224 @@
       "complete": false
     },
     {
+      "id": "candidate-19bac49a343010e7",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1mTNU68E5F/",
+      "title": "撞车局卡莎，大法师+法爆，AP出装的上限还是不高，打到大后期空W≈没伤害（18杀）",
+      "author": "海斗K头滴神",
+      "publishedAt": "2026-07-18",
+      "signal": "5 lượt xem · 1 lượt thích · 0 coin · 0 lượt lưu · 0 bình luận",
+      "metrics": {
+        "views": 5,
+        "likes": 1,
+        "coins": 0,
+        "favorites": 0,
+        "comments": 0
+      },
+      "authorTier": "watch",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "commentEvidenceState": "insufficient",
+      "commentAccessState": "insufficient-total",
+      "currentEnough": true,
+      "evidenceVersion": 3,
+      "evidenceClassifierRevision": 1,
+      "evidenceFields": [
+        "description",
+        "parts",
+        "tags",
+        "title"
+      ],
+      "entityEvidence": {
+        "champions": [
+          {
+            "id": "kaisa",
+            "channels": [
+              "parts",
+              "title"
+            ]
+          }
+        ],
+        "augments": [
+          {
+            "id": 1048,
+            "channels": [
+              "parts",
+              "title"
+            ]
+          },
+          {
+            "id": 2087,
+            "channels": [
+              "parts",
+              "title"
+            ]
+          }
+        ],
+        "items": []
+      },
+      "partialSignature": "kaisa:1048-2087:",
+      "evidenceReviewState": "incomplete",
+      "subtitleAccessState": "not-available",
+      "imageEvidenceState": "not-requested",
+      "sourceImageIds": [],
+      "sourceImageReferenceIds": [],
+      "sourceContentId": "BV1mTNU68E5F",
+      "sourceArchiveId": "116913925527655",
+      "sourceAuthorId": "283846978",
+      "sourceQueryIds": [
+        "bilibili-items",
+        "bilibili-patch"
+      ],
+      "championMatches": [
+        {
+          "id": "kaisa",
+          "cn": "卡莎",
+          "match": "卡莎",
+          "vi": "Kai'Sa",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/145.png"
+        }
+      ],
+      "augmentMatches": [
+        {
+          "id": 1048,
+          "cn": "珠光护手",
+          "match": "法爆",
+          "vi": "Găng Bảo Thạch",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/ux/cherry/augments/icons/jeweledgauntlet_small.png"
+        },
+        {
+          "id": 2087,
+          "cn": "大法师",
+          "match": "大法师",
+          "vi": "Đại Pháp Sư",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/ux/cherry/augments/icons/eureka_small.png"
+        }
+      ],
+      "itemMatches": [],
+      "score": 80,
+      "status": "needs-details",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nhận dạng Kai'Sa",
+        "2 lõi khớp ID game",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-18",
+      "complete": false
+    },
+    {
+      "id": "candidate-6658cdf40e9b70e9",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1mTNU68EaU/",
+      "title": "38杀卢锡安，升级无尽法爆双发，拿到想让水晶控温的，可惜了（38杀+双五杀）",
+      "author": "海斗K头滴神",
+      "publishedAt": "2026-07-18",
+      "signal": "61 lượt xem · 5 lượt thích · 0 coin · 0 lượt lưu · 1 bình luận",
+      "metrics": {
+        "views": 61,
+        "likes": 5,
+        "coins": 0,
+        "favorites": 0,
+        "comments": 1
+      },
+      "authorTier": "watch",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "commentEvidenceState": "insufficient",
+      "commentAccessState": "insufficient-total",
+      "currentEnough": true,
+      "evidenceVersion": 3,
+      "evidenceClassifierRevision": 1,
+      "evidenceFields": [
+        "description",
+        "parts",
+        "tags",
+        "title"
+      ],
+      "entityEvidence": {
+        "champions": [
+          {
+            "id": "lucian",
+            "channels": [
+              "description",
+              "parts",
+              "tags",
+              "title"
+            ]
+          }
+        ],
+        "augments": [
+          {
+            "id": 1048,
+            "channels": [
+              "parts",
+              "title"
+            ]
+          }
+        ],
+        "items": []
+      },
+      "partialSignature": "lucian:1048:",
+      "evidenceReviewState": "incomplete",
+      "subtitleAccessState": "not-requested",
+      "imageEvidenceState": "not-requested",
+      "sourceImageIds": [],
+      "sourceImageReferenceIds": [],
+      "sourceContentId": "BV1mTNU68EaU",
+      "sourceArchiveId": "116913925526558",
+      "sourceAuthorId": "283846978",
+      "sourceQueryIds": [
+        "bilibili-patch"
+      ],
+      "championMatches": [
+        {
+          "id": "lucian",
+          "cn": "卢锡安",
+          "match": "卢锡安",
+          "vi": "Lucian",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/236.png"
+        }
+      ],
+      "augmentMatches": [
+        {
+          "id": 1048,
+          "cn": "珠光护手",
+          "match": "法爆",
+          "vi": "Găng Bảo Thạch",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/ux/cherry/augments/icons/jeweledgauntlet_small.png"
+        }
+      ],
+      "itemMatches": [],
+      "score": 80,
+      "status": "needs-details",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nhận dạng Lucian",
+        "1 lõi khớp ID game",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-18",
+      "complete": false
+    },
+    {
       "id": "candidate-622b4a139b7b9c73",
       "platform": "Bilibili",
       "url": "https://www.bilibili.com/video/BV12MNU6fEXj/",
       "title": "狗头，10分钟1000层，用这套出装，伤害，CD，回复我全都要（24杀）",
       "author": "海斗K头滴神",
       "publishedAt": "2026-07-18",
-      "signal": "17 lượt xem · 1 lượt thích · 0 coin · 0 lượt lưu · 0 bình luận",
+      "signal": "220 lượt xem · 4 lượt thích · 0 coin · 0 lượt lưu · 1 bình luận",
       "metrics": {
-        "views": 17,
-        "likes": 1,
+        "views": 220,
+        "likes": 4,
         "coins": 0,
         "favorites": 0,
-        "comments": 0
+        "comments": 1
       },
       "authorTier": "watch",
       "accessState": "ok",
@@ -281,10 +579,10 @@
       "title": "海斗又出逆天bug！炽燃利息千万别拿 我金币呢？",
       "author": "爆_炒",
       "publishedAt": "2026-07-18",
-      "signal": "577 lượt xem · 12 lượt thích · 1 lượt lưu",
+      "signal": "783 lượt xem · 13 lượt thích · 1 lượt lưu",
       "metrics": {
-        "views": 577,
-        "likes": 12,
+        "views": 783,
+        "likes": 13,
         "favorites": 1
       },
       "authorTier": "unlisted",
@@ -339,18 +637,99 @@
       "complete": false
     },
     {
+      "id": "candidate-f664ed11e4e16ff8",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1gKKw6zE7x/",
+      "title": "海斗炮台流寒冰",
+      "author": "予小xin",
+      "publishedAt": "2026-07-18",
+      "signal": "180 lượt xem · 1 lượt thích · 0 coin · 0 lượt lưu · 0 bình luận",
+      "metrics": {
+        "views": 180,
+        "likes": 1,
+        "coins": 0,
+        "favorites": 0,
+        "comments": 0
+      },
+      "authorTier": "unlisted",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "commentEvidenceState": "insufficient",
+      "commentAccessState": "insufficient-total",
+      "currentEnough": true,
+      "evidenceVersion": 3,
+      "evidenceClassifierRevision": 1,
+      "evidenceFields": [
+        "description",
+        "parts",
+        "public-image",
+        "tags",
+        "title"
+      ],
+      "entityEvidence": {
+        "champions": [
+          {
+            "id": "ashe",
+            "channels": [
+              "parts",
+              "title"
+            ]
+          }
+        ],
+        "augments": [],
+        "items": []
+      },
+      "partialSignature": "ashe::",
+      "evidenceReviewState": "image-review-required",
+      "subtitleAccessState": "not-available",
+      "imageEvidenceState": "ok",
+      "sourceImageIds": [
+        "sha256:fe07a12133369443dd77ec89"
+      ],
+      "sourceImageReferenceIds": [],
+      "sourceContentId": "BV1gKKw6zE7x",
+      "sourceArchiveId": "116940031008560",
+      "sourceAuthorId": "399731755",
+      "sourceQueryIds": [
+        "bilibili-builds"
+      ],
+      "championMatches": [
+        {
+          "id": "ashe",
+          "cn": "艾希",
+          "match": "寒冰",
+          "vi": "Ashe",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/22.png"
+        }
+      ],
+      "augmentMatches": [],
+      "itemMatches": [],
+      "score": 55,
+      "status": "needs-details",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nhận dạng Ashe",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành",
+        "Ảnh công khai chỉ lưu mã tham chiếu; cần OCR/đối chiếu thủ công trước khi duyệt"
+      ],
+      "firstSeenAt": "2026-07-18",
+      "complete": false
+    },
+    {
       "id": "candidate-32fdf3ad039608b8",
       "platform": "Bilibili",
       "url": "https://www.bilibili.com/video/BV1k7NU6XEqt/",
       "title": "39杀泽丽，两前排两辅助的局，泽丽只要刷到无尽就无敌了（39杀+五杀）",
       "author": "海斗K头滴神",
       "publishedAt": "2026-07-18",
-      "signal": "191 lượt xem · 4 lượt thích · 0 coin · 0 lượt lưu · 0 bình luận",
+      "signal": "393 lượt xem · 6 lượt thích · 0 coin · 1 lượt lưu · 0 bình luận",
       "metrics": {
-        "views": 191,
-        "likes": 4,
+        "views": 393,
+        "likes": 6,
         "coins": 0,
-        "favorites": 0,
+        "favorites": 1,
         "comments": 0
       },
       "authorTier": "watch",
@@ -424,13 +803,11 @@
       "title": "无限大招小火龙",
       "author": "乱斗螃蟹",
       "publishedAt": "2026-07-18",
-      "signal": "606 lượt xem · 16 lượt thích · 0 coin · 1 lượt lưu · 1 bình luận",
+      "signal": "648 lượt xem · 17 lượt thích · 1 lượt lưu",
       "metrics": {
-        "views": 606,
-        "likes": 16,
-        "coins": 0,
-        "favorites": 1,
-        "comments": 1
+        "views": 648,
+        "likes": 17,
+        "favorites": 1
       },
       "authorTier": "unlisted",
       "accessState": "ok",
@@ -438,22 +815,13 @@
       "disqualifiers": [],
       "engagementState": false,
       "commentEvidenceState": "insufficient",
-      "commentAccessState": "insufficient-total",
       "currentEnough": true,
-      "evidenceVersion": 3,
-      "evidenceClassifierRevision": 1,
-      "evidenceFields": [
-        "description",
-        "parts",
-        "tags",
-        "title"
-      ],
+      "evidenceFields": [],
       "entityEvidence": {
         "champions": [
           {
             "id": "smolder",
             "channels": [
-              "parts",
               "title"
             ]
           }
@@ -463,13 +831,8 @@
       },
       "partialSignature": "smolder::",
       "evidenceReviewState": "incomplete",
-      "subtitleAccessState": "not-requested",
-      "imageEvidenceState": "not-requested",
       "sourceImageIds": [],
       "sourceImageReferenceIds": [],
-      "sourceContentId": "BV1y3KF64ErW",
-      "sourceArchiveId": "116938873309736",
-      "sourceAuthorId": "3493140895893734",
       "sourceQueryIds": [
         "bilibili-patch"
       ],
@@ -501,13 +864,13 @@
       "title": "兄弟们，闪现真有伤害！",
       "author": "螃蟹俄洛伊",
       "publishedAt": "2026-07-18",
-      "signal": "876 lượt xem · 13 lượt thích · 0 coin · 0 lượt lưu · 0 bình luận",
+      "signal": "919 lượt xem · 14 lượt thích · 0 coin · 0 lượt lưu · 2 bình luận",
       "metrics": {
-        "views": 876,
-        "likes": 13,
+        "views": 919,
+        "likes": 14,
         "coins": 0,
         "favorites": 0,
-        "comments": 0
+        "comments": 2
       },
       "authorTier": "unlisted",
       "accessState": "ok",
@@ -578,17 +941,17 @@
       "title": "新版本救赎改版了 但符文大乱斗可没改! 两种模式有什么区别？",
       "author": "清晨有点困",
       "publishedAt": "2026-07-18",
-      "signal": "418 lượt xem · 24 lượt thích · 0 lượt lưu",
+      "signal": "1147 lượt xem · 30 lượt thích · 0 lượt lưu",
       "metrics": {
-        "views": 418,
-        "likes": 24,
+        "views": 1147,
+        "likes": 30,
         "favorites": 0
       },
       "authorTier": "unlisted",
       "accessState": "ok",
       "modeValid": true,
       "disqualifiers": [],
-      "engagementState": false,
+      "engagementState": true,
       "commentEvidenceState": "insufficient",
       "currentEnough": true,
       "evidenceFields": [],
@@ -627,6 +990,143 @@
       "reasons": [
         "Có từ khóa Hải Đấu/ARAM Mayhem",
         "1 trang bị khớp ID game",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-18",
+      "complete": false
+    },
+    {
+      "id": "candidate-4344551afa82e530",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV12MNU6fEqA/",
+      "title": "厄斐，开局选玻璃大炮？就为了赌亮剑？还真被我爽到了（34杀+五杀）",
+      "author": "海斗K头滴神",
+      "publishedAt": "2026-07-18",
+      "signal": "184 lượt xem · 3 lượt thích · 0 lượt lưu",
+      "metrics": {
+        "views": 184,
+        "likes": 3,
+        "favorites": 0
+      },
+      "authorTier": "watch",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "commentEvidenceState": "insufficient",
+      "currentEnough": true,
+      "evidenceFields": [],
+      "entityEvidence": {
+        "champions": [],
+        "augments": [],
+        "items": []
+      },
+      "evidenceReviewState": "incomplete",
+      "sourceImageIds": [],
+      "sourceImageReferenceIds": [],
+      "sourceQueryIds": [
+        "bilibili-patch"
+      ],
+      "championMatches": [],
+      "augmentMatches": [],
+      "itemMatches": [],
+      "score": 30,
+      "status": "needs-champion",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+      ],
+      "firstSeenAt": "2026-07-18",
+      "complete": false
+    },
+    {
+      "id": "candidate-cf0953e6703cd829",
+      "platform": "Bilibili",
+      "url": "https://www.bilibili.com/video/BV1mTNU68EiJ/",
+      "title": "金克丝，升级无尽+飞弹还是太权威了，血一格一格的打，启动太容易了（35杀+五杀）",
+      "author": "海斗K头滴神",
+      "publishedAt": "2026-07-18",
+      "signal": "46 lượt xem · 4 lượt thích · 0 coin · 0 lượt lưu · 0 bình luận",
+      "metrics": {
+        "views": 46,
+        "likes": 4,
+        "coins": 0,
+        "favorites": 0,
+        "comments": 0
+      },
+      "authorTier": "watch",
+      "accessState": "ok",
+      "modeValid": true,
+      "disqualifiers": [],
+      "engagementState": false,
+      "commentEvidenceState": "insufficient",
+      "commentAccessState": "insufficient-total",
+      "currentEnough": true,
+      "evidenceVersion": 3,
+      "evidenceClassifierRevision": 1,
+      "evidenceFields": [
+        "description",
+        "parts",
+        "tags",
+        "title"
+      ],
+      "entityEvidence": {
+        "champions": [
+          {
+            "id": "jinx",
+            "channels": [
+              "description",
+              "parts",
+              "tags",
+              "title"
+            ]
+          },
+          {
+            "id": "masteryi",
+            "channels": [
+              "parts",
+              "title"
+            ]
+          }
+        ],
+        "augments": [],
+        "items": []
+      },
+      "partialSignature": "jinx-masteryi::",
+      "evidenceReviewState": "translation-review-required",
+      "subtitleAccessState": "not-requested",
+      "imageEvidenceState": "not-requested",
+      "sourceImageIds": [],
+      "sourceImageReferenceIds": [],
+      "sourceContentId": "BV1mTNU68EiJ",
+      "sourceArchiveId": "116913925526858",
+      "sourceAuthorId": "283846978",
+      "sourceQueryIds": [
+        "bilibili-patch"
+      ],
+      "championMatches": [
+        {
+          "id": "jinx",
+          "cn": "金克丝",
+          "match": "金克丝",
+          "vi": "Jinx",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/222.png"
+        },
+        {
+          "id": "masteryi",
+          "cn": "易",
+          "match": "易",
+          "vi": "Master Yi",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/11.png"
+        }
+      ],
+      "augmentMatches": [],
+      "itemMatches": [],
+      "score": 30,
+      "status": "needs-details",
+      "reasons": [
+        "Có từ khóa Hải Đấu/ARAM Mayhem",
+        "Có nhiều tướng trong bằng chứng; cần đối chiếu bản dịch/ngữ cảnh",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
       "firstSeenAt": "2026-07-18",
@@ -709,13 +1209,11 @@
       "title": "卢锡安，无尽飞弹法爆，这海克斯来了什么坦克战士都是一梭子（32杀+五杀）",
       "author": "海斗K头滴神",
       "publishedAt": "2026-07-17",
-      "signal": "203 lượt xem · 9 lượt thích · 0 coin · 0 lượt lưu · 0 bình luận",
+      "signal": "209 lượt xem · 9 lượt thích · 0 lượt lưu",
       "metrics": {
-        "views": 203,
+        "views": 209,
         "likes": 9,
-        "coins": 0,
-        "favorites": 0,
-        "comments": 0
+        "favorites": 0
       },
       "authorTier": "watch",
       "accessState": "ok",
@@ -723,18 +1221,8 @@
       "disqualifiers": [],
       "engagementState": false,
       "commentEvidenceState": "insufficient",
-      "commentAccessState": "insufficient-total",
       "currentEnough": true,
-      "evidenceVersion": 3,
-      "evidenceFields": [
-        "description",
-        "parts",
-        "tags",
-        "title"
-      ],
-      "sourceContentId": "BV1w7NU69EZ1",
-      "sourceArchiveId": "116913875260591",
-      "sourceAuthorId": "283846978",
+      "evidenceFields": [],
       "sourceQueryIds": [
         "bilibili-patch"
       ],
@@ -766,15 +1254,12 @@
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
       "firstSeenAt": "2026-07-17",
-      "evidenceClassifierRevision": 1,
       "entityEvidence": {
         "champions": [
           {
             "id": "lucian",
             "channels": [
               "description",
-              "parts",
-              "tags",
               "title"
             ]
           }
@@ -783,7 +1268,6 @@
           {
             "id": 1048,
             "channels": [
-              "parts",
               "title"
             ]
           }
@@ -792,8 +1276,6 @@
       },
       "partialSignature": "lucian:1048:",
       "evidenceReviewState": "incomplete",
-      "subtitleAccessState": "not-requested",
-      "imageEvidenceState": "not-requested",
       "sourceImageIds": [],
       "sourceImageReferenceIds": [],
       "complete": false
@@ -882,13 +1364,11 @@
       "title": "34杀寒冰，双发满爆特效流，现在看到出三项火炮的火龙就想笑hhh（34杀+超神）",
       "author": "海斗K头滴神",
       "publishedAt": "2026-07-17",
-      "signal": "496 lượt xem · 8 lượt thích · 0 coin · 0 lượt lưu · 3 bình luận",
+      "signal": "519 lượt xem · 8 lượt thích · 0 lượt lưu",
       "metrics": {
-        "views": 496,
+        "views": 519,
         "likes": 8,
-        "coins": 0,
-        "favorites": 0,
-        "comments": 3
+        "favorites": 0
       },
       "authorTier": "watch",
       "accessState": "ok",
@@ -896,18 +1376,8 @@
       "disqualifiers": [],
       "engagementState": false,
       "commentEvidenceState": "insufficient",
-      "commentAccessState": "insufficient-total",
       "currentEnough": true,
-      "evidenceVersion": 3,
-      "evidenceFields": [
-        "description",
-        "parts",
-        "tags",
-        "title"
-      ],
-      "sourceContentId": "BV1JxNN6bE8U",
-      "sourceArchiveId": "116902634526438",
-      "sourceAuthorId": "283846978",
+      "evidenceFields": [],
       "sourceQueryIds": [
         "bilibili-patch"
       ],
@@ -946,13 +1416,11 @@
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
       "firstSeenAt": "2026-07-17",
-      "evidenceClassifierRevision": 1,
       "entityEvidence": {
         "champions": [
           {
             "id": "ashe",
             "channels": [
-              "parts",
               "title"
             ]
           }
@@ -962,14 +1430,12 @@
           {
             "id": 3078,
             "channels": [
-              "parts",
               "title"
             ]
           },
           {
             "id": 3094,
             "channels": [
-              "parts",
               "title"
             ]
           }
@@ -977,8 +1443,6 @@
       },
       "partialSignature": "ashe::3078-3094",
       "evidenceReviewState": "incomplete",
-      "subtitleAccessState": "not-requested",
-      "imageEvidenceState": "not-requested",
       "sourceImageIds": [],
       "sourceImageReferenceIds": [],
       "complete": false
@@ -990,9 +1454,9 @@
       "title": "50杀男枪，3次五杀，男枪怎么都会胡的，打肉有巨杀，双发，打脆皮有基本功（50杀+3次五杀）",
       "author": "海斗K头滴神",
       "publishedAt": "2026-07-17",
-      "signal": "222 lượt xem · 7 lượt thích · 1 lượt lưu",
+      "signal": "232 lượt xem · 7 lượt thích · 1 lượt lưu",
       "metrics": {
-        "views": 222,
+        "views": 232,
         "likes": 7,
         "favorites": 1
       },
@@ -1112,9 +1576,9 @@
       "title": "男枪双彩局的池子也不虚啊，亮剑基本功，又是颗秒的对局（24杀）",
       "author": "海斗K头滴神",
       "publishedAt": "2026-07-17",
-      "signal": "546 lượt xem · 5 lượt thích · 0 lượt lưu",
+      "signal": "626 lượt xem · 5 lượt thích · 0 lượt lưu",
       "metrics": {
-        "views": 546,
+        "views": 626,
         "likes": 5,
         "favorites": 0
       },
@@ -1173,9 +1637,9 @@
       "title": "杰斯，对面4钢局，拿下最终形态补强贴身肉搏能力，话说杰斯没法爆了？（33杀+五杀）",
       "author": "海斗K头滴神",
       "publishedAt": "2026-07-17",
-      "signal": "267 lượt xem · 4 lượt thích · 0 lượt lưu",
+      "signal": "530 lượt xem · 4 lượt thích · 0 lượt lưu",
       "metrics": {
-        "views": 267,
+        "views": 530,
         "likes": 4,
         "favorites": 0
       },
@@ -1278,13 +1742,11 @@
       "title": "38杀男枪，有男枪一定要拿啊！把把都爽，亮剑无尽基本功，体验颗秒的感觉！（38杀+五杀）",
       "author": "海斗K头滴神",
       "publishedAt": "2026-07-17",
-      "signal": "415 lượt xem · 5 lượt thích · 0 coin · 2 lượt lưu · 2 bình luận",
+      "signal": "435 lượt xem · 5 lượt thích · 2 lượt lưu",
       "metrics": {
-        "views": 415,
+        "views": 435,
         "likes": 5,
-        "coins": 0,
-        "favorites": 2,
-        "comments": 2
+        "favorites": 2
       },
       "authorTier": "watch",
       "accessState": "ok",
@@ -1292,18 +1754,8 @@
       "disqualifiers": [],
       "engagementState": false,
       "commentEvidenceState": "insufficient",
-      "commentAccessState": "insufficient-total",
       "currentEnough": true,
-      "evidenceVersion": 3,
-      "evidenceFields": [
-        "description",
-        "parts",
-        "tags",
-        "title"
-      ],
-      "sourceContentId": "BV1FxNN6bENu",
-      "sourceArchiveId": "116902634460704",
-      "sourceAuthorId": "283846978",
+      "evidenceFields": [],
       "sourceQueryIds": [
         "bilibili-patch"
       ],
@@ -1326,15 +1778,12 @@
         "Nguồn nằm trong cửa sổ theo dõi hiện hành"
       ],
       "firstSeenAt": "2026-07-17",
-      "evidenceClassifierRevision": 1,
       "entityEvidence": {
         "champions": [
           {
             "id": "graves",
             "channels": [
               "description",
-              "parts",
-              "tags",
               "title"
             ]
           }
@@ -1344,8 +1793,6 @@
       },
       "partialSignature": "graves::",
       "evidenceReviewState": "incomplete",
-      "subtitleAccessState": "not-requested",
-      "imageEvidenceState": "not-requested",
       "sourceImageIds": [],
       "sourceImageReferenceIds": [],
       "complete": false
@@ -1357,17 +1804,17 @@
       "title": "现版本杰斯只推荐穿甲转暴击 海克斯池子里全是暴击 穿甲拉完了",
       "author": "爆_炒",
       "publishedAt": "2026-07-17",
-      "signal": "3517 lượt xem · 63 lượt thích · 3 lượt lưu",
+      "signal": "4085 lượt xem · 67 lượt thích · 3 lượt lưu",
       "metrics": {
-        "views": 3517,
-        "likes": 63,
+        "views": 4085,
+        "likes": 67,
         "favorites": 3
       },
       "authorTier": "unlisted",
       "accessState": "ok",
       "modeValid": true,
       "disqualifiers": [],
-      "engagementState": true,
+      "engagementState": false,
       "commentEvidenceState": "insufficient",
       "currentEnough": true,
       "evidenceFields": [],
@@ -1906,9 +2353,9 @@
       "title": "海克斯大乱斗第14期：邪恶小法师·维迦「这套装备真好用！」",
       "author": "乱斗仙人",
       "publishedAt": "2026-07-17",
-      "signal": "294 lượt xem · 5 lượt thích · 0 lượt lưu",
+      "signal": "304 lượt xem · 5 lượt thích · 0 lượt lưu",
       "metrics": {
-        "views": 294,
+        "views": 304,
         "likes": 5,
         "favorites": 0
       },
@@ -1980,11 +2427,11 @@
       "title": "海斗出装思路参考",
       "author": "初见乱斗",
       "publishedAt": "2026-07-17",
-      "signal": "4146 lượt xem · 100 lượt thích · 18 lượt lưu",
+      "signal": "4884 lượt xem · 108 lượt thích · 19 lượt lưu",
       "metrics": {
-        "views": 4146,
-        "likes": 100,
-        "favorites": 18
+        "views": 4884,
+        "likes": 108,
+        "favorites": 19
       },
       "authorTier": "unlisted",
       "accessState": "ok",
@@ -2024,11 +2471,11 @@
       "title": "海斗的EZ到底该怎么出装？？？",
       "author": "乱斗-不良人",
       "publishedAt": "2026-07-17",
-      "signal": "7253 lượt xem · 125 lượt thích · 28 lượt lưu",
+      "signal": "8804 lượt xem · 153 lượt thích · 36 lượt lưu",
       "metrics": {
-        "views": 7253,
-        "likes": 125,
-        "favorites": 28
+        "views": 8804,
+        "likes": 153,
+        "favorites": 36
       },
       "authorTier": "unlisted",
       "accessState": "ok",
@@ -2287,9 +2734,9 @@
       "title": "一分钟学会无限炸弹！时光大法师出装一图流！",
       "author": "时间旅行者poi",
       "publishedAt": "2026-07-16",
-      "signal": "371 lượt xem · 5 lượt thích · 2 lượt lưu",
+      "signal": "373 lượt xem · 5 lượt thích · 2 lượt lưu",
       "metrics": {
-        "views": 371,
+        "views": 373,
         "likes": 5,
         "favorites": 2
       },
@@ -2658,13 +3105,13 @@
       "title": "花几个月时间把卢锡安的仿比赛出装挨个喷了一遍",
       "author": "朴实无华的SVP",
       "publishedAt": "2026-07-16",
-      "signal": "18192 lượt xem · 434 lượt thích · 12 coin · 7 lượt lưu · 179 bình luận",
+      "signal": "18765 lượt xem · 441 lượt thích · 14 coin · 8 lượt lưu · 183 bình luận",
       "metrics": {
-        "views": 18192,
-        "likes": 434,
-        "coins": 12,
-        "favorites": 7,
-        "comments": 179
+        "views": 18765,
+        "likes": 441,
+        "coins": 14,
+        "favorites": 8,
+        "comments": 183
       },
       "authorTier": "unlisted",
       "accessState": "ok",
@@ -3246,7 +3693,7 @@
       "title": "新版海斗寒冰无敌玩法",
       "author": "乱斗螃蟹",
       "publishedAt": "2026-07-15",
-      "signal": "591 lượt xem · 16 lượt thích · 0 coin · 1 lượt lưu · 0 bình luận",
+      "signal": "592 lượt xem · 16 lượt thích · 0 coin · 1 lượt lưu · 0 bình luận",
       "sourceQueryIds": [
         "bilibili-builds",
         "bilibili-patch"
@@ -3272,7 +3719,7 @@
       ],
       "firstSeenAt": "2026-07-16",
       "metrics": {
-        "views": 591,
+        "views": 592,
         "likes": 16,
         "coins": 0,
         "favorites": 1,
@@ -3769,9 +4216,9 @@
       "title": "玩海斗的，法师出装思路可以参考",
       "author": "不单影",
       "publishedAt": "2026-07-15",
-      "signal": "330 lượt xem · 24 lượt thích · 1 lượt lưu",
+      "signal": "331 lượt xem · 24 lượt thích · 1 lượt lưu",
       "metrics": {
-        "views": 330,
+        "views": 331,
         "likes": 24,
         "favorites": 1
       },
@@ -3813,41 +4260,59 @@
       "title": "盘点海斗强势英雄玩法-秘术冲拳AP大卑",
       "author": "海斗教主张无忌",
       "publishedAt": "2026-07-14",
-      "signal": "600 lượt xem · 19 lượt thích · 4 coin · 2 lượt lưu · 1 bình luận",
+      "signal": "610 lượt xem · 19 lượt thích · 4 coin · 2 lượt lưu · 1 bình luận",
       "sourceQueryIds": [
         "bilibili-builds"
       ],
       "championMatches": [
         {
           "id": "belveth",
-          "cn": "卑尔维斯",
-          "match": "卑尔维斯",
           "vi": "Bel'Veth",
+          "cn": "卑尔维斯",
           "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/200.png"
         }
       ],
       "augmentMatches": [
         {
           "id": 1058,
-          "cn": "秘术冲拳",
-          "match": "秘术冲拳",
           "vi": "Cú Đấm Thần Bí",
+          "cn": "秘术冲拳",
           "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/ux/cherry/augments/icons/mysticpunch_small.png"
         }
       ],
-      "itemMatches": [],
+      "itemMatches": [
+        {
+          "id": 4633,
+          "vi": "Quyền Trượng Ác Thần",
+          "cn": "裂隙制造者",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/items/icons2d/4633_mage_t4_riftmaker.png"
+        },
+        {
+          "id": 3430,
+          "vi": "Nghi Thức Suy Vong",
+          "cn": "毁坏仪式",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/items/icons2d/3430_riteofruin.png"
+        },
+        {
+          "id": 3065,
+          "vi": "Giáp Tâm Linh",
+          "cn": "振奋盔甲",
+          "icon": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/items/icons2d/3065_tank_t3_spiritvisage.png"
+        }
+      ],
       "score": 80,
-      "status": "needs-details",
+      "status": "ready-for-review",
       "reasons": [
         "Có từ khóa Hải Đấu/ARAM Mayhem",
         "Nhận dạng Bel'Veth",
         "1 lõi khớp ID game",
         "Nguồn nằm trong cửa sổ theo dõi hiện hành",
-        "Ảnh công khai chỉ lưu mã tham chiếu; cần OCR/đối chiếu thủ công trước khi duyệt"
+        "Ảnh công khai chỉ lưu mã tham chiếu; cần OCR/đối chiếu thủ công trước khi duyệt",
+        "Evidence v3.1 đã đối chiếu thủ công theo ID và ảnh client hiện hành"
       ],
       "firstSeenAt": "2026-07-16",
       "metrics": {
-        "views": 600,
+        "views": 610,
         "likes": 19,
         "coins": 4,
         "favorites": 2,
@@ -3878,7 +4343,7 @@
           {
             "id": "belveth",
             "channels": [
-              "tags"
+              "reviewer-selection"
             ]
           }
         ],
@@ -3886,22 +4351,46 @@
           {
             "id": 1058,
             "channels": [
-              "parts",
-              "title"
+              "reviewer-selection"
             ]
           }
         ],
-        "items": []
+        "items": [
+          {
+            "id": 3065,
+            "channels": [
+              "reviewer-selection"
+            ]
+          },
+          {
+            "id": 3430,
+            "channels": [
+              "reviewer-selection"
+            ]
+          },
+          {
+            "id": 4633,
+            "channels": [
+              "reviewer-selection"
+            ]
+          }
+        ]
       },
-      "partialSignature": "belveth:1058:",
-      "evidenceReviewState": "image-review-required",
+      "partialSignature": "belveth:1058:3065-3430-4633",
+      "evidenceReviewState": "complete",
       "subtitleAccessState": "not-available",
       "imageEvidenceState": "ok",
       "sourceImageIds": [
         "sha256:9d7f0d79678d6107ad4268f3"
       ],
       "sourceImageReferenceIds": [],
-      "complete": false
+      "complete": true,
+      "signature": "belveth:1058:3065-3430-4633",
+      "reviewOverride": {
+        "evidenceVersion": "3.1",
+        "reviewedAt": "2026-07-18T11:00:56.757Z",
+        "attested": true
+      }
     },
     {
       "id": "candidate-e76c4010927c7bd5",
@@ -3910,13 +4399,13 @@
       "title": "盘点海斗强势英雄玩法-男枪",
       "author": "海斗教主张无忌",
       "publishedAt": "2026-07-14",
-      "signal": "14714 lượt xem · 214 lượt thích · 10 coin · 18 lượt lưu · 99 bình luận",
+      "signal": "14866 lượt xem · 215 lượt thích · 10 coin · 18 lượt lưu · 97 bình luận",
       "metrics": {
-        "views": 14714,
-        "likes": 214,
+        "views": 14866,
+        "likes": 215,
         "coins": 10,
         "favorites": 18,
-        "comments": 99
+        "comments": 97
       },
       "authorTier": "unlisted",
       "accessState": "ok",
@@ -4043,7 +4532,7 @@
       "title": "海克斯大乱斗牙仙子阿萝拉教学，高容错出装，一套秒满血！",
       "author": "声沙Hoarse",
       "publishedAt": "2026-07-13",
-      "signal": "993 lượt xem · 18 lượt thích · 2 coin · 1 lượt lưu · 3 bình luận",
+      "signal": "1011 lượt xem · 18 lượt thích · 2 coin · 1 lượt lưu · 3 bình luận",
       "sourceQueryIds": [
         "bilibili-items"
       ],
@@ -4076,7 +4565,7 @@
       ],
       "firstSeenAt": "2026-07-16",
       "metrics": {
-        "views": 993,
+        "views": 1011,
         "likes": 18,
         "coins": 2,
         "favorites": 1,
@@ -4086,7 +4575,7 @@
       "accessState": "ok",
       "modeValid": true,
       "disqualifiers": [],
-      "engagementState": false,
+      "engagementState": true,
       "currentEnough": true,
       "commentEvidenceState": "insufficient",
       "commentAccessState": "insufficient-total",
@@ -4141,7 +4630,7 @@
       "title": "物理转魔法的正确出装，成就六边形法师",
       "author": "乱斗-不良人",
       "publishedAt": "2026-07-13",
-      "signal": "58758 lượt xem · 886 lượt thích · 160 lượt lưu",
+      "signal": "59537 lượt xem · 899 lượt thích · 160 lượt lưu",
       "sourceQueryIds": [
         "bilibili-items"
       ],
@@ -4165,8 +4654,8 @@
       ],
       "firstSeenAt": "2026-07-16",
       "metrics": {
-        "views": 58758,
-        "likes": 886,
+        "views": 59537,
+        "likes": 899,
         "favorites": 160
       },
       "authorTier": "unlisted",
@@ -4202,9 +4691,9 @@
       "title": "盘点新版海斗强势英雄玩法-芸阿娜",
       "author": "海斗教主张无忌",
       "publishedAt": "2026-07-13",
-      "signal": "2554 lượt xem · 32 lượt thích · 2 coin · 3 lượt lưu · 3 bình luận",
+      "signal": "2646 lượt xem · 32 lượt thích · 2 coin · 3 lượt lưu · 3 bình luận",
       "metrics": {
-        "views": 2554,
+        "views": 2646,
         "likes": 32,
         "coins": 2,
         "favorites": 3,
@@ -4403,7 +4892,7 @@
       "title": "海克斯大乱斗AD:出装和海克斯应该怎么选？",
       "author": "癫火莎弥拉",
       "publishedAt": "2026-07-13",
-      "signal": "1098 lượt xem · 17 lượt thích · 1 lượt lưu",
+      "signal": "1099 lượt xem · 17 lượt thích · 1 lượt lưu",
       "sourceQueryIds": [
         "bilibili-items"
       ],
@@ -4418,7 +4907,7 @@
       ],
       "firstSeenAt": "2026-07-16",
       "metrics": {
-        "views": 1098,
+        "views": 1099,
         "likes": 17,
         "favorites": 1
       },
@@ -4447,7 +4936,7 @@
       "title": "海克斯大乱斗地形专家巨魔教学，出装海克斯符文推荐，胶黏对手折磨到死！",
       "author": "声沙Hoarse",
       "publishedAt": "2026-07-12",
-      "signal": "297 lượt xem · 9 lượt thích · 0 coin · 0 lượt lưu · 0 bình luận",
+      "signal": "298 lượt xem · 9 lượt thích · 0 coin · 0 lượt lưu · 0 bình luận",
       "sourceQueryIds": [
         "bilibili-items"
       ],
@@ -4480,7 +4969,7 @@
       ],
       "firstSeenAt": "2026-07-16",
       "metrics": {
-        "views": 297,
+        "views": 298,
         "likes": 9,
         "coins": 0,
         "favorites": 0,
@@ -4543,9 +5032,9 @@
       "title": "海斗非主流玩法之双女神泪赵信",
       "author": "MEAQUIN_咩啊困",
       "publishedAt": "2026-07-12",
-      "signal": "1180 lượt xem · 11 lượt thích · 2 coin · 0 lượt lưu · 1 bình luận",
+      "signal": "1210 lượt xem · 11 lượt thích · 2 coin · 0 lượt lưu · 1 bình luận",
       "metrics": {
-        "views": 1180,
+        "views": 1210,
         "likes": 11,
         "coins": 2,
         "favorites": 0,
@@ -4642,13 +5131,13 @@
       "title": "为什么海斗高分凯南反而出残疫？",
       "author": "符文乱斗周报",
       "publishedAt": "2026-07-12",
-      "signal": "242394 lượt xem · 1696 lượt thích · 26 coin · 30 lượt lưu · 493 bình luận",
+      "signal": "245871 lượt xem · 1719 lượt thích · 26 coin · 30 lượt lưu · 497 bình luận",
       "metrics": {
-        "views": 242394,
-        "likes": 1696,
+        "views": 245871,
+        "likes": 1719,
         "coins": 26,
         "favorites": 30,
-        "comments": 493
+        "comments": 497
       },
       "authorTier": "unlisted",
       "accessState": "ok",
@@ -4748,7 +5237,7 @@
       "title": "英雄联盟海克斯大乱斗 学了绝活哥卡萨丁的出装，爱上卡萨丁了",
       "author": "一起去踩水坑嗎",
       "publishedAt": "2026-07-12",
-      "signal": "1095 lượt xem · 13 lượt thích · 0 coin · 2 lượt lưu · 4 bình luận",
+      "signal": "1104 lượt xem · 13 lượt thích · 0 coin · 2 lượt lưu · 4 bình luận",
       "sourceQueryIds": [
         "bilibili-items"
       ],
@@ -4772,7 +5261,7 @@
       ],
       "firstSeenAt": "2026-07-16",
       "metrics": {
-        "views": 1095,
+        "views": 1104,
         "likes": 13,
         "coins": 0,
         "favorites": 2,
@@ -4826,9 +5315,9 @@
       "title": "盘点新版海斗强势英雄玩法-VN",
       "author": "海斗教主张无忌",
       "publishedAt": "2026-07-12",
-      "signal": "17165 lượt xem · 147 lượt thích · 10 coin · 21 lượt lưu · 55 bình luận",
+      "signal": "17182 lượt xem · 147 lượt thích · 10 coin · 21 lượt lưu · 55 bình luận",
       "metrics": {
-        "views": 17165,
+        "views": 17182,
         "likes": 147,
         "coins": 10,
         "favorites": 21,
@@ -4854,6 +5343,7 @@
         "description",
         "parts",
         "public-comments",
+        "public-image",
         "tags",
         "title"
       ],
@@ -4879,7 +5369,8 @@
       "reasons": [
         "Có từ khóa Hải Đấu/ARAM Mayhem",
         "Nhận dạng Vayne",
-        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành",
+        "Ảnh công khai chỉ lưu mã tham chiếu; cần OCR/đối chiếu thủ công trước khi duyệt"
       ],
       "firstSeenAt": "2026-07-17",
       "evidenceClassifierRevision": 1,
@@ -4899,10 +5390,12 @@
         "items": []
       },
       "partialSignature": "vayne::",
-      "evidenceReviewState": "incomplete",
+      "evidenceReviewState": "image-review-required",
       "subtitleAccessState": "not-available",
-      "imageEvidenceState": "temporary-error",
-      "sourceImageIds": [],
+      "imageEvidenceState": "ok",
+      "sourceImageIds": [
+        "sha256:172d81248c348b1cad2722d0"
+      ],
       "sourceImageReferenceIds": [],
       "complete": false
     },
@@ -4913,9 +5406,9 @@
       "title": "40杀韦鲁斯，虚幻武器穿甲流最优出装，玩这套不打火直接把自己埋了（40杀+大腿）",
       "author": "海斗K头滴神",
       "publishedAt": "2026-07-11",
-      "signal": "2665 lượt xem · 9 lượt thích · 0 coin · 4 lượt lưu · 4 bình luận",
+      "signal": "2703 lượt xem · 9 lượt thích · 0 coin · 4 lượt lưu · 4 bình luận",
       "metrics": {
-        "views": 2665,
+        "views": 2703,
         "likes": 9,
         "coins": 0,
         "favorites": 4,
@@ -4996,7 +5489,7 @@
       },
       "partialSignature": "varus:1029:",
       "evidenceReviewState": "incomplete",
-      "subtitleAccessState": "not-available",
+      "subtitleAccessState": "not-requested",
       "imageEvidenceState": "not-requested",
       "sourceImageIds": [],
       "sourceImageReferenceIds": [],
@@ -5009,7 +5502,7 @@
       "title": "海斗螳螂的3种玩法，妈妈他在天上飞！",
       "author": "海斗小助手",
       "publishedAt": "2026-07-11",
-      "signal": "1379 lượt xem · 20 lượt thích · 0 coin · 6 lượt lưu · 0 bình luận",
+      "signal": "1399 lượt xem · 20 lượt thích · 0 coin · 6 lượt lưu · 0 bình luận",
       "sourceQueryIds": [
         "bilibili-builds"
       ],
@@ -5034,7 +5527,7 @@
       ],
       "firstSeenAt": "2026-07-16",
       "metrics": {
-        "views": 1379,
+        "views": 1399,
         "likes": 20,
         "coins": 0,
         "favorites": 6,
@@ -5092,7 +5585,7 @@
       "title": "海斗真的永远不要出卢登吗？这件装备似乎有点被妖魔化了",
       "author": "取个合适的名称吧_",
       "publishedAt": "2026-07-11",
-      "signal": "6321 lượt xem · 27 lượt thích · 1 lượt lưu",
+      "signal": "6429 lượt xem · 27 lượt thích · 1 lượt lưu",
       "sourceQueryIds": [
         "bilibili-items"
       ],
@@ -5116,7 +5609,7 @@
       ],
       "firstSeenAt": "2026-07-16",
       "metrics": {
-        "views": 6321,
+        "views": 6429,
         "likes": 27,
         "favorites": 1
       },
@@ -5153,9 +5646,9 @@
       "title": "这出装能看懂的钻石以上",
       "author": "汉主凌空万国明",
       "publishedAt": "2026-07-11",
-      "signal": "1335 lượt xem · 22 lượt thích · 1 lượt lưu",
+      "signal": "1346 lượt xem · 22 lượt thích · 1 lượt lưu",
       "metrics": {
-        "views": 1335,
+        "views": 1346,
         "likes": 22,
         "favorites": 1
       },
@@ -5197,7 +5690,7 @@
       "title": "海斗3.0:无限技能的四种玩法！达成条件以及出装思路！",
       "author": "可乐乱斗",
       "publishedAt": "2026-07-10",
-      "signal": "5487 lượt xem · 52 lượt thích · 36 lượt lưu",
+      "signal": "5504 lượt xem · 52 lượt thích · 37 lượt lưu",
       "sourceQueryIds": [
         "bilibili-builds",
         "bilibili-items"
@@ -5236,9 +5729,9 @@
       ],
       "firstSeenAt": "2026-07-16",
       "metrics": {
-        "views": 5487,
+        "views": 5504,
         "likes": 52,
-        "favorites": 36
+        "favorites": 37
       },
       "authorTier": "unlisted",
       "accessState": "ok",
@@ -5360,7 +5853,7 @@
       "title": "海克斯大乱斗个人推荐薇恩出装",
       "author": "Rainbow_ice7",
       "publishedAt": "2026-07-10",
-      "signal": "219 lượt xem · 2 lượt thích · 0 coin · 0 lượt lưu · 0 bình luận",
+      "signal": "220 lượt xem · 2 lượt thích · 0 coin · 0 lượt lưu · 0 bình luận",
       "sourceQueryIds": [
         "bilibili-items"
       ],
@@ -5384,7 +5877,7 @@
       ],
       "firstSeenAt": "2026-07-16",
       "metrics": {
-        "views": 219,
+        "views": 220,
         "likes": 2,
         "coins": 0,
         "favorites": 0,
@@ -5438,7 +5931,7 @@
       "title": "热血传奇：【光辉纪元】全网最爽1.76暗黑大作，几百种铭文+符文组合，超级BUFF进阶玩法，特殊组合，职业觉醒，多种玩法自己发掘体验，一切靠打轻松爽玩！！",
       "author": "传奇嫖得爽",
       "publishedAt": "2026-07-10",
-      "signal": "132 lượt xem · 3 lượt thích · 1 lượt lưu",
+      "signal": "135 lượt xem · 3 lượt thích · 1 lượt lưu",
       "sourceQueryIds": [
         "bilibili-builds"
       ],
@@ -5453,7 +5946,7 @@
       ],
       "firstSeenAt": "2026-07-16",
       "metrics": {
-        "views": 132,
+        "views": 135,
         "likes": 3,
         "favorites": 1
       },
@@ -5482,10 +5975,10 @@
       "title": "盘点新版海斗强势英雄玩法-永恩亚索",
       "author": "海斗教主张无忌",
       "publishedAt": "2026-07-10",
-      "signal": "13984 lượt xem · 102 lượt thích · 7 coin · 18 lượt lưu · 73 bình luận",
+      "signal": "14162 lượt xem · 103 lượt thích · 7 coin · 18 lượt lưu · 73 bình luận",
       "metrics": {
-        "views": 13984,
-        "likes": 102,
+        "views": 14162,
+        "likes": 103,
         "coins": 7,
         "favorites": 18,
         "comments": 73
@@ -5588,11 +6081,11 @@
       "title": "铁男大招巨大加强13%属性偷取！快学真不区的海斗铁男玩法！",
       "author": "夜陨zz",
       "publishedAt": "2026-07-10",
-      "signal": "344266 lượt xem · 12740 lượt thích · 752 lượt lưu",
+      "signal": "344850 lượt xem · 12761 lượt thích · 755 lượt lưu",
       "metrics": {
-        "views": 344266,
-        "likes": 12740,
-        "favorites": 752
+        "views": 344850,
+        "likes": 12761,
+        "favorites": 755
       },
       "authorTier": "unlisted",
       "accessState": "ok",
@@ -5632,10 +6125,10 @@
       "title": "海斗小猫队友的出装口味be like：",
       "author": "cte591",
       "publishedAt": "2026-07-10",
-      "signal": "37917 lượt xem · 412 lượt thích · 34 lượt lưu",
+      "signal": "38081 lượt xem · 414 lượt thích · 34 lượt lưu",
       "metrics": {
-        "views": 37917,
-        "likes": 412,
+        "views": 38081,
+        "likes": 414,
         "favorites": 34
       },
       "authorTier": "unlisted",
@@ -5676,11 +6169,11 @@
       "title": "地形专家巨魔玩法解析：一柱擎天，安如泰山",
       "author": "化学催化剂i",
       "publishedAt": "2026-07-09",
-      "signal": "83966 lượt xem · 7696 lượt thích · 315 lượt lưu",
+      "signal": "84371 lượt xem · 7700 lượt thích · 316 lượt lưu",
       "metrics": {
-        "views": 83966,
-        "likes": 7696,
-        "favorites": 315
+        "views": 84371,
+        "likes": 7700,
+        "favorites": 316
       },
       "authorTier": "unlisted",
       "accessState": "ok",
@@ -5782,7 +6275,7 @@
       "title": "过早出魔宗是最大的陷阱，人马全流派玩法",
       "author": "炭烧魚",
       "publishedAt": "2026-07-08",
-      "signal": "54577 lượt xem · 940 lượt thích · 201 lượt lưu",
+      "signal": "55174 lượt xem · 950 lượt thích · 203 lượt lưu",
       "sourceQueryIds": [
         "bilibili-builds",
         "bilibili-items"
@@ -5823,9 +6316,9 @@
       ],
       "firstSeenAt": "2026-07-16",
       "metrics": {
-        "views": 54577,
-        "likes": 940,
-        "favorites": 201
+        "views": 55174,
+        "likes": 950,
+        "favorites": 203
       },
       "authorTier": "unlisted",
       "accessState": "ok",
@@ -5873,7 +6366,7 @@
       "title": "无限www吸血鬼！符文炼狱导管+150技能极速即可解锁新欢乐玩法！#海克斯大乱斗",
       "author": "LOL阿阳哥搞笑王子",
       "publishedAt": "2026-07-08",
-      "signal": "1571 lượt xem · 30 lượt thích · 1 lượt lưu",
+      "signal": "1576 lượt xem · 30 lượt thích · 1 lượt lưu",
       "sourceQueryIds": [
         "bilibili-builds"
       ],
@@ -5897,7 +6390,7 @@
       ],
       "firstSeenAt": "2026-07-16",
       "metrics": {
-        "views": 1571,
+        "views": 1576,
         "likes": 30,
         "favorites": 1
       },
@@ -6033,6 +6526,7 @@
       "evidenceVersion": 3,
       "evidenceFields": [
         "description",
+        "public-image",
         "tags",
         "title"
       ],
@@ -6067,7 +6561,8 @@
         "Có từ khóa Hải Đấu/ARAM Mayhem",
         "Nhận dạng Sejuani",
         "1 lõi khớp ID game",
-        "Nguồn nằm trong cửa sổ theo dõi hiện hành"
+        "Nguồn nằm trong cửa sổ theo dõi hiện hành",
+        "Ảnh công khai chỉ lưu mã tham chiếu; cần OCR/đối chiếu thủ công trước khi duyệt"
       ],
       "firstSeenAt": "2026-07-17",
       "evidenceClassifierRevision": 1,
@@ -6091,10 +6586,12 @@
         "items": []
       },
       "partialSignature": "sejuani:2006:",
-      "evidenceReviewState": "incomplete",
+      "evidenceReviewState": "image-review-required",
       "subtitleAccessState": "not-available",
-      "imageEvidenceState": "temporary-error",
-      "sourceImageIds": [],
+      "imageEvidenceState": "ok",
+      "sourceImageIds": [
+        "sha256:3f396f11ed61579d1d0ef3f7"
+      ],
       "sourceImageReferenceIds": [],
       "complete": false
     },
@@ -6105,7 +6602,7 @@
       "title": "海克斯大乱斗炸弹人3套玩法推荐",
       "author": "海斗小助手",
       "publishedAt": "2026-07-07",
-      "signal": "966 lượt xem · 25 lượt thích · 0 coin · 2 lượt lưu · 0 bình luận",
+      "signal": "988 lượt xem · 25 lượt thích · 0 coin · 2 lượt lưu · 0 bình luận",
       "sourceQueryIds": [
         "bilibili-builds"
       ],
@@ -6130,7 +6627,7 @@
       ],
       "firstSeenAt": "2026-07-16",
       "metrics": {
-        "views": 966,
+        "views": 988,
         "likes": 25,
         "coins": 0,
         "favorites": 2,
@@ -6186,7 +6683,7 @@
       "title": "奶枪物法皆修邪修玩法",
       "author": "乱斗螃蟹",
       "publishedAt": "2026-07-07",
-      "signal": "3103 lượt xem · 22 lượt thích · 3 lượt lưu",
+      "signal": "3130 lượt xem · 22 lượt thích · 3 lượt lưu",
       "sourceQueryIds": [
         "bilibili-builds"
       ],
@@ -6217,7 +6714,7 @@
       ],
       "firstSeenAt": "2026-07-16",
       "metrics": {
-        "views": 3103,
+        "views": 3130,
         "likes": 22,
         "favorites": 3
       },
@@ -6309,6 +6806,7 @@
       "evidenceFields": [
         "description",
         "parts",
+        "public-image",
         "tags",
         "title"
       ],
@@ -6343,8 +6841,10 @@
       "partialSignature": "huijinqumoren-rakan::",
       "evidenceReviewState": "translation-review-required",
       "subtitleAccessState": "not-available",
-      "imageEvidenceState": "temporary-error",
-      "sourceImageIds": [],
+      "imageEvidenceState": "ok",
+      "sourceImageIds": [
+        "sha256:1eb3eebbea36f733ae289019"
+      ],
       "sourceImageReferenceIds": [],
       "complete": false
     },

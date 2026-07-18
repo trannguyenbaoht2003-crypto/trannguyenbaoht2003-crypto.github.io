@@ -1,14 +1,14 @@
 {
-  "generatedAt": "2026-07-18T07:13:02.498Z",
-  "contentHash": "d409578bd889a71c5e3b711e74dfadba4c27c38ad1495828eb0e4ab5dc2763b4",
-  "evidenceHash": "0e9d1bb991d8b471e71552b67149744d2bdd59cbe7da9430b2410b1b4614e046",
+  "generatedAt": "2026-07-18T11:04:55.429Z",
+  "contentHash": "c7f06b7f9e93a34cf4eecf924daf817f523e259e429c2fda1a0d35088fba9c3b",
+  "evidenceHash": "f76345d6e6f9350c92d9be9eea04dcc2152b3d5423e073798ccaebdb681372e4",
   "currentPatch": "16.14",
-  "candidateCount": 3,
-  "decisionCount": 0,
+  "candidateCount": 4,
+  "decisionCount": 1,
   "statusCounts": {
     "auto-approved": 0,
     "needs-verification": 0,
-    "observing": 0,
+    "observing": 1,
     "rejected": 0
   },
   "generatedRecordCount": 0,

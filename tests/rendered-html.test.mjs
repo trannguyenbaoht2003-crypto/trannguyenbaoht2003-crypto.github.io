@@ -47,7 +47,9 @@ test("does not add an installable app surface", () => {
 
 test("renders the public Evidence v3.1 review workbench with exact-ID controls", () => {
   assert.match(reviewHtml, /Bảng duyệt Evidence v3\.1/i);
-  assert.match(reviewHtml, /11 ứng viên/i);
+  const candidateCount = reviewHtml.match(/aria-label=["'](\d+) ứng viên["']/i);
+  assert.ok(candidateCount, "review workbench must render its current candidate count");
+  assert.ok(Number(candidateCount[1]) > 0, "review workbench must contain an actionable candidate");
   assert.match(reviewHtml, /Chờ đối chiếu ảnh/i);
   assert.match(reviewHtml, /Chờ đối chiếu bản dịch/i);
   assert.match(reviewHtml, /Chọn đúng 1 tướng/i);

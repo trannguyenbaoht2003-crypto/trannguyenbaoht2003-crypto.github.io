@@ -1,6 +1,22 @@
 {
   "schemaVersion": 1,
   "evidenceVersion": "3.1",
-  "updatedAt": "2026-07-18T00:00:00.000Z",
-  "reviews": []
+  "updatedAt": "2026-07-18T11:00:56.757Z",
+  "reviews": [
+    {
+      "candidateId": "candidate-c002b53073a33891",
+      "url": "https://www.bilibili.com/video/BV1ztNt6xEEa/",
+      "championId": "belveth",
+      "augmentIds": [
+        1058
+      ],
+      "itemIds": [
+        4633,
+        3430,
+        3065
+      ],
+      "attested": true,
+      "reviewedAt": "2026-07-18T11:00:56.757Z"
+    }
+  ]
 }
