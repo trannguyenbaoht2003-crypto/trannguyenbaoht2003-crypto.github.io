@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-07-21T10:03:38.883Z",
+  "schemaVersion": 1,
+  "ranAt": "2026-07-21T10:04:00.475Z",
+  "sourceCommit": "4b90bb8201b6d5272ecc7d537eccffa23a90aa41",
   "contentHash": "1d20772e58536f124e8401b7423950924e7a2b6f461d089e6eebe3a0b5702b6b",
   "currentPatch": "16.14",
-  "queryCount": 7,
-  "creatorCount": 5,
   "candidateCount": 151,
   "newCandidateCount": 25,
   "updatedCandidateCount": 25,
@@ -27,7 +27,5 @@
     "patch-watch": 3,
     "stale": 2
   },
-  "newestPublishedAt": "2026-07-21",
-  "scanErrors": [],
-  "autoPublish": true
+  "scanErrors": []
 }
