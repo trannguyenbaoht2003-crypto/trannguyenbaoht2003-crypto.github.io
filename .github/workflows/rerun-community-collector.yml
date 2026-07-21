@@ -1,0 +1,88 @@
+name: Rerun community collector
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/rerun-community-collector.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: community-collector
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.0
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Evidence v3.1 collector pipeline
+        run: |
+          npm run collect:community
+          npm run moderate:community
+          npm run validate:community
+          npm run test:moderation
+
+      - name: Rebuild GitHub Pages output
+        run: |
+          npm run build:pages
+          rm -rf _next
+          cp -a out/. .
+          npm run patch:pages-fallback
+          node --test tests/rendered-html.test.mjs
+          rm -rf out .next
+
+      - name: Record collector run
+        env:
+          SOURCE_COMMIT: ${{ github.sha }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFile, writeFile } from "node:fs/promises";
+
+          const report = JSON.parse(await readFile("community-watch-report.json", "utf8"));
+          const marker = {
+            schemaVersion: 1,
+            ranAt: new Date().toISOString(),
+            sourceCommit: process.env.SOURCE_COMMIT,
+            contentHash: report.contentHash,
+            currentPatch: report.currentPatch,
+            candidateCount: report.candidateCount,
+            newCandidateCount: report.newCandidateCount,
+            updatedCandidateCount: report.updatedCandidateCount,
+            reviewCandidateCount: report.reviewCandidateCount,
+            evidenceV3: report.evidenceV3,
+            statusCounts: report.statusCounts,
+            scanErrors: report.scanErrors,
+          };
+          await writeFile("data/community-collector-last-run.json", `${JSON.stringify(marker, null, 2)}\n`);
+          NODE
+
+      - name: Commit collector results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Collector completed with no repository changes."
+            exit 0
+          fi
+          git commit -m "chore: rerun Evidence v3.1 collector"
+          git push
