@@ -35,23 +35,56 @@ jobs:
           node-version: 22.13.0
           cache: npm
 
-      - name: Install dependencies
+      - name: Record protected policy hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum app/community-source-registry.json data/community-review-overrides.json > "$RUNNER_TEMP/protected-policy.sha256"
+
+      - name: npm ci
         run: npm ci
 
-      - name: Validate collector and moderation pipeline
-        run: |
-          npm run collect:community
-          npm run moderate:community
-          npm run validate:community
-          npm run test:moderation
+      - name: collect:community
+        run: npm run collect:community
 
-      - name: Build deploy artifact without publishing
+      - name: moderate:community
+        run: npm run moderate:community
+
+      - name: validate:community
+        run: npm run validate:community
+
+      - name: test:moderation
+        run: npm run test:moderation
+
+      - name: lint
+        run: npm run lint
+
+      - name: npm test
+        run: npm test
+
+      - name: npm run build
+        run: npm run build
+
+      - name: build:pages
         run: npm run build:pages
 
-      - name: Validate generated artifact
+      - name: rendered-html test
         run: node --test tests/rendered-html.test.mjs
 
-      - name: Confirm production deployment is disabled
+      - name: Verify output routes
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -d out
+          test -f out/index.html
+          test -f out/review/index.html
+          echo "Verified out/, /, and /review/."
+
+      - name: Verify Evidence and moderation policy unchanged
+        shell: bash
+        run: sha256sum --check "$RUNNER_TEMP/protected-policy.sha256"
+
+      - name: Production deployment guard
         shell: bash
         run: |
           set -euo pipefail
@@ -62,14 +95,21 @@ jobs:
             exit 1
           fi
 
-          if grep -Eq 'git push|actions/deploy-pages|peaceiris/actions-gh-pages|cloudflare/wrangler-action|wrangler deploy' "$workflow"; then
+          if grep -Eq 'git push|actions/deploy-pages|peaceiris/actions-gh-pages|cloudflare/wrangler-action|wrangler deploy|npm run deploy' "$workflow"; then
             echo "Production deployment command detected." >&2
             exit 1
           fi
 
           echo "Dry run only: no production deployment permission or command is present."
 
-      - name: Upload dry-run artifact
+      - name: Git status
+        shell: bash
+        run: |
+          set -euo pipefail
+          git status --short
+          git status --branch --porcelain=v1
+
+      - name: Artifact upload
         uses: actions/upload-artifact@v4
         with:
           name: github-pages-dry-run-${{ github.sha }}
