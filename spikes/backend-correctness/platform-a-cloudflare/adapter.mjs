@@ -12,6 +12,7 @@ export const PLATFORM_A_METADATA = Object.freeze({
 
 const PLATFORM_DIR = fileURLToPath(new URL('.', import.meta.url));
 const WORKER_PATH = path.join(PLATFORM_DIR, 'worker.mjs');
+const COMPATIBILITY_DATE = '2026-05-22';
 
 function checksum(value) {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -25,7 +26,7 @@ export async function createCloudflareAdapter(options = {}) {
   const runtime = new Miniflare({
     modules: true,
     scriptPath: WORKER_PATH,
-    compatibilityDate: '2026-07-22',
+    compatibilityDate: COMPATIBILITY_DATE,
     d1Databases: { DB: 'hai-dau-platform-a-correctness' },
     queueProducers: { EVENT_QUEUE: 'hai-dau-platform-a-events' },
     queueConsumers: {
@@ -113,6 +114,7 @@ export async function createCloudflareAdapter(options = {}) {
     async collectEvidence() {
       return {
         platform: PLATFORM_A_METADATA.platform,
+        compatibilityDate: COMPATIBILITY_DATE,
         state: await adapter.snapshotState(),
       };
     },
