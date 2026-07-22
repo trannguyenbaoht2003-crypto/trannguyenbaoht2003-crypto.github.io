@@ -91,9 +91,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ! grep -RniE 'wrangler[[:space:]]+deploy|--remote|CLOUDFLARE_API_TOKEN|CLOUDFLARE_ACCOUNT_ID|pages:[[:space:]]*write|contents:[[:space:]]*write|id-token:[[:space:]]*write' \
+          ! grep -RniE 'wrangler[[:space:]]+deploy|--remote|CLOUDFLARE_API_TOKEN|CLOUDFLARE_ACCOUNT_ID' \
             spikes/backend-correctness/platform-a-cloudflare \
-            .github/workflows/spike-1b-cloudflare-correctness.yml
+            --exclude='*.log' \
+            --exclude-dir=evidence
+          permissions_block="$(sed -n '/^permissions:/,/^jobs:/p' .github/workflows/spike-1b-cloudflare-correctness.yml)"
+          echo "${permissions_block}" | grep -q 'contents: read'
+          ! echo "${permissions_block}" | grep -q 'write'
 
       - name: Upload Platform A evidence
         if: always()
