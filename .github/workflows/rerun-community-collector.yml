@@ -83,5 +83,6 @@ jobs:
         with:
           name: github-pages-dry-run-${{ github.sha }}
           path: out/
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 3
