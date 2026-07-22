@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { unstable_startWorker } from 'wrangler';
+import { Miniflare } from 'miniflare';
 
 export const PLATFORM_A_METADATA = Object.freeze({
   platform: 'cloudflare-worker-d1-queues',
@@ -11,7 +11,7 @@ export const PLATFORM_A_METADATA = Object.freeze({
 });
 
 const PLATFORM_DIR = fileURLToPath(new URL('.', import.meta.url));
-const CONFIG_PATH = path.join(PLATFORM_DIR, 'wrangler.jsonc');
+const WORKER_PATH = path.join(PLATFORM_DIR, 'worker.mjs');
 
 function checksum(value) {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -22,10 +22,24 @@ export async function createCloudflareAdapter(options = {}) {
     throw new Error('PLATFORM_A_LOCAL_TEST_ONLY');
   }
 
-  const worker = await unstable_startWorker({ config: CONFIG_PATH });
+  const runtime = new Miniflare({
+    modules: true,
+    scriptPath: WORKER_PATH,
+    compatibilityDate: '2026-07-22',
+    d1Databases: { DB: 'hai-dau-platform-a-correctness' },
+    queueProducers: { EVENT_QUEUE: 'hai-dau-platform-a-events' },
+    queueConsumers: {
+      'hai-dau-platform-a-events': {
+        maxBatchSize: 10,
+        maxBatchTimeout: 1,
+        maxRetries: 3,
+      },
+    },
+    cf: false,
+  });
 
   async function request(pathname, init = {}) {
-    const response = await worker.fetch(`http://platform-a.local${pathname}`, {
+    const response = await runtime.dispatchFetch(`http://platform-a.local${pathname}`, {
       ...init,
       headers: {
         'content-type': 'application/json',
@@ -104,7 +118,7 @@ export async function createCloudflareAdapter(options = {}) {
     },
 
     async close() {
-      await worker.dispose();
+      await runtime.dispose();
     },
   };
 
