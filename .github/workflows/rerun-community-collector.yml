@@ -63,7 +63,15 @@ jobs:
         run: npm test
 
       - name: npm run build
-        run: npm run build
+        shell: bash
+        run: |
+          set -o pipefail
+          if ! npm run build > "$RUNNER_TEMP/npm-build.log" 2>&1; then
+            echo "npm run build failed; final diagnostic lines follow:"
+            tail -n 160 "$RUNNER_TEMP/npm-build.log"
+            exit 1
+          fi
+          cat "$RUNNER_TEMP/npm-build.log"
 
       - name: build:pages
         run: npm run build:pages
