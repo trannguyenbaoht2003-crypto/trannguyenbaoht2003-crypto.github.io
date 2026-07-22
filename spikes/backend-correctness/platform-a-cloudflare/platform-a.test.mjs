@@ -17,3 +17,44 @@ test('Platform A implements the complete common adapter contract', async () => {
   assert.equal(assertAdapterContract(adapter), true);
   await adapter.close?.();
 });
+
+test('Platform A runs D1 and Queues locally with idempotent delivery', async () => {
+  const adapter = await createCloudflareAdapter({ mode: 'local-test' });
+  try {
+    await adapter.resetEnvironment();
+    assert.deepEqual(await adapter.snapshotState(), {
+      outboxEvents: 0,
+      consumerEffects: 0,
+      deliveredOutboxEvents: 0,
+    });
+
+    await adapter.executeCommand({
+      type: 'record_outbox_event',
+      eventId: 'event-0001',
+      eventType: 'PlatformASmokeTest',
+      payload: { candidateId: 'candidate-000001' },
+    });
+
+    await adapter.dispatchOutbox();
+    await adapter.drainQueue();
+
+    assert.deepEqual(await adapter.snapshotState(), {
+      outboxEvents: 1,
+      consumerEffects: 1,
+      deliveredOutboxEvents: 1,
+    });
+
+    await adapter.executeCommand({
+      type: 'redeliver_event',
+      eventId: 'event-0001',
+      eventType: 'PlatformASmokeTest',
+      payload: { candidateId: 'candidate-000001' },
+    });
+    await adapter.drainQueue();
+
+    const finalState = await adapter.snapshotState();
+    assert.equal(finalState.consumerEffects, 1, 'duplicate queue delivery must not duplicate its side effect');
+  } finally {
+    await adapter.close?.();
+  }
+});
