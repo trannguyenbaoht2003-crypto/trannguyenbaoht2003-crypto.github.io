@@ -34,8 +34,30 @@ jobs:
           cache: npm
       - name: npm ci
         run: npm ci
-      - name: npm run build
-        run: npm run build
+      - name: Capture npm run build log
+        id: clean_build
+        shell: bash
+        run: |
+          set +e
+          npm run build > "$RUNNER_TEMP/clean-npm-build.log" 2>&1
+          status=$?
+          echo "$status" > "$RUNNER_TEMP/clean-npm-build.status"
+          tail -n 40 "$RUNNER_TEMP/clean-npm-build.log"
+          exit 0
+      - name: Upload clean build diagnostic
+        uses: actions/upload-artifact@v4
+        with:
+          name: clean-npm-build-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/clean-npm-build.log
+            ${{ runner.temp }}/clean-npm-build.status
+          if-no-files-found: error
+          retention-days: 3
+      - name: Enforce clean build result
+        shell: bash
+        run: |
+          status="$(cat "$RUNNER_TEMP/clean-npm-build.status")"
+          test "$status" -eq 0
 
   validate-deploy-workflow:
     runs-on: ubuntu-latest
