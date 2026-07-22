@@ -1,5 +1,6 @@
 const SCHEMA_STATEMENTS = Object.freeze([
   'DROP TABLE IF EXISTS consumer_effects',
+  'DROP TABLE IF EXISTS idempotency_records',
   'DROP TABLE IF EXISTS outbox_events',
   `CREATE TABLE outbox_events (
     event_id TEXT PRIMARY KEY,
@@ -7,6 +8,12 @@ const SCHEMA_STATEMENTS = Object.freeze([
     payload_json TEXT NOT NULL,
     delivery_state TEXT NOT NULL DEFAULT 'pending',
     created_at TEXT NOT NULL
+  )`,
+  `CREATE TABLE idempotency_records (
+    idempotency_key TEXT PRIMARY KEY,
+    request_json TEXT NOT NULL,
+    result_json TEXT NOT NULL,
+    completed_at TEXT NOT NULL
   )`,
   `CREATE TABLE consumer_effects (
     event_id TEXT PRIMARY KEY,
@@ -36,31 +43,67 @@ async function resetDatabase(env) {
 }
 
 async function snapshot(env) {
-  const outbox = await env.DB.prepare(`
-    SELECT
-      COUNT(*) AS total,
-      SUM(CASE WHEN delivery_state = 'delivered' THEN 1 ELSE 0 END) AS delivered
-    FROM outbox_events
-  `).first();
-  const effects = await env.DB.prepare('SELECT COUNT(*) AS total FROM consumer_effects').first();
+  const [outbox, effects, idempotency] = await Promise.all([
+    env.DB.prepare(`
+      SELECT
+        COUNT(*) AS total,
+        SUM(CASE WHEN delivery_state = 'delivered' THEN 1 ELSE 0 END) AS delivered
+      FROM outbox_events
+    `).first(),
+    env.DB.prepare('SELECT COUNT(*) AS total FROM consumer_effects').first(),
+    env.DB.prepare('SELECT COUNT(*) AS total FROM idempotency_records').first(),
+  ]);
   return {
     outboxEvents: Number(outbox?.total ?? 0),
     consumerEffects: Number(effects?.total ?? 0),
     deliveredOutboxEvents: Number(outbox?.delivered ?? 0),
+    idempotencyRecords: Number(idempotency?.total ?? 0),
   };
+}
+
+async function recordOutboxEvent(command, env) {
+  if (!command.idempotencyKey || !command.eventId || !command.eventType) {
+    return json({ error: 'INVALID_COMMAND' }, 400);
+  }
+
+  const requestJson = JSON.stringify({
+    eventId: command.eventId,
+    eventType: command.eventType,
+    payload: command.payload ?? null,
+  });
+  const existing = await env.DB.prepare(`
+    SELECT request_json, result_json
+    FROM idempotency_records
+    WHERE idempotency_key = ?
+  `).bind(command.idempotencyKey).first();
+
+  if (existing) {
+    if (existing.request_json !== requestJson) {
+      return json({ error: 'IDEMPOTENCY_PAYLOAD_CONFLICT' }, 409);
+    }
+    return json({ ...JSON.parse(existing.result_json), replayed: true });
+  }
+
+  const now = new Date().toISOString();
+  const result = { ok: true, eventId: command.eventId };
+  await env.DB.batch([
+    env.DB.prepare(`
+      INSERT INTO outbox_events (event_id, event_type, payload_json, delivery_state, created_at)
+      VALUES (?, ?, ?, 'pending', ?)
+    `).bind(command.eventId, command.eventType, JSON.stringify(command.payload ?? null), now),
+    env.DB.prepare(`
+      INSERT INTO idempotency_records (idempotency_key, request_json, result_json, completed_at)
+      VALUES (?, ?, ?, ?)
+    `).bind(command.idempotencyKey, requestJson, JSON.stringify(result), now),
+  ]);
+  return json({ ...result, replayed: false });
 }
 
 async function handleCommand(request, env) {
   const command = await readJson(request);
-  const now = new Date().toISOString();
 
   if (command.type === 'record_outbox_event') {
-    if (!command.eventId || !command.eventType) return json({ error: 'INVALID_COMMAND' }, 400);
-    await env.DB.prepare(`
-      INSERT INTO outbox_events (event_id, event_type, payload_json, delivery_state, created_at)
-      VALUES (?, ?, ?, 'pending', ?)
-    `).bind(command.eventId, command.eventType, JSON.stringify(command.payload ?? null), now).run();
-    return json({ ok: true, eventId: command.eventId });
+    return recordOutboxEvent(command, env);
   }
 
   if (command.type === 'redeliver_event') {
