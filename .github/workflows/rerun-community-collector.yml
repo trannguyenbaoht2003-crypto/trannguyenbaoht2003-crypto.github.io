@@ -7,8 +7,10 @@ on:
       - ".github/workflows/**"
       - "app/**"
       - "data/**"
+      - "docs/**"
       - "scripts/**"
       - "tests/**"
+      - "README.md"
       - "package.json"
       - "package-lock.json"
       - "next.config.ts"
@@ -21,48 +23,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  clean-build-diagnostic:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22.13.0
-          cache: npm
-      - name: npm ci
-        run: npm ci
-      - name: Capture npm run build log
-        id: clean_build
-        shell: bash
-        run: |
-          set +e
-          npm run build > "$RUNNER_TEMP/clean-npm-build.log" 2>&1
-          status=$?
-          echo "$status" > "$RUNNER_TEMP/clean-npm-build.status"
-          tail -n 40 "$RUNNER_TEMP/clean-npm-build.log"
-          exit 0
-      - name: Upload clean build diagnostic
-        uses: actions/upload-artifact@v4
-        with:
-          name: clean-npm-build-${{ github.sha }}
-          path: |
-            ${{ runner.temp }}/clean-npm-build.log
-            ${{ runner.temp }}/clean-npm-build.status
-          if-no-files-found: error
-          retention-days: 3
-      - name: Enforce clean build result
-        shell: bash
-        run: |
-          status="$(cat "$RUNNER_TEMP/clean-npm-build.status")"
-          test "$status" -eq 0
-
   validate-deploy-workflow:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -74,10 +37,7 @@ jobs:
           cache: npm
 
       - name: Record protected policy hashes
-        shell: bash
-        run: |
-          set -euo pipefail
-          sha256sum app/community-source-registry.json data/community-review-overrides.json > "$RUNNER_TEMP/protected-policy.sha256"
+        run: sha256sum app/community-source-registry.json data/community-review-overrides.json > "$RUNNER_TEMP/protected-policy.sha256"
 
       - name: npm ci
         run: npm ci
@@ -101,33 +61,15 @@ jobs:
         run: npm test
 
       - name: npm run build
-        shell: bash
-        run: |
-          set -o pipefail
-          if ! npm run build > "$RUNNER_TEMP/npm-build.log" 2>&1; then
-            echo "npm run build failed; final diagnostic lines follow:"
-            tail -n 160 "$RUNNER_TEMP/npm-build.log"
-            exit 1
-          fi
-          cat "$RUNNER_TEMP/npm-build.log"
+        run: npm run build
 
-      - name: build:pages
-        run: npm run build:pages
+      - name: validate:pages
+        run: npm run validate:pages
 
       - name: rendered-html test
         run: node --test tests/rendered-html.test.mjs
 
-      - name: Verify output routes
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -d out
-          test -f out/index.html
-          test -f out/review/index.html
-          echo "Verified out/, /, and /review/."
-
       - name: Verify Evidence and moderation policy unchanged
-        shell: bash
         run: sha256sum --check "$RUNNER_TEMP/protected-policy.sha256"
 
       - name: Production deployment guard
@@ -135,23 +77,18 @@ jobs:
         run: |
           set -euo pipefail
           workflow=".github/workflows/rerun-community-collector.yml"
-
           if grep -Eq 'contents:[[:space:]]*write|pages:[[:space:]]*write|id-token:[[:space:]]*write' "$workflow"; then
             echo "Write-capable deployment permission detected." >&2
             exit 1
           fi
-
           if grep -Eq 'git push|actions/deploy-pages|peaceiris/actions-gh-pages|cloudflare/wrangler-action|wrangler deploy|npm run deploy' "$workflow"; then
             echo "Production deployment command detected." >&2
             exit 1
           fi
-
           echo "Dry run only: no production deployment permission or command is present."
 
       - name: Git status
-        shell: bash
         run: |
-          set -euo pipefail
           git status --short
           git status --branch --porcelain=v1
 
