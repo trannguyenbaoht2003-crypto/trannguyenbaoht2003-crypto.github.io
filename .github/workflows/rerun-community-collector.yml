@@ -1,29 +1,33 @@
-name: Rerun community collector
+name: Deploy workflow dry run
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
+  pull_request:
     paths:
-      - .github/workflows/rerun-community-collector.yml
+      - ".github/workflows/**"
+      - "app/**"
+      - "data/**"
+      - "scripts/**"
+      - "tests/**"
+      - "package.json"
+      - "package-lock.json"
+      - "next.config.ts"
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: community-collector
-  cancel-in-progress: false
+  group: deploy-dry-run-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  collect:
+  validate-deploy-workflow:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -34,55 +38,41 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run Evidence v3.1 collector pipeline
+      - name: Validate collector and moderation pipeline
         run: |
           npm run collect:community
           npm run moderate:community
           npm run validate:community
           npm run test:moderation
 
-      - name: Rebuild GitHub Pages output
-        run: |
-          npm run build:pages
-          rm -rf _next
-          cp -a out/. .
-          npm run patch:pages-fallback
-          node --test tests/rendered-html.test.mjs
-          rm -rf out .next
+      - name: Build deploy artifact without publishing
+        run: npm run build:pages
 
-      - name: Record collector run
-        env:
-          SOURCE_COMMIT: ${{ github.sha }}
-        run: |
-          node --input-type=module <<'NODE'
-          import { readFile, writeFile } from "node:fs/promises";
+      - name: Validate generated artifact
+        run: node --test tests/rendered-html.test.mjs
 
-          const report = JSON.parse(await readFile("community-watch-report.json", "utf8"));
-          const marker = {
-            schemaVersion: 1,
-            ranAt: new Date().toISOString(),
-            sourceCommit: process.env.SOURCE_COMMIT,
-            contentHash: report.contentHash,
-            currentPatch: report.currentPatch,
-            candidateCount: report.candidateCount,
-            newCandidateCount: report.newCandidateCount,
-            updatedCandidateCount: report.updatedCandidateCount,
-            reviewCandidateCount: report.reviewCandidateCount,
-            evidenceV3: report.evidenceV3,
-            statusCounts: report.statusCounts,
-            scanErrors: report.scanErrors,
-          };
-          await writeFile("data/community-collector-last-run.json", `${JSON.stringify(marker, null, 2)}\n`);
-          NODE
-
-      - name: Commit collector results
+      - name: Confirm production deployment is disabled
+        shell: bash
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          if git diff --cached --quiet; then
-            echo "Collector completed with no repository changes."
-            exit 0
+          set -euo pipefail
+          workflow=".github/workflows/rerun-community-collector.yml"
+
+          if grep -Eq 'contents:[[:space:]]*write|pages:[[:space:]]*write|id-token:[[:space:]]*write' "$workflow"; then
+            echo "Write-capable deployment permission detected." >&2
+            exit 1
           fi
-          git commit -m "chore: rerun Evidence v3.1 collector"
-          git push
+
+          if grep -Eq 'git push|actions/deploy-pages|peaceiris/actions-gh-pages|cloudflare/wrangler-action|wrangler deploy' "$workflow"; then
+            echo "Production deployment command detected." >&2
+            exit 1
+          fi
+
+          echo "Dry run only: no production deployment permission or command is present."
+
+      - name: Upload dry-run artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: github-pages-dry-run-${{ github.sha }}
+          path: out/
+          if-no-files-found: error
+          retention-days: 3
