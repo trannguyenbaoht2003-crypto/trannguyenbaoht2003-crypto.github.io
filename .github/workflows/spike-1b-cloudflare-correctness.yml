@@ -1,0 +1,47 @@
+name: Sprint 1B-A Cloudflare Correctness
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'spikes/backend-correctness/common/**'
+      - 'spikes/backend-correctness/platform-a-cloudflare/**'
+      - '.github/workflows/spike-1b-cloudflare-correctness.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  red-green:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify locked Common Harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f spikes/backend-correctness/common/common-harness.test.mjs
+          node --test spikes/backend-correctness/common/common-harness.test.mjs
+
+      - name: Run Platform A contract tests
+        run: node --test spikes/backend-correctness/platform-a-cloudflare/platform-a.test.mjs
+
+      - name: Production safety guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          ! grep -RniE 'wrangler[[:space:]]+deploy|--remote|pages:[[:space:]]*write|contents:[[:space:]]*write|id-token:[[:space:]]*write' \
+            spikes/backend-correctness/platform-a-cloudflare \
+            .github/workflows/spike-1b-cloudflare-correctness.yml
