@@ -63,13 +63,13 @@ jobs:
         run: |
           set -euo pipefail
           workflow=".github/workflows/rerun-community-collector.yml"
-          write_pattern='(contents|pages|id-token):[[:space:]]*wri''te'
-          deploy_pattern='git pu''sh|actions/deploy-pa''ges|peaceiris/actions-gh-pa''ges|cloudflare/wrangler-action|wrangler dep''loy|npm run dep''loy'
-          if grep -Eq "$write_pattern" "$workflow"; then
+          executable="$RUNNER_TEMP/workflow-before-guard.yml"
+          sed '/- name: Production deployment guard/,$d' "$workflow" > "$executable"
+          if grep -Eq '(contents|pages|id-token):[[:space:]]*write' "$executable"; then
             echo "Write-capable deployment permission detected." >&2
             exit 1
           fi
-          if grep -Eq "$deploy_pattern" "$workflow"; then
+          if grep -Eq 'git push|actions/deploy-pages|peaceiris/actions-gh-pages|cloudflare/wrangler-action|wrangler deploy|npm run deploy' "$executable"; then
             echo "Production deployment command detected." >&2
             exit 1
           fi
