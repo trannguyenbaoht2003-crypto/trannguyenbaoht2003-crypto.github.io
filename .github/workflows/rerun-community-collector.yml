@@ -29,69 +29,55 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22.13.0
           cache: npm
-
       - name: Record protected policy hashes
         run: sha256sum app/community-source-registry.json data/community-review-overrides.json > "$RUNNER_TEMP/protected-policy.sha256"
-
       - name: npm ci
         run: npm ci
-
       - name: collect:community
         run: npm run collect:community
-
       - name: moderate:community
         run: npm run moderate:community
-
       - name: validate:community
         run: npm run validate:community
-
       - name: test:moderation
         run: npm run test:moderation
-
       - name: lint
         run: npm run lint
-
       - name: npm test
         run: npm test
-
       - name: npm run build
         run: npm run build
-
       - name: validate:pages
         run: npm run validate:pages
-
       - name: rendered-html test
         run: node --test tests/rendered-html.test.mjs
-
       - name: Verify Evidence and moderation policy unchanged
         run: sha256sum --check "$RUNNER_TEMP/protected-policy.sha256"
-
       - name: Production deployment guard
         shell: bash
         run: |
           set -euo pipefail
           workflow=".github/workflows/rerun-community-collector.yml"
-          if grep -Eq 'contents:[[:space:]]*write|pages:[[:space:]]*write|id-token:[[:space:]]*write' "$workflow"; then
+          write_pattern='(contents|pages|id-token):[[:space:]]*wri''te'
+          deploy_pattern='git pu''sh|actions/deploy-pa''ges|peaceiris/actions-gh-pa''ges|cloudflare/wrangler-action|wrangler dep''loy|npm run dep''loy'
+          if grep -Eq "$write_pattern" "$workflow"; then
             echo "Write-capable deployment permission detected." >&2
             exit 1
           fi
-          if grep -Eq 'git push|actions/deploy-pages|peaceiris/actions-gh-pages|cloudflare/wrangler-action|wrangler deploy|npm run deploy' "$workflow"; then
+          if grep -Eq "$deploy_pattern" "$workflow"; then
             echo "Production deployment command detected." >&2
             exit 1
           fi
           echo "Dry run only: no production deployment permission or command is present."
-
       - name: Git status
         run: |
           git status --short
           git status --branch --porcelain=v1
-
       - name: Artifact upload
         uses: actions/upload-artifact@v4
         with:
