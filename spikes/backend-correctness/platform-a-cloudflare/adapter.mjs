@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Miniflare } from 'miniflare';
+import { generateFixture } from '../common/generate-fixture.mjs';
 
 export const PLATFORM_A_METADATA = Object.freeze({
   platform: 'cloudflare-worker-d1-queues',
@@ -14,14 +15,20 @@ const PLATFORM_DIR = fileURLToPath(new URL('.', import.meta.url));
 const WORKER_PATH = path.join(PLATFORM_DIR, 'worker.mjs');
 const COMPATIBILITY_DATE = '2026-05-22';
 
+function canonical(value) {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonical(value[key])]));
+  }
+  return value;
+}
+
 function checksum(value) {
-  return createHash('sha256').update(JSON.stringify(value)).digest('hex');
+  return createHash('sha256').update(JSON.stringify(canonical(value))).digest('hex');
 }
 
 export async function createCloudflareAdapter(options = {}) {
-  if (options.mode !== 'local-test') {
-    throw new Error('PLATFORM_A_LOCAL_TEST_ONLY');
-  }
+  if (options.mode !== 'local-test') throw new Error('PLATFORM_A_LOCAL_TEST_ONLY');
 
   const runtime = new Miniflare({
     modules: true,
@@ -49,42 +56,50 @@ export async function createCloudflareAdapter(options = {}) {
     });
     const data = await response.json();
     if (!response.ok) {
-      throw new Error(`PLATFORM_A_REQUEST_FAILED:${response.status}:${data.error ?? 'UNKNOWN'}`);
+      const error = new Error(`PLATFORM_A_REQUEST_FAILED:${response.status}:${data.error ?? 'UNKNOWN'}`);
+      error.status = response.status;
+      error.code = data.error ?? 'UNKNOWN';
+      throw error;
     }
     return data;
   }
 
   const adapter = {
     async resetEnvironment() {
-      await request('/__spike/reset', { method: 'POST' });
+      return request('/__spike/reset', { method: 'POST' });
     },
 
-    async loadFixture() {
-      return { loaded: false, reason: 'fixture-loading-not-implemented-in-smoke-slice' };
+    async loadFixture(input = null) {
+      const generated = input ?? generateFixture();
+      return request('/__spike/load-fixture', {
+        method: 'POST',
+        body: JSON.stringify(generated),
+      });
     },
 
     async executeCommand(command) {
       return request('/__spike/command', { method: 'POST', body: JSON.stringify(command) });
     },
 
-    async injectFailure() {
-      return { injected: false, reason: 'failure-injection-not-implemented-in-smoke-slice' };
+    async injectFailure(point) {
+      return request('/__spike/inject-failure', { method: 'POST', body: JSON.stringify({ point }) });
     },
 
-    async releaseBarrier() {
-      return { released: false, reason: 'barriers-not-implemented-in-smoke-slice' };
+    async releaseBarrier(point = null) {
+      return request('/__spike/release-failure', { method: 'POST', body: JSON.stringify({ point }) });
     },
 
     async dispatchOutbox() {
       return request('/__spike/dispatch-outbox', { method: 'POST' });
     },
 
-    async drainQueue({ timeoutMs = 5000 } = {}) {
+    async drainQueue({ timeoutMs = 8000, expectedEffects = null } = {}) {
       const deadline = Date.now() + timeoutMs;
       let last;
       while (Date.now() < deadline) {
         last = await adapter.snapshotState();
-        if (last.consumerEffects >= last.deliveredOutboxEvents) return last;
+        const target = expectedEffects ?? last.outboxEvents;
+        if (last.consumerEffects >= target) return last;
         await new Promise((resolve) => setTimeout(resolve, 50));
       }
       throw new Error(`PLATFORM_A_QUEUE_DRAIN_TIMEOUT:${JSON.stringify(last)}`);
@@ -96,26 +111,27 @@ export async function createCloudflareAdapter(options = {}) {
 
     async computeChecksums() {
       const state = await adapter.snapshotState();
-      return { state: checksum(state) };
+      return { state: checksum(state), canonicalState: canonical(state) };
     },
 
     async backupState() {
-      return { snapshot: await adapter.snapshotState() };
+      return request('/__spike/export');
     },
 
-    async restoreState() {
-      throw new Error('PLATFORM_A_NOT_IMPLEMENTED:restoreState');
+    async restoreState(snapshot) {
+      return request('/__spike/import', { method: 'POST', body: JSON.stringify(snapshot) });
     },
 
     async readPublishedContent() {
-      return [];
+      return request('/__spike/published');
     },
 
     async collectEvidence() {
+      const evidence = await request('/__spike/evidence');
       return {
         platform: PLATFORM_A_METADATA.platform,
         compatibilityDate: COMPATIBILITY_DATE,
-        state: await adapter.snapshotState(),
+        ...evidence,
       };
     },
 
