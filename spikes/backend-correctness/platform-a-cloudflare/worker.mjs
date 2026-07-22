@@ -1,20 +1,20 @@
-const SCHEMA_SQL = `
-DROP TABLE IF EXISTS consumer_effects;
-DROP TABLE IF EXISTS outbox_events;
-CREATE TABLE outbox_events (
-  event_id TEXT PRIMARY KEY,
-  event_type TEXT NOT NULL,
-  payload_json TEXT NOT NULL,
-  delivery_state TEXT NOT NULL DEFAULT 'pending',
-  created_at TEXT NOT NULL
-);
-CREATE TABLE consumer_effects (
-  event_id TEXT PRIMARY KEY,
-  event_type TEXT NOT NULL,
-  payload_json TEXT NOT NULL,
-  processed_at TEXT NOT NULL
-);
-`;
+const SCHEMA_STATEMENTS = Object.freeze([
+  'DROP TABLE IF EXISTS consumer_effects',
+  'DROP TABLE IF EXISTS outbox_events',
+  `CREATE TABLE outbox_events (
+    event_id TEXT PRIMARY KEY,
+    event_type TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
+    delivery_state TEXT NOT NULL DEFAULT 'pending',
+    created_at TEXT NOT NULL
+  )`,
+  `CREATE TABLE consumer_effects (
+    event_id TEXT PRIMARY KEY,
+    event_type TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
+    processed_at TEXT NOT NULL
+  )`,
+]);
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -29,6 +29,10 @@ async function readJson(request) {
   } catch {
     throw new Error('INVALID_JSON');
   }
+}
+
+async function resetDatabase(env) {
+  await env.DB.batch(SCHEMA_STATEMENTS.map((statement) => env.DB.prepare(statement)));
 }
 
 async function snapshot(env) {
@@ -101,7 +105,7 @@ export default {
     const { pathname } = new URL(request.url);
     try {
       if (request.method === 'POST' && pathname === '/__spike/reset') {
-        await env.DB.exec(SCHEMA_SQL);
+        await resetDatabase(env);
         return json({ ok: true });
       }
 
