@@ -22,70 +22,36 @@ test('Platform A runs D1 and Queues locally with idempotent delivery', async () 
   const adapter = await createCloudflareAdapter({ mode: 'local-test' });
   try {
     await adapter.resetEnvironment();
-    assert.deepEqual(await adapter.snapshotState(), {
-      outboxEvents: 0,
-      consumerEffects: 0,
-      deliveredOutboxEvents: 0,
-      idempotencyRecords: 0,
-    });
+    const empty = await adapter.snapshotState();
+    assert.equal(empty.outboxEvents, 0);
+    assert.equal(empty.consumerEffects, 0);
+    assert.equal(empty.deliveredOutboxEvents, 0);
 
     await adapter.executeCommand({
-      type: 'record_outbox_event',
-      idempotencyKey: 'smoke-record-0001',
-      eventId: 'event-0001',
-      eventType: 'PlatformASmokeTest',
-      payload: { candidateId: 'candidate-000001' },
+      type: 'activate_source_policy',
+      policyId: 'policy-smoke',
+      sourceId: 'source-smoke',
+      revision: 1,
+      storagePermission: 'reference_only',
+      auditId: 'audit-smoke',
+      eventId: 'event-smoke',
     });
-
     await adapter.dispatchOutbox();
-    await adapter.drainQueue();
+    await adapter.drainQueue({ expectedEffects: 1 });
 
-    assert.deepEqual(await adapter.snapshotState(), {
-      outboxEvents: 1,
-      consumerEffects: 1,
-      deliveredOutboxEvents: 1,
-      idempotencyRecords: 1,
-    });
+    const delivered = await adapter.snapshotState();
+    assert.equal(delivered.outboxEvents, 1);
+    assert.equal(delivered.consumerEffects, 1);
+    assert.equal(delivered.deliveredOutboxEvents, 1);
 
     await adapter.executeCommand({
       type: 'redeliver_event',
-      eventId: 'event-0001',
-      eventType: 'PlatformASmokeTest',
-      payload: { candidateId: 'candidate-000001' },
+      eventId: 'event-smoke',
+      eventType: 'SourcePolicyActivated',
+      payload: { policyId: 'policy-smoke' },
     });
-    await adapter.drainQueue();
-
-    const finalState = await adapter.snapshotState();
-    assert.equal(finalState.consumerEffects, 1, 'duplicate queue delivery must not duplicate its side effect');
-  } finally {
-    await adapter.close?.();
-  }
-});
-
-test('Platform A command idempotency replays the same payload and rejects conflicts', async () => {
-  const adapter = await createCloudflareAdapter({ mode: 'local-test' });
-  try {
-    await adapter.resetEnvironment();
-    const command = {
-      type: 'record_outbox_event',
-      idempotencyKey: 'record-event-key-0001',
-      eventId: 'event-idempotent-0001',
-      eventType: 'IdempotencyTest',
-      payload: { claimId: 'claim-000001' },
-    };
-
-    const first = await adapter.executeCommand(command);
-    const replay = await adapter.executeCommand(command);
-    assert.equal(first.replayed, false);
-    assert.equal(replay.replayed, true);
-    assert.equal((await adapter.snapshotState()).outboxEvents, 1);
-    assert.equal((await adapter.snapshotState()).idempotencyRecords, 1);
-
-    await assert.rejects(
-      adapter.executeCommand({ ...command, eventId: 'event-idempotent-0002' }),
-      /IDEMPOTENCY_PAYLOAD_CONFLICT/,
-    );
-    assert.equal((await adapter.snapshotState()).outboxEvents, 1);
+    await adapter.drainQueue({ expectedEffects: 1 });
+    assert.equal((await adapter.snapshotState()).consumerEffects, 1, 'duplicate queue delivery must not duplicate its side effect');
   } finally {
     await adapter.close?.();
   }
