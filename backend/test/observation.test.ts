@@ -21,7 +21,7 @@ async function seedPolicy(storagePermission: 'blob_allowed' | 'reference_only' |
     sourceId: '30000000-0000-4000-8000-000000000001',
     storagePermission,
   });
-  await pool.query('truncate audit_events, outbox_events');
+  await pool.query('truncate audit_events, outbox_events cascade');
   return pool;
 }
 
