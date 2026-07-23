@@ -18,6 +18,13 @@ interface WorkerHookContext {
   outboxEventId: string;
 }
 
+interface SourceOutboxEvent {
+  aggregate_id: string;
+  aggregate_type: string;
+  event_type: string;
+  payload_observation_id: string | null;
+}
+
 export interface CreateNormalizationWorkerOptions {
   afterCommit?: (context: WorkerHookContext) => Promise<void>;
   beforeCommit?: (context: WorkerHookContext) => Promise<void>;
@@ -27,15 +34,43 @@ export interface CreateNormalizationWorkerOptions {
   pool: Pool;
 }
 
-function readObservationId(job: Job<OutboxJobData>): string {
+function validateJobEnvelope(job: Job<OutboxJobData>): string {
   if (job.name !== 'RawObservationIngested') {
     throw new Error('UNSUPPORTED_NORMALIZATION_EVENT');
   }
-  const observationId = job.data.payload.observationId;
-  if (typeof observationId !== 'string' || observationId.length === 0) {
-    throw new Error('INVALID_NORMALIZATION_JOB');
+  if (!job.id) {
+    throw new Error('NORMALIZATION_JOB_ID_REQUIRED');
   }
-  return observationId;
+  if (job.data.outboxEventId !== job.id) {
+    throw new Error('OUTBOX_JOB_ID_MISMATCH');
+  }
+  return job.id;
+}
+
+async function loadObservationId(
+  client: PoolClient,
+  outboxEventId: string,
+): Promise<string> {
+  const result = await client.query<SourceOutboxEvent>(
+    `select aggregate_id,
+            aggregate_type,
+            event_type,
+            payload ->> 'observationId' as payload_observation_id
+       from outbox_events
+      where outbox_event_id = $1
+      for key share`,
+    [outboxEventId],
+  );
+  const event = result.rows[0];
+  if (
+    !event ||
+    event.aggregate_type !== 'raw_observation' ||
+    event.event_type !== 'RawObservationIngested' ||
+    event.payload_observation_id !== event.aggregate_id
+  ) {
+    throw new Error('INVALID_SOURCE_OUTBOX_EVENT');
+  }
+  return event.aggregate_id;
 }
 
 async function recordAttempt(
@@ -90,11 +125,7 @@ export function createNormalizationWorker(
   return new Worker<OutboxJobData, NormalizationWorkerResult>(
     NORMALIZATION_QUEUE_NAME,
     async (job) => {
-      const jobId = job.id;
-      if (!jobId) {
-        throw new Error('NORMALIZATION_JOB_ID_REQUIRED');
-      }
-      const observationId = readObservationId(job);
+      const jobId = validateJobEnvelope(job);
       const context: WorkerHookContext = {
         attemptNumber: job.attemptsMade + 1,
         jobId,
@@ -103,6 +134,7 @@ export function createNormalizationWorker(
 
       try {
         const result = await withTransaction(options.pool, async (client) => {
+          const observationId = await loadObservationId(client, context.outboxEventId);
           const reserved = await client.query(
             `insert into normalization_effects
               (outbox_event_id, raw_observation_id, effect_state)
