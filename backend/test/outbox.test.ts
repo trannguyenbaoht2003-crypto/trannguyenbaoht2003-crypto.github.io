@@ -38,12 +38,25 @@ test('dispatch retry creates one BullMQ job and marks the outbox event delivered
 
   const eventId = randomUUID();
   const observationId = randomUUID();
+  const correlationId = randomUUID();
   const payload = { observationId, sourceId: randomUUID() };
   await pool.query(
     `insert into outbox_events
       (outbox_event_id, aggregate_type, aggregate_id, event_type, payload, correlation_id)
      values ($1, 'raw_observation', $2, 'RawObservationIngested', $3::jsonb, $4)`,
-    [eventId, observationId, JSON.stringify(payload), randomUUID()],
+    [eventId, observationId, JSON.stringify(payload), correlationId],
+  );
+  await queue.add(
+    'RawObservationIngested',
+    {
+      aggregateId: observationId,
+      aggregateType: 'raw_observation',
+      correlationId,
+      eventType: 'RawObservationIngested',
+      outboxEventId: eventId,
+      payload,
+    },
+    { jobId: eventId },
   );
 
   const first = await dispatchOutbox({ pool, queue });
