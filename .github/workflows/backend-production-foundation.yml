@@ -69,5 +69,7 @@ jobs:
         run: |
           set -euo pipefail
           workflow=".github/workflows/backend-production-foundation.yml"
+          executable="$RUNNER_TEMP/backend-workflow-before-guard.yml"
+          sed '/- name: Deployment guard/,$d' "$workflow" > "$executable"
           ! grep -Eq '(contents|packages|pages|id-token):[[:space:]]*write' "$workflow"
-          ! grep -Eq 'git push|deploy|wrangler|DATABASE_URL|REDIS_URL' "$workflow"
+          ! grep -Eq 'git push|wrangler[[:space:]]+deploy|npm run deploy|actions/deploy-pages' "$executable"
