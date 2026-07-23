@@ -69,7 +69,7 @@ export async function createPostgresBullmqAdapter(options = {}) {
   worker.on('error', () => {});
   await Promise.all([queue.waitUntilReady(), worker.waitUntilReady()]);
 
-  const app = Fastify({ logger: false });
+  const app = Fastify({ logger: false, bodyLimit: 64 * 1024 * 1024 });
   app.setErrorHandler((error, _request, reply) => {
     reply.code(error.status ?? 500).send({ error: error.message });
   });
