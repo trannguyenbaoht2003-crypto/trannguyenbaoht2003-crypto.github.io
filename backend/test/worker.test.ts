@@ -7,7 +7,10 @@ import { Queue, QueueEvents } from 'bullmq';
 import type { Redis } from 'ioredis';
 import type { Pool } from 'pg';
 
-import { createRedisConnection } from '../src/queue/connection.js';
+import {
+  createQueueConnection,
+  createWorkerConnection,
+} from '../src/queue/connection.js';
 import { NORMALIZATION_QUEUE_NAME, type OutboxJobData } from '../src/queue/names.js';
 import { createNormalizationWorker } from '../src/queue/normalization-worker.js';
 import { resetDatabase, tableCount } from './helpers/database.js';
@@ -33,9 +36,11 @@ afterEach(async () => {
 });
 
 async function queueHarness() {
-  const queueConnection = createRedisConnection(redisUrl);
-  const eventsConnection = createRedisConnection(redisUrl);
-  const workerConnection = createRedisConnection(redisUrl);
+  const queueConnection = createQueueConnection(redisUrl);
+  const eventsConnection = createWorkerConnection(redisUrl);
+  const workerConnection = createWorkerConnection(redisUrl);
+  assert.equal(queueConnection.options.maxRetriesPerRequest, 1);
+  assert.equal(workerConnection.options.maxRetriesPerRequest, null);
   const queue = new Queue<OutboxJobData>(NORMALIZATION_QUEUE_NAME, {
     connection: queueConnection,
   });
@@ -141,6 +146,38 @@ test('worker success records one attempt and one normalization effect', async ()
   });
   assert.equal(normalizeCalls, 1);
   assert.equal(await tableCount(pool, 'worker_job_attempts'), 1);
+  assert.equal(await tableCount(pool, 'normalization_effects'), 1);
+});
+
+test('worker resolves the observation from PostgreSQL instead of trusting Redis payload', async () => {
+  pool = await resetDatabase();
+  const { eventId, jobData, observationId } = await seedObservationEvent(pool);
+  const { events, queue, workerConnection } = await queueHarness();
+  let receivedObservationId: string | undefined;
+  const worker = createNormalizationWorker({
+    connection: workerConnection,
+    normalizeObservation: async (value) => {
+      receivedObservationId = value;
+    },
+    pool,
+  });
+  cleanups.push(async () => worker.close());
+
+  const job = await queue.add(
+    'RawObservationIngested',
+    {
+      ...jobData,
+      aggregateId: randomUUID(),
+      payload: { ...jobData.payload, observationId: randomUUID() },
+    },
+    {
+      attempts: 1,
+      jobId: eventId,
+    },
+  );
+  await job.waitUntilFinished(events, 5_000);
+
+  assert.equal(receivedObservationId, observationId);
   assert.equal(await tableCount(pool, 'normalization_effects'), 1);
 });
 
