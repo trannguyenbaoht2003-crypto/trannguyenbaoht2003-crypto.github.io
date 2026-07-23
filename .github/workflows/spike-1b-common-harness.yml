@@ -1,0 +1,55 @@
+name: Sprint 1B.0 Common Harness
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'spikes/backend-correctness/common/**'
+      - '.github/workflows/spike-1b-common-harness.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  common-harness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Generate deterministic fixture
+        run: node spikes/backend-correctness/common/generate-fixture.mjs | tee fixture-summary.json
+
+      - name: Run common harness self-tests
+        run: |
+          node --test \
+            spikes/backend-correctness/common/common-harness.test.mjs \
+            spikes/backend-correctness/common/evidence-v2.test.mjs
+
+      - name: Verify no platform adapters exist
+        if: github.head_ref == 'spike/1b-common-harness'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -d spikes/backend-correctness/platform-a-cloudflare
+          test ! -d spikes/backend-correctness/platform-b-node-postgres
+          ! grep -RniE 'wrangler|cloudflare|\bD1\b|postgres|bullmq|redis' \
+            spikes/backend-correctness/common \
+            --exclude=README.md \
+            --exclude='*.test.mjs'
+
+      - name: Upload harness evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: sprint-1b0-common-harness-${{ github.sha }}
+          path: |
+            fixture-summary.json
+            spikes/backend-correctness/common/generated/expected-counts.json
+            spikes/backend-correctness/common/generated/expected-checksums.json
+          if-no-files-found: error
