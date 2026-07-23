@@ -1,0 +1,31 @@
+{
+  "$schema": "../../../node_modules/wrangler/config-schema.json",
+  "name": "hai-dau-platform-a-correctness",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-07-22",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "hai-dau-platform-a-correctness",
+      "database_id": "00000000-0000-0000-0000-000000000001",
+      "preview_database_id": "DB"
+    }
+  ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "EVENT_QUEUE",
+        "queue": "hai-dau-platform-a-events"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "hai-dau-platform-a-events",
+        "max_batch_size": 10,
+        "max_batch_timeout": 1,
+        "max_retries": 3
+      }
+    ]
+  }
+}
+
