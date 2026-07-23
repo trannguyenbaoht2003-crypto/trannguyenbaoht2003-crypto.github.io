@@ -1,0 +1,73 @@
+name: Sprint 1B-B PostgreSQL BullMQ Correctness
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'spikes/backend-correctness/common/**'
+      - 'spikes/backend-correctness/platform-b-postgres-bullmq/**'
+      - '.github/workflows/spike-1b-postgres-bullmq-correctness.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  red-green:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: hai_dau_correctness
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d hai_dau_correctness"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PLATFORM_B_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/hai_dau_correctness
+      PLATFORM_B_REDIS_URL: redis://127.0.0.1:6379
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install repository dependencies
+        run: npm ci
+
+      - name: Install Platform B spike dependencies
+        run: npm install --no-save --ignore-scripts fastify@5 pg@8 bullmq@5 ioredis@5
+
+      - name: Verify locked Common Harness
+        run: node --test spikes/backend-correctness/common/common-harness.test.mjs
+
+      - name: Run Platform B contract tests
+        run: node --test spikes/backend-correctness/platform-b-postgres-bullmq/platform-b.test.mjs
+
+      - name: Production safety guard
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          ! grep -RniE 'DATABASE_URL=.*(amazonaws|neon|supabase)|REDIS_URL=.*(upstash|rediscloud)|contents:[[:space:]]*write|id-token:[[:space:]]*write|kubectl|docker[[:space:]]+push' \
+            spikes/backend-correctness/platform-b-postgres-bullmq \
+            .github/workflows/spike-1b-postgres-bullmq-correctness.yml
