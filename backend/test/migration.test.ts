@@ -21,6 +21,7 @@ const expectedTables = [
   'game_entities',
   'game_entity_revisions',
   'idempotency_records',
+  'normalization_effects',
   'outbox_events',
   'patch_lifecycle_events',
   'patches',
@@ -28,6 +29,7 @@ const expectedTables = [
   'schema_migrations',
   'source_policy_revisions',
   'sources',
+  'worker_job_attempts',
 ];
 
 test('migration creates the production foundation tables from an empty schema', async () => {
