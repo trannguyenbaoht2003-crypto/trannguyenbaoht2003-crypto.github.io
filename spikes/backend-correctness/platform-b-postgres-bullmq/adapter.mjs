@@ -88,11 +88,12 @@ export async function createPostgresBullmqAdapter(options = {}) {
   await app.ready();
 
   async function request(pathname, init = {}) {
+    const hasBody = init.body !== undefined && init.body !== null;
     const response = await app.inject({
       method: init.method ?? 'GET',
       url: pathname,
-      headers: { 'content-type': 'application/json', ...(init.headers ?? {}) },
-      payload: init.body,
+      headers: hasBody ? { 'content-type': 'application/json', ...(init.headers ?? {}) } : (init.headers ?? {}),
+      ...(hasBody ? { payload: init.body } : {}),
     });
     const data = response.json();
     if (response.statusCode >= 400) {
