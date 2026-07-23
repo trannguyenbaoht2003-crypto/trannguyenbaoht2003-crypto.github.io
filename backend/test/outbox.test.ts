@@ -70,3 +70,52 @@ test('dispatch retry creates one BullMQ job and marks the outbox event delivered
   assert.equal(delivery.rows[0]?.attempt_count, 1);
   assert.deepEqual(delivery.rows[0]?.payload, payload);
 });
+
+test('queue failure keeps the immutable payload and schedules a database-backed retry', async () => {
+  pool = await resetDatabase();
+  const eventId = randomUUID();
+  const observationId = randomUUID();
+  const payload = { observationId, sourceId: randomUUID() };
+  await pool.query(
+    `insert into outbox_events
+      (outbox_event_id, aggregate_type, aggregate_id, event_type, payload, correlation_id)
+     values ($1, 'raw_observation', $2, 'RawObservationIngested', $3::jsonb, $4)`,
+    [eventId, observationId, JSON.stringify(payload), randomUUID()],
+  );
+
+  const result = await dispatchOutbox({
+    pool,
+    queue: {
+      async add() {
+        throw new Error('injected Redis outage');
+      },
+    },
+    retryDelayMs: 10,
+  });
+
+  assert.deepEqual(result, { claimed: 1, delivered: 0, failed: 1 });
+  const delivery = await pool.query<{
+    attempt_count: number;
+    available: boolean;
+    delivery_state: string;
+    last_error_code: string;
+    lease_token: string | null;
+    payload: typeof payload;
+  }>(
+    `select attempt_count,
+            available_at > created_at as available,
+            delivery_state,
+            last_error_code,
+            lease_token,
+            payload
+       from outbox_events
+      where outbox_event_id = $1`,
+    [eventId],
+  );
+  assert.equal(delivery.rows[0]?.delivery_state, 'retryable_failed');
+  assert.equal(delivery.rows[0]?.attempt_count, 1);
+  assert.equal(delivery.rows[0]?.last_error_code, 'QUEUE_ENQUEUE_FAILED');
+  assert.equal(delivery.rows[0]?.available, true);
+  assert.equal(delivery.rows[0]?.lease_token, null);
+  assert.deepEqual(delivery.rows[0]?.payload, payload);
+});
