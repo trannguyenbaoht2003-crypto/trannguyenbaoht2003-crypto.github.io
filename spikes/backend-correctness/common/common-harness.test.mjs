@@ -112,6 +112,7 @@ test('evidence bundle contract is complete', () => {
     'run-manifest.json',
     'scenario-results.jsonl',
     'test-report.xml',
+    'scenario-trace.jsonl',
     'failure-injection.jsonl',
     'record-counts-before.json',
     'record-counts-after.json',
