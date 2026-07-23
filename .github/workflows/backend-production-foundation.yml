@@ -1,0 +1,73 @@
+name: Backend production foundation
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-production-foundation.yml"
+      - "docs/adr/**"
+      - "docs/superpowers/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-production-foundation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: hai_dau_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d hai_dau_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      NODE_ENV: test
+      TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/hai_dau_test
+      TEST_REDIS_URL: redis://127.0.0.1:6379
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.0"
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install backend dependencies
+        run: npm --prefix backend ci
+      - name: Backend typecheck
+        run: npm --prefix backend run typecheck
+      - name: Backend tests
+        run: npm --prefix backend test
+      - name: Backend build
+        run: npm --prefix backend run build
+      - name: Deployment guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          workflow=".github/workflows/backend-production-foundation.yml"
+          ! grep -Eq '(contents|packages|pages|id-token):[[:space:]]*write' "$workflow"
+          ! grep -Eq 'git push|deploy|wrangler|DATABASE_URL|REDIS_URL' "$workflow"
