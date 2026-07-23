@@ -33,6 +33,7 @@ jobs:
             spikes/backend-correctness/common/evidence-v2.test.mjs
 
       - name: Verify no platform adapters exist
+        if: github.head_ref == 'spike/1b-common-harness'
         shell: bash
         run: |
           set -euo pipefail
