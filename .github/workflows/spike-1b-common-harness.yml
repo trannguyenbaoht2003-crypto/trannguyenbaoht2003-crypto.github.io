@@ -27,7 +27,10 @@ jobs:
         run: node spikes/backend-correctness/common/generate-fixture.mjs | tee fixture-summary.json
 
       - name: Run common harness self-tests
-        run: node --test spikes/backend-correctness/common/common-harness.test.mjs
+        run: |
+          node --test \
+            spikes/backend-correctness/common/common-harness.test.mjs \
+            spikes/backend-correctness/common/evidence-v2.test.mjs
 
       - name: Verify no platform adapters exist
         shell: bash
