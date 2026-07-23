@@ -5,7 +5,7 @@ import { afterEach, test } from 'node:test';
 import { Queue } from 'bullmq';
 import type { Pool } from 'pg';
 
-import { createRedisConnection } from '../src/queue/connection.js';
+import { createQueueConnection } from '../src/queue/connection.js';
 import { NORMALIZATION_QUEUE_NAME } from '../src/queue/names.js';
 import { dispatchOutbox } from '../src/queue/outbox-dispatcher.js';
 import { resetDatabase } from './helpers/database.js';
@@ -28,7 +28,8 @@ afterEach(async () => {
 
 test('dispatch retry creates one BullMQ job and marks the outbox event delivered', async () => {
   pool = await resetDatabase();
-  const connection = createRedisConnection(redisUrl);
+  const connection = createQueueConnection(redisUrl);
+  assert.equal(connection.options.maxRetriesPerRequest, 1);
   const queue = new Queue(NORMALIZATION_QUEUE_NAME, { connection });
   cleanups.push(async () => {
     await queue.obliterate({ force: true });
@@ -82,6 +83,15 @@ test('dispatch retry creates one BullMQ job and marks the outbox event delivered
   assert.equal(delivery.rows[0]?.delivery_state, 'delivered');
   assert.equal(delivery.rows[0]?.attempt_count, 1);
   assert.deepEqual(delivery.rows[0]?.payload, payload);
+  await assert.rejects(
+    pool.query(
+      `update outbox_events
+          set payload = '{}'::jsonb
+        where outbox_event_id = $1`,
+      [eventId],
+    ),
+    /immutable/,
+  );
 });
 
 test('queue failure keeps the immutable payload and schedules a database-backed retry', async () => {
