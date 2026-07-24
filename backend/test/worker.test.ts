@@ -128,6 +128,41 @@ async function seedObservationEvent(database: Pool) {
   };
 }
 
+async function seedCandidateObservationEvent(database: Pool) {
+  await seedActiveCatalog(database);
+  const observationId = randomUUID();
+  const eventId = randomUUID();
+  const correlationId = randomUUID();
+  await seedRawObservation(database, observationId, {
+    normalizationSnapshot: validNormalizationSnapshot(),
+  });
+  await database.query(
+    `insert into outbox_events
+      (outbox_event_id, aggregate_type, aggregate_id, event_type, payload,
+       correlation_id, delivery_state, delivered_at)
+     values ($1, 'raw_observation', $2, 'RawObservationIngested', $3::jsonb,
+             $4, 'delivered', clock_timestamp())`,
+    [
+      eventId,
+      observationId,
+      JSON.stringify({ observationId }),
+      correlationId,
+    ],
+  );
+  return {
+    eventId,
+    jobData: {
+      aggregateId: randomUUID(),
+      aggregateType: 'tampered',
+      correlationId: randomUUID(),
+      eventType: 'RawObservationIngested',
+      outboxEventId: eventId,
+      payload: { observationId: randomUUID() },
+    } satisfies OutboxJobData,
+    observationId,
+  };
+}
+
 test('worker success records one attempt and one normalization effect', async () => {
   pool = await resetDatabase();
   const {
@@ -302,34 +337,11 @@ test('transaction failure is retried without marking the failed attempt successf
 
 test('candidate registration rolls back and retries with the normalization effect', async () => {
   pool = await resetDatabase();
-  await seedActiveCatalog(pool);
-  const observationId = randomUUID();
-  const eventId = randomUUID();
-  const correlationId = randomUUID();
-  await seedRawObservation(pool, observationId, {
-    normalizationSnapshot: validNormalizationSnapshot(),
-  });
-  await pool.query(
-    `insert into outbox_events
-      (outbox_event_id, aggregate_type, aggregate_id, event_type, payload,
-       correlation_id, delivery_state, delivered_at)
-     values ($1, 'raw_observation', $2, 'RawObservationIngested', $3::jsonb,
-             $4, 'delivered', clock_timestamp())`,
-    [
-      eventId,
-      observationId,
-      JSON.stringify({ observationId }),
-      correlationId,
-    ],
-  );
-  const jobData = {
-    aggregateId: randomUUID(),
-    aggregateType: 'tampered',
-    correlationId: randomUUID(),
-    eventType: 'RawObservationIngested',
-    outboxEventId: eventId,
-    payload: { observationId: randomUUID() },
-  } satisfies OutboxJobData;
+  const {
+    eventId,
+    jobData,
+    observationId,
+  } = await seedCandidateObservationEvent(pool);
   const { events, queue, workerConnection } = await queueHarness();
   let transactionAttempts = 0;
   const worker = createNormalizationWorker({
@@ -379,6 +391,65 @@ test('candidate registration rolls back and retries with the normalization effec
   assert.deepEqual(
     attempts.rows.map((row) => row.status),
     ['failed_retryable', 'succeeded'],
+  );
+});
+
+test('candidate registration survives lost acknowledgement without duplicates', async () => {
+  pool = await resetDatabase();
+  const {
+    eventId,
+    jobData,
+    observationId,
+  } = await seedCandidateObservationEvent(pool);
+  const { events, queue, workerConnection } = await queueHarness();
+  let acknowledgements = 0;
+  const worker = createNormalizationWorker({
+    afterCommit: async () => {
+      acknowledgements += 1;
+      if (acknowledgements === 1) {
+        throw new Error('injected candidate acknowledgement loss');
+      }
+    },
+    connection: workerConnection,
+    normalizeObservation: registerStoredObservationInTransaction,
+    pool,
+  });
+  cleanups.push(async () => worker.close());
+
+  const job = await queue.add('RawObservationIngested', jobData, {
+    attempts: 2,
+    backoff: { delay: 10, type: 'fixed' },
+    jobId: eventId,
+  });
+  const result = await job.waitUntilFinished(events, 5_000);
+
+  assert.deepEqual(result, {
+    observationId,
+    outcome: 'duplicate_noop',
+  });
+  for (const table of [
+    'normalization_effects',
+    'normalized_observations',
+    'candidates',
+    'candidate_revisions',
+    'candidate_provenance',
+  ]) {
+    assert.equal(await tableCount(pool, table), 1);
+  }
+  const candidateEvents = await pool.query<{ count: string }>(
+    `select count(*)::text as count
+       from outbox_events
+      where aggregate_type = 'candidate'`,
+  );
+  assert.equal(candidateEvents.rows[0]?.count, '1');
+  const attempts = await pool.query<{ status: string }>(
+    `select status
+       from worker_job_attempts
+      order by attempt_number`,
+  );
+  assert.deepEqual(
+    attempts.rows.map((row) => row.status),
+    ['succeeded', 'duplicate_noop'],
   );
 });
 
