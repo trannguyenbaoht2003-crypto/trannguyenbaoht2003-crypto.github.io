@@ -134,6 +134,13 @@ The snapshot contains structured game identity only. It must not contain
 source HTML, transcript text, comments, images, credentials, popularity
 signals, moderation state, or publication copy.
 
+The runtime shape is closed: the snapshot must contain exactly the seven
+declared properties, and the aggregate wrapper must contain only
+`normalizationSnapshot`. Every trimmed identifier is limited to 128
+characters and each augment/item list is limited to 64 entries. Input outside
+those bounds fails with `NORMALIZATION_SCHEMA_UNSUPPORTED` before it is
+hashed or stored.
+
 The pure normalizer:
 
 1. requires schema version `1` and mode `aram_mayhem`;
@@ -210,9 +217,10 @@ One immutable row per raw observation:
 - canonical selection payload;
 - creation timestamp.
 
-The subject entity revision and catalog revision use a composite foreign key,
-so PostgreSQL rejects a subject from a different catalog even if application
-validation is bypassed.
+The subject entity revision and catalog revision use a composite foreign key.
+The catalog revision and patch ID use a second composite foreign key.
+PostgreSQL therefore rejects either a subject from another catalog or a
+catalog from another patch even if application validation is bypassed.
 
 ### `candidates`
 
@@ -234,16 +242,20 @@ Immutable catalog-pinned content:
 - `candidate_revision_id`;
 - `candidate_id`;
 - positive revision number;
+- `patch_id`;
 - `catalog_revision_id`;
 - `normalized_signature`;
 - canonical selection payload;
 - creation timestamp.
 
-`candidate_id + revision` is unique. The exact combination of candidate,
-catalog revision, normalized signature, and payload hash is also unique. A
-second observation with the same fingerprint under the same catalog reuses
-the revision. The same fingerprint under a newer active catalog creates the
-next revision while retaining the same Candidate.
+`candidate_id + revision` is unique. Composite foreign keys require the
+revision patch to own both its Candidate and catalog revision. The exact
+combination of candidate, catalog revision, and normalized signature is also
+unique, and the application rejects a signature whose canonical payload does
+not match the stored payload. A second observation with the same fingerprint
+under the same catalog reuses the revision. The same fingerprint under a
+newer active catalog creates the next revision while retaining the same
+Candidate.
 
 ### `candidate_provenance`
 
@@ -260,6 +272,11 @@ The immutable chain
 the exact source, Source Policy revision, adapter version, content hash,
 permitted reference, and collection time without duplicating governed source
 data into Candidate tables.
+
+A PostgreSQL insert trigger accepts a provenance link only when its
+CandidateRevision and normalized observation have the same catalog revision,
+normalized signature, and canonical payload. Because both referenced rows are
+immutable, the graph cannot become inconsistent later.
 
 All four tables reject update and delete. Candidate rows are never updated to
 increment a provenance counter; counts are derived from immutable provenance
@@ -280,7 +297,8 @@ The boundary:
 
 1. normalizes the snapshot and computes its semantic signature before any
    write;
-2. locks the immutable raw observation;
+2. locks the immutable raw observation with `FOR UPDATE`, then reloads replay
+   state so concurrent commands for one raw observation return one result;
 3. resolves `patchKey`, verifies the latest Patch lifecycle state is
    `active`, and locks the exact `active_catalog_revisions` row with
    `FOR SHARE`;
@@ -323,6 +341,8 @@ PostgreSQL is authoritative for every race:
 
 - the active catalog pointer is held with `FOR SHARE` until commit, while
   activation uses a conflicting row lock;
+- an exclusive raw-observation lock serializes concurrent replay before the
+  unique normalized-observation insert;
 - unique fingerprint plus `ON CONFLICT` produces one Candidate under
   concurrent source observations;
 - the Candidate row lock serializes CandidateRevision numbering;
@@ -414,6 +434,8 @@ All implementation is test-first.
 
 - equivalent array orders produce one signature;
 - duplicate IDs and empty IDs fail with stable reason codes;
+- additional fields, identifiers over 128 characters, and lists over 64
+  entries fail closed;
 - source, origin, reference, adapter version, and timestamps cannot change a
   fingerprint;
 - patch, mode, subject, or semantic selection changes the fingerprint.
@@ -424,6 +446,8 @@ All implementation is test-first.
 - normalized observations, Candidates, CandidateRevisions, and provenance
   reject update/delete;
 - a subject entity revision from another catalog is rejected by PostgreSQL;
+- patch/catalog mismatches and inconsistent provenance graph links are
+  rejected by PostgreSQL;
 - migration checksums remain locked.
 
 ### Candidate registration
@@ -433,6 +457,7 @@ All implementation is test-first.
 - a real late constraint conflict rolls back every domain, audit, outbox, and
   normalization-effect row;
 - the same raw observation replays without a duplicate side effect;
+- concurrent commands for the same raw observation return the same result;
 - a changed replay payload is rejected;
 - two origins with the same semantic signature produce one Candidate, one
   CandidateRevision, and two provenance rows;
