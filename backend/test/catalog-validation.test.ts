@@ -22,7 +22,7 @@ const PATCH_2 = '40000000-0000-4000-8000-000000000007';
 const PATCH_2_EVENT = '40000000-0000-4000-8000-000000000008';
 
 function importCommand(
-  catalogRevisionId = CATALOG_IDS.catalogRevisionId,
+  catalogRevisionId: string = CATALOG_IDS.catalogRevisionId,
   revision = 1,
   idempotencyKey = 'catalog-import-1',
 ): ImportCatalogRevisionCommand {
@@ -45,7 +45,7 @@ function importCommand(
 
 function validationCommand(
   catalogRevisionId = CATALOG_IDS.catalogRevisionId,
-  resultId = '41000000-0000-4000-8000-000000000001',
+  resultId: string = '41000000-0000-4000-8000-000000000001',
 ) {
   return {
     actorId: 'catalog-validator',
@@ -60,7 +60,7 @@ function validationCommand(
 function activationCommand(
   catalogRevisionId: string,
   expectedCurrentCatalogRevisionId: string | null,
-  patchId = CATALOG_IDS.patchId,
+  patchId: string = CATALOG_IDS.patchId,
 ) {
   return {
     actorId: 'catalog-operator',
