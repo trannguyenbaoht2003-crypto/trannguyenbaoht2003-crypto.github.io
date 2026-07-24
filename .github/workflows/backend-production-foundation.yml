@@ -133,7 +133,12 @@ jobs:
         run: |
           set -euo pipefail
           git diff --check
-          test -z "$(git status --short)"
+          status="$(git status --short)"
+          if [[ -n "$status" ]]; then
+            echo "Generated files changed the checkout:"
+            echo "$status"
+            exit 1
+          fi
 
       - name: Deployment guard
         shell: bash
