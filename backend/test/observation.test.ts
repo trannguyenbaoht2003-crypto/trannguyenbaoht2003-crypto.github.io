@@ -38,6 +38,12 @@ function command() {
     aggregateMetadata: {
       normalizationSnapshot: {
         schemaVersion: 1,
+        patchKey: '26.15',
+        gameModeExternalId: 'aram_mayhem',
+        origin: 'collector_detected',
+        subjectExternalId: 'samira',
+        augmentExternalIds: ['1194'],
+        itemExternalIds: ['3006', '6672'],
       },
     },
     collectedAt: new Date('2026-07-23T01:00:00Z'),
@@ -89,6 +95,25 @@ test('aggregate-only policy stores structured metadata without blob or reference
       schemaVersion: 1,
     },
   });
+  await pool.end();
+});
+
+test('aggregate-only policy rejects metadata outside the V1 boundary', async () => {
+  const pool = await seedPolicy('aggregate_only');
+  await assert.rejects(
+    ingestObservation(pool, {
+      ...command(),
+      aggregateMetadata: {
+        ...command().aggregateMetadata,
+        sourceHtml: '<p>must not be retained</p>',
+      },
+    }),
+    /NORMALIZATION_SCHEMA_UNSUPPORTED/,
+  );
+  assert.equal(await tableCount(pool, 'raw_observations'), 0);
+  assert.equal(await tableCount(pool, 'audit_events'), 0);
+  assert.equal(await tableCount(pool, 'outbox_events'), 0);
+  assert.equal(await tableCount(pool, 'idempotency_records'), 0);
   await pool.end();
 });
 
