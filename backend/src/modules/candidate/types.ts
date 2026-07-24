@@ -21,6 +21,10 @@ export interface ObservationNormalizationSnapshotV1 {
   itemExternalIds: string[];
 }
 
+export interface ObservationAggregateMetadataV1 {
+  normalizationSnapshot: ObservationNormalizationSnapshotV1;
+}
+
 export interface CandidateSelectionPayloadV1 {
   schemaVersion: 1;
   augmentExternalIds: string[];
