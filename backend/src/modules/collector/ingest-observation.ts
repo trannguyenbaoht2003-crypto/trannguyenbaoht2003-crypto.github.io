@@ -9,6 +9,7 @@ import type { StoragePermission } from '../source-policy/activate-source-policy.
 export interface IngestObservationCommand {
   actorId: string;
   adapterVersion: string;
+  aggregateMetadata?: Record<string, unknown>;
   collectedAt: Date;
   correlationId: string;
   externalReference?: Record<string, unknown>;
@@ -92,20 +93,24 @@ export async function ingestObservation(
     }
 
     const blobStored = active.storage_permission === 'blob_allowed' && command.rawBlob !== undefined;
+    const aggregateStored =
+      active.storage_permission === 'blob_allowed' ||
+      active.storage_permission === 'aggregate_only';
     const referenceStored =
       active.storage_permission === 'blob_allowed' ||
       active.storage_permission === 'reference_only';
     await client.query(
       `insert into raw_observations
         (raw_observation_id, source_id, source_policy_revision_id, adapter_version,
-         external_reference, content_hash, raw_blob, collected_at)
-       values ($1, $2, $3, $4, $5::jsonb, $6, $7, $8)`,
+         external_reference, aggregate_metadata, content_hash, raw_blob, collected_at)
+       values ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7, $8, $9)`,
       [
         command.observationId,
         command.sourceId,
         active.source_policy_revision_id,
         command.adapterVersion,
         referenceStored ? JSON.stringify(command.externalReference ?? null) : null,
+        aggregateStored ? JSON.stringify(command.aggregateMetadata ?? null) : null,
         payloadHash,
         blobStored ? command.rawBlob : null,
         command.collectedAt,
