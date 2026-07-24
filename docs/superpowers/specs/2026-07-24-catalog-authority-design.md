@@ -137,6 +137,7 @@ One immutable row per catalog revision:
 - `schema_version`;
 - `adapter_version`;
 - `source_digest`;
+- `game_mode_external_id` fixed to `aram_mayhem` for V1;
 - `content_hash` with a uniqueness constraint;
 - entity and rule counts;
 - actor and timestamp.
@@ -244,6 +245,16 @@ It fails closed unless the supplied revision is the active pointer for the patch
 5. applicable `limit` rules.
 
 It returns `{ valid, reasonCodes }` with sorted, stable reason codes and performs no write. It does not create a Candidate.
+
+Selection reason codes are limited to:
+
+- `CATALOG_REVISION_NOT_ACTIVE`;
+- `CATALOG_SELECTION_DUPLICATE_ID`;
+- `CATALOG_ENTITY_MISSING`;
+- `CATALOG_ENTITY_INACTIVE`;
+- `CATALOG_SELECTION_DENIED`;
+- `CATALOG_SELECTION_NOT_ALLOWED`;
+- `CATALOG_SELECTION_LIMIT_EXCEEDED`.
 
 ## Audit and outbox
 
