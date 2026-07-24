@@ -345,13 +345,20 @@ normalization callback to receive the same `PoolClient` used by the worker
 transaction:
 
 ```ts
+interface NormalizationSourceContext {
+  observationId: string;
+  outboxEventId: string;
+  correlationId: string;
+}
+
 normalizeObservation(
   client: PoolClient,
-  observationId: string,
+  source: NormalizationSourceContext,
 ): Promise<RegisterNormalizedObservationResult>;
 ```
 
-The production handler reads a bounded
+The source context is reloaded from the immutable PostgreSQL outbox row; Redis
+cannot override any of its fields. The production handler reads a bounded
 `ObservationNormalizationSnapshotV1` from permitted structured observation
 metadata. Source-specific fetching/parsing remains outside this sprint.
 
