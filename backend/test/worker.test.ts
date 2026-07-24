@@ -5,14 +5,22 @@ import { afterEach, test } from 'node:test';
 
 import { Queue, QueueEvents } from 'bullmq';
 import type { Redis } from 'ioredis';
-import type { Pool } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 
+import {
+  registerStoredObservationInTransaction,
+} from '../src/modules/candidate/register-stored-observation.js';
 import {
   createQueueConnection,
   createWorkerConnection,
 } from '../src/queue/connection.js';
 import { NORMALIZATION_QUEUE_NAME, type OutboxJobData } from '../src/queue/names.js';
 import { createNormalizationWorker } from '../src/queue/normalization-worker.js';
+import { seedActiveCatalog } from './helpers/catalog.js';
+import {
+  seedRawObservation,
+  validNormalizationSnapshot,
+} from './helpers/candidate.js';
 import { resetDatabase, tableCount } from './helpers/database.js';
 
 function testRedisUrl(): string {
@@ -72,6 +80,7 @@ async function seedObservationEvent(database: Pool) {
   const policyRevisionId = randomUUID();
   const observationId = randomUUID();
   const eventId = randomUUID();
+  const correlationId = randomUUID();
   await database.query(
     `insert into sources (source_id, source_key, display_name, status)
      values ($1, $2, 'Worker test source', 'active')`,
@@ -101,10 +110,11 @@ async function seedObservationEvent(database: Pool) {
       eventId,
       observationId,
       JSON.stringify({ observationId, sourceId }),
-      randomUUID(),
+      correlationId,
     ],
   );
   return {
+    correlationId,
     eventId,
     jobData: {
       aggregateId: observationId,
@@ -120,14 +130,25 @@ async function seedObservationEvent(database: Pool) {
 
 test('worker success records one attempt and one normalization effect', async () => {
   pool = await resetDatabase();
-  const { eventId, jobData, observationId } = await seedObservationEvent(pool);
+  const {
+    correlationId,
+    eventId,
+    jobData,
+    observationId,
+  } = await seedObservationEvent(pool);
   const { events, queue, workerConnection } = await queueHarness();
   let normalizeCalls = 0;
   const worker = createNormalizationWorker({
     connection: workerConnection,
-    normalizeObservation: async (receivedObservationId: string) => {
+    normalizeObservation: async (
+      client: PoolClient,
+      source,
+    ) => {
       normalizeCalls += 1;
-      assert.equal(receivedObservationId, observationId);
+      await client.query('select 1');
+      assert.equal(source.observationId, observationId);
+      assert.equal(source.outboxEventId, eventId);
+      assert.equal(source.correlationId, correlationId);
     },
     pool,
   });
@@ -151,13 +172,24 @@ test('worker success records one attempt and one normalization effect', async ()
 
 test('worker resolves the observation from PostgreSQL instead of trusting Redis payload', async () => {
   pool = await resetDatabase();
-  const { eventId, jobData, observationId } = await seedObservationEvent(pool);
+  const {
+    correlationId,
+    eventId,
+    jobData,
+    observationId,
+  } = await seedObservationEvent(pool);
   const { events, queue, workerConnection } = await queueHarness();
-  let receivedObservationId: string | undefined;
+  let receivedSource:
+    | {
+        correlationId: string;
+        observationId: string;
+        outboxEventId: string;
+      }
+    | undefined;
   const worker = createNormalizationWorker({
     connection: workerConnection,
-    normalizeObservation: async (value) => {
-      receivedObservationId = value;
+    normalizeObservation: async (_client, source) => {
+      receivedSource = source;
     },
     pool,
   });
@@ -168,6 +200,7 @@ test('worker resolves the observation from PostgreSQL instead of trusting Redis 
     {
       ...jobData,
       aggregateId: randomUUID(),
+      correlationId: randomUUID(),
       payload: { ...jobData.payload, observationId: randomUUID() },
     },
     {
@@ -177,7 +210,11 @@ test('worker resolves the observation from PostgreSQL instead of trusting Redis 
   );
   await job.waitUntilFinished(events, 5_000);
 
-  assert.equal(receivedObservationId, observationId);
+  assert.deepEqual(receivedSource, {
+    correlationId,
+    observationId,
+    outboxEventId: eventId,
+  });
   assert.equal(await tableCount(pool, 'normalization_effects'), 1);
 });
 
@@ -261,6 +298,88 @@ test('transaction failure is retried without marking the failed attempt successf
     { attempt_number: 1, status: 'failed_retryable' },
     { attempt_number: 2, status: 'succeeded' },
   ]);
+});
+
+test('candidate registration rolls back and retries with the normalization effect', async () => {
+  pool = await resetDatabase();
+  await seedActiveCatalog(pool);
+  const observationId = randomUUID();
+  const eventId = randomUUID();
+  const correlationId = randomUUID();
+  await seedRawObservation(pool, observationId, {
+    normalizationSnapshot: validNormalizationSnapshot(),
+  });
+  await pool.query(
+    `insert into outbox_events
+      (outbox_event_id, aggregate_type, aggregate_id, event_type, payload,
+       correlation_id, delivery_state, delivered_at)
+     values ($1, 'raw_observation', $2, 'RawObservationIngested', $3::jsonb,
+             $4, 'delivered', clock_timestamp())`,
+    [
+      eventId,
+      observationId,
+      JSON.stringify({ observationId }),
+      correlationId,
+    ],
+  );
+  const jobData = {
+    aggregateId: randomUUID(),
+    aggregateType: 'tampered',
+    correlationId: randomUUID(),
+    eventType: 'RawObservationIngested',
+    outboxEventId: eventId,
+    payload: { observationId: randomUUID() },
+  } satisfies OutboxJobData;
+  const { events, queue, workerConnection } = await queueHarness();
+  let transactionAttempts = 0;
+  const worker = createNormalizationWorker({
+    beforeCommit: async () => {
+      transactionAttempts += 1;
+      if (transactionAttempts === 1) {
+        throw new Error('injected candidate transaction failure');
+      }
+    },
+    connection: workerConnection,
+    normalizeObservation: registerStoredObservationInTransaction,
+    pool,
+  });
+  cleanups.push(async () => worker.close());
+
+  const job = await queue.add('RawObservationIngested', jobData, {
+    attempts: 2,
+    backoff: { delay: 10, type: 'fixed' },
+    jobId: eventId,
+  });
+  const result = await job.waitUntilFinished(events, 5_000);
+
+  assert.deepEqual(result, {
+    observationId,
+    outcome: 'accepted_for_normalization',
+  });
+  assert.equal(await tableCount(pool, 'normalization_effects'), 1);
+  assert.equal(await tableCount(pool, 'normalized_observations'), 1);
+  assert.equal(await tableCount(pool, 'candidates'), 1);
+  assert.equal(await tableCount(pool, 'candidate_revisions'), 1);
+  assert.equal(await tableCount(pool, 'candidate_provenance'), 1);
+  const candidateEvents = await pool.query<{ count: string }>(
+    `select count(*)::text as count
+       from outbox_events
+      where event_type in (
+        'CandidateRegistered',
+        'CandidateRevisionRegistered',
+        'CandidateProvenanceAdded'
+      )`,
+  );
+  assert.equal(candidateEvents.rows[0]?.count, '1');
+  const attempts = await pool.query<{ status: string }>(
+    `select status
+       from worker_job_attempts
+      order by attempt_number`,
+  );
+  assert.deepEqual(
+    attempts.rows.map((row) => row.status),
+    ['failed_retryable', 'succeeded'],
+  );
 });
 
 test('normalization worker has no publication dependency', async () => {
