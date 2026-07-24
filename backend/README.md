@@ -1,6 +1,8 @@
 # Hải Đấu backend runbook
 
-This runbook covers the Sprint 2A production foundation and Sprint 2B catalog authority. PostgreSQL is the system of record; Redis/BullMQ is delivery infrastructure.
+This runbook covers the Sprint 2A production foundation, Sprint 2B catalog
+authority, and Sprint 3A deterministic normalization and Candidate Registry.
+PostgreSQL is the system of record; Redis/BullMQ is delivery infrastructure.
 
 ## Prerequisites
 
@@ -93,8 +95,8 @@ Every observation resolves the active Source Policy before it is stored:
 
 | Permission | Stored representation |
 |---|---|
-| `blob_allowed` | Structured reference and permitted raw blob |
-| `reference_only` | Structured reference; raw blob forced to `null` |
+| `blob_allowed` | Structured reference, permitted aggregate metadata, and permitted raw blob |
+| `reference_only` | Structured reference; aggregate metadata and raw blob forced to `null` |
 | `aggregate_only` | Only permitted aggregate metadata; raw reference and blob forced to `null` |
 | `prohibited` | Command rejected with no observation, audit, outbox, or completed idempotency side effect |
 
@@ -133,7 +135,70 @@ Catalog lifecycle events remain in PostgreSQL. The outbox dispatcher allowlist s
 - No production credentials.
 - No deployment or infrastructure provisioning.
 
-## Full Sprint 2A–2B gate
+## Deterministic normalization and Candidate Registry
+
+Sprint 3A consumes a bounded `ObservationNormalizationSnapshotV1` from
+permitted `aggregate_metadata`. It accepts schema version 1, patch key,
+`aram_mayhem`, origin, champion external ID, augment external IDs, and item
+external IDs. The runtime validator trims IDs, rejects empty or duplicate
+IDs, and sorts augment and item selections by code-point order before hashing.
+It does not fetch, infer, or parse external source content.
+
+In operational terms, reference_only cannot supply a stored aggregate snapshot.
+Only `aggregate_only` or `blob_allowed` policy can retain the structured
+snapshot. Missing metadata fails with `NORMALIZATION_SNAPSHOT_UNAVAILABLE`;
+malformed input fails through stable normalization reason codes.
+
+### Fingerprint exclusions
+
+The Candidate fingerprint includes only the patch ID, game mode, canonical
+subject external ID, and normalized selection signature. It excludes source,
+Source Policy revision, raw observation ID, origin, reference, adapter
+version, timestamps, and catalog revision. Patch remains in the fingerprint,
+so identity cannot cross a patch boundary.
+
+### Candidate identity and CandidateRevision identity
+
+Candidate identity is the patch-scoped semantic fingerprint. A repeated
+fingerprint reuses one immutable Candidate.
+
+CandidateRevision identity is the immutable representation under an exact
+active catalog revision. `CandidateRevision` pins the catalog revision, while
+the Candidate does not. The same fingerprint under the same catalog reuses
+the revision; the same fingerprint after a catalog refresh creates the next
+immutable revision on the same Candidate.
+
+### Provenance chain
+
+Every accepted raw observation creates an append-only provenance link:
+
+```text
+candidate_provenance → normalized_observation → raw_observation
+```
+
+The chain preserves origin, source, Source Policy revision, adapter version,
+content hash, permitted reference, and collection time without copying
+governed source content into Candidate rows. Provenance counts are derived
+from immutable rows; Candidate rows are never updated as counters.
+
+The normalization worker reloads observation ID and correlation ID from the
+PostgreSQL outbox event and ignores source fields in the Redis payload. Its
+normalization reservation, normalized observation, Candidate,
+CandidateRevision, provenance, audit, and outbox writes share one transaction.
+
+- Scenario S1: an injected failure before commit rolls back every domain,
+  audit, outbox, and normalization-effect row; retry can succeed once.
+- Scenario S12: a patch, active-catalog, or catalog-selection mismatch fails
+  closed before Candidate creation and leaves no partial side effect.
+- Scenario S21: source-independent observations with one semantic
+  fingerprint converge to one Candidate and one catalog-pinned revision while
+  retaining one provenance row per observation.
+
+A retry after commit returns `duplicate_noop` and does not create another
+registry effect. Candidate outbox events are not dispatched in Sprint 3A:
+the dispatcher allowlist remains limited to `RawObservationIngested`.
+
+## Full Sprint 2A–3A gate
 
 The GitHub Actions workflow starts PostgreSQL 17 and Redis 7, installs both lockfiles, and runs:
 
@@ -150,13 +215,17 @@ git diff --check
 
 It also requires a clean repository after generated-output checks and scans the workflow for write permissions or deployment commands.
 
-## Sprint 2A–2B safety boundary
+## Sprint 2A–3A safety boundary
 
+- No Evidence.
 - No AI.
-- No publication.
+- No Publication.
 - No production credentials.
 - No deployment.
+- No merge.
 - No external crawler.
 - No production infrastructure provisioning.
 
-The worker only records acceptance at the normalization boundary. It has no publication dependency or command.
+The worker registers deterministic Candidates only. It creates no Evidence,
+review, eligibility, or publication decision and has no publication
+dependency or command.
