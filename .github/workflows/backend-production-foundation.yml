@@ -1,4 +1,4 @@
-name: Sprint 2B catalog authority gate
+name: Sprint 3A deterministic candidate registry gate
 
 on:
   workflow_dispatch:
@@ -16,11 +16,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: sprint-2b-catalog-authority-${{ github.ref }}
+  group: sprint-3a-deterministic-candidate-registry-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   verify:
+    name: verify deterministic candidate registry
     runs-on: ubuntu-latest
     timeout-minutes: 40
     services:
@@ -100,6 +101,19 @@ jobs:
             "CATALOG_REVISION_NOT_ACTIVE",
             "No external catalog fetch",
             "No normalization",
+            "ObservationNormalizationSnapshotV1",
+            "Fingerprint exclusions",
+            "Candidate identity",
+            "CandidateRevision identity",
+            "Provenance chain",
+            "Scenario S1",
+            "Scenario S12",
+            "Scenario S21",
+            "reference_only cannot supply a stored aggregate snapshot",
+            "Candidate outbox events are not dispatched in Sprint 3A",
+            "No Evidence",
+            "No Publication",
+            "No merge",
           ]) {
             if (!runbook.includes(contract)) {
               throw new Error(`backend runbook is missing contract: ${contract}`);
@@ -151,7 +165,7 @@ jobs:
         run: |
           set -euo pipefail
           workflow=".github/workflows/backend-production-foundation.yml"
-          executable="$RUNNER_TEMP/sprint-2b-catalog-authority-before-guard.yml"
+          executable="$RUNNER_TEMP/sprint-3a-deterministic-candidate-registry-before-guard.yml"
           sed '/- name: Deployment guard/,$d' "$workflow" > "$executable"
           ! grep -Eq '(contents|packages|pages|id-token):[[:space:]]*write' "$workflow"
           ! grep -Eq 'git push|wrangler[[:space:]]+deploy|npm run deploy|actions/deploy-pages' "$executable"
