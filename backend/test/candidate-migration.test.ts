@@ -141,12 +141,13 @@ async function seedRegistryGraph(pool: Pool): Promise<void> {
   );
   await pool.query(
     `insert into candidate_revisions
-      (candidate_revision_id, candidate_id, revision,
+      (candidate_revision_id, candidate_id, revision, patch_id,
        catalog_revision_id, normalized_signature, canonical_payload)
-     values ($1, $2, 1, $3, $4, $5::jsonb)`,
+     values ($1, $2, 1, $3, $4, $5, $6::jsonb)`,
     [
       IDS.candidateRevisionId,
       IDS.candidateId,
+      CATALOG_IDS.patchId,
       CATALOG_IDS.catalogRevisionId,
       SIGNATURE,
       JSON.stringify(PAYLOAD),
