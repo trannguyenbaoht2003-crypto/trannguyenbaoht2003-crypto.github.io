@@ -44,7 +44,7 @@ function importCommand(
 }
 
 function validationCommand(
-  catalogRevisionId = CATALOG_IDS.catalogRevisionId,
+  catalogRevisionId: string = CATALOG_IDS.catalogRevisionId,
   resultId: string = '41000000-0000-4000-8000-000000000001',
 ) {
   return {
