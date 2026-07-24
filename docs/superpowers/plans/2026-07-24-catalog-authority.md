@@ -683,7 +683,7 @@ git commit -m "feat(2b): enforce sealed catalog history"
 **Interfaces:**
 - Consumes: `normalizeCatalogSnapshot`
 - Consumes: `withTransaction`
-- Produces: `importCatalogRevision(pool, command, hooks?): Promise<ImportCatalogRevisionResult>`
+- Produces: `importCatalogRevision(pool, command): Promise<ImportCatalogRevisionResult>`
 
 - [ ] **Step 1: Create deterministic prerequisites and failing import tests**
 
@@ -830,23 +830,43 @@ test('same import idempotency key replays and conflicting payload is rejected', 
   await pool.end();
 });
 
-test('failure after child rows rolls back every import side effect', async () => {
+test('seal conflict after child inserts rolls back the second revision', async () => {
   const pool = await resetDatabase();
   await seedCatalogPrerequisites(pool);
-  const beforeAudit = await tableCount(pool, 'audit_events');
-  const beforeOutbox = await tableCount(pool, 'outbox_events');
+  await importCatalogRevision(pool, importCommand());
+  const beforeConflict = {
+    audit: await tableCount(pool, 'audit_events'),
+    entityRevisions: await tableCount(pool, 'game_entity_revisions'),
+    idempotency: await tableCount(pool, 'idempotency_records'),
+    lifecycle: await tableCount(pool, 'catalog_lifecycle_events'),
+    outbox: await tableCount(pool, 'outbox_events'),
+    revisions: await tableCount(pool, 'catalog_revisions'),
+    rules: await tableCount(pool, 'compatibility_rules'),
+    seals: await tableCount(pool, 'catalog_revision_seals'),
+  };
+  const conflicting = importCommand();
+  conflicting.catalogRevisionId = '40000000-0000-4000-8000-000000000006';
+  conflicting.correlationId = 'catalog-import-correlation-2';
+  conflicting.idempotencyKey = 'catalog-import-2';
+  conflicting.revision = 2;
+
   await assert.rejects(
-    importCatalogRevision(pool, importCommand(), {
-      afterChildren: async () => {
-        throw new Error('injected-catalog-import-failure');
-      },
-    }),
-    /injected-catalog-import-failure/,
+    importCatalogRevision(pool, conflicting),
+    /CATALOG_CONTENT_ALREADY_IMPORTED/,
   );
-  assert.equal(await tableCount(pool, 'catalog_revisions'), 0);
-  assert.equal(await tableCount(pool, 'catalog_revision_seals'), 0);
-  assert.equal(await tableCount(pool, 'audit_events'), beforeAudit);
-  assert.equal(await tableCount(pool, 'outbox_events'), beforeOutbox);
+  assert.deepEqual(
+    {
+      audit: await tableCount(pool, 'audit_events'),
+      entityRevisions: await tableCount(pool, 'game_entity_revisions'),
+      idempotency: await tableCount(pool, 'idempotency_records'),
+      lifecycle: await tableCount(pool, 'catalog_lifecycle_events'),
+      outbox: await tableCount(pool, 'outbox_events'),
+      revisions: await tableCount(pool, 'catalog_revisions'),
+      rules: await tableCount(pool, 'compatibility_rules'),
+      seals: await tableCount(pool, 'catalog_revision_seals'),
+    },
+    beforeConflict,
+  );
   await pool.end();
 });
 ```
@@ -886,9 +906,6 @@ export interface ImportCatalogRevisionResult {
   replayed: boolean;
 }
 
-export interface ImportCatalogRevisionHooks {
-  afterChildren?: () => Promise<void>;
-}
 ```
 
 Implement the transaction in this exact order:
@@ -905,12 +922,12 @@ Implement the transaction in this exact order:
    `on conflict (entity_type, canonical_external_id) do nothing`, select the
    canonical ID, then insert `game_entity_revisions`.
 8. Insert all compatibility rules.
-9. Invoke `hooks.afterChildren` when supplied.
-10. Insert `catalog_revision_seals`.
-11. Insert `catalog_lifecycle_events` with state `imported`.
-12. Insert audit action `catalog.revision_imported`.
-13. Insert outbox event `CatalogRevisionImported`.
-14. Complete the idempotency record with the result JSON.
+9. Insert `catalog_revision_seals`; its unique content hash is also the real
+   database conflict used to prove rollback after child inserts.
+10. Insert `catalog_lifecycle_events` with state `imported`.
+11. Insert audit action `catalog.revision_imported`.
+12. Insert outbox event `CatalogRevisionImported`.
+13. Complete the idempotency record with the result JSON.
 
 Use `randomUUID()` for generated child, lifecycle, audit, and outbox IDs.
 Never store the complete snapshot in audit or outbox; store revision ID,
