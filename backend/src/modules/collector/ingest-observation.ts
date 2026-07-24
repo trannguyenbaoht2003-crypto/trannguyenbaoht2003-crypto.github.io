@@ -4,12 +4,15 @@ import type { Pool } from 'pg';
 
 import { withTransaction } from '../../database/transaction.js';
 import { hashCanonicalJson } from '../../shared/hash.js';
+import {
+  normalizeObservationAggregateMetadata,
+} from '../candidate/normalize-observation.js';
 import type { StoragePermission } from '../source-policy/activate-source-policy.js';
 
 export interface IngestObservationCommand {
   actorId: string;
   adapterVersion: string;
-  aggregateMetadata?: Record<string, unknown>;
+  aggregateMetadata?: unknown;
   collectedAt: Date;
   correlationId: string;
   externalReference?: Record<string, unknown>;
@@ -42,8 +45,6 @@ export async function ingestObservation(
   pool: Pool,
   command: IngestObservationCommand,
 ): Promise<IngestObservationResult> {
-  const payloadHash = hashCanonicalJson(command);
-
   return withTransaction(pool, async (client) => {
     const policy = await client.query<ActivePolicyRow>(
       `select spr.source_policy_revision_id,
@@ -65,6 +66,35 @@ export async function ingestObservation(
     if (active.storage_permission === 'prohibited') {
       throw new Error('SOURCE_POLICY_PROHIBITS_INGEST');
     }
+
+    const blobStored =
+      active.storage_permission === 'blob_allowed'
+      && command.rawBlob !== undefined;
+    const aggregateStored =
+      active.storage_permission === 'blob_allowed' ||
+      active.storage_permission === 'aggregate_only';
+    const referenceStored =
+      active.storage_permission === 'blob_allowed' ||
+      active.storage_permission === 'reference_only';
+    const aggregateMetadata = (
+      aggregateStored && command.aggregateMetadata !== undefined
+        ? normalizeObservationAggregateMetadata(command.aggregateMetadata)
+        : undefined
+    );
+    const payloadHash = hashCanonicalJson({
+      actorId: command.actorId,
+      adapterVersion: command.adapterVersion,
+      aggregateMetadata: aggregateMetadata ?? null,
+      collectedAt: command.collectedAt,
+      correlationId: command.correlationId,
+      externalReference: (
+        referenceStored ? command.externalReference ?? null : null
+      ),
+      idempotencyKey: command.idempotencyKey,
+      observationId: command.observationId,
+      rawBlob: blobStored ? command.rawBlob : null,
+      sourceId: command.sourceId,
+    });
 
     const inserted = await client.query(
       `insert into idempotency_records
@@ -92,13 +122,6 @@ export async function ingestObservation(
       return { ...record.result, replayed: true };
     }
 
-    const blobStored = active.storage_permission === 'blob_allowed' && command.rawBlob !== undefined;
-    const aggregateStored =
-      active.storage_permission === 'blob_allowed' ||
-      active.storage_permission === 'aggregate_only';
-    const referenceStored =
-      active.storage_permission === 'blob_allowed' ||
-      active.storage_permission === 'reference_only';
     await client.query(
       `insert into raw_observations
         (raw_observation_id, source_id, source_policy_revision_id, adapter_version,
@@ -110,7 +133,7 @@ export async function ingestObservation(
         active.source_policy_revision_id,
         command.adapterVersion,
         referenceStored ? JSON.stringify(command.externalReference ?? null) : null,
-        aggregateStored ? JSON.stringify(command.aggregateMetadata ?? null) : null,
+        aggregateStored ? JSON.stringify(aggregateMetadata ?? null) : null,
         payloadHash,
         blobStored ? command.rawBlob : null,
         command.collectedAt,
