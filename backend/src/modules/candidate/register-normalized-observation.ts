@@ -9,10 +9,6 @@ import {
   fingerprintCandidate,
   normalizeObservationSnapshot,
 } from './normalize-observation.js';
-import type {
-  ObservationNormalizationSnapshotV1,
-} from './types.js';
-
 const NORMALIZER_VERSION = 'candidate-selection-v1';
 
 interface ReplayRow {
@@ -57,7 +53,7 @@ export interface RegisterNormalizedObservationCommand {
   normalizedObservationId: string;
   provenanceId: string;
   rawObservationId: string;
-  snapshot: ObservationNormalizationSnapshotV1;
+  snapshot: unknown;
 }
 
 export interface RegisterNormalizedObservationResult {
