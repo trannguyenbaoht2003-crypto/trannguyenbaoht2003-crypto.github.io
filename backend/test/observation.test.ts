@@ -5,7 +5,13 @@ import { ingestObservation } from '../src/modules/collector/ingest-observation.j
 import { activateSourcePolicy } from '../src/modules/source-policy/activate-source-policy.js';
 import { resetDatabase, tableCount } from './helpers/database.js';
 
-async function seedPolicy(storagePermission: 'blob_allowed' | 'reference_only' | 'prohibited') {
+async function seedPolicy(
+  storagePermission:
+    | 'aggregate_only'
+    | 'blob_allowed'
+    | 'reference_only'
+    | 'prohibited',
+) {
   const pool = await resetDatabase();
   await pool.query(`
     insert into sources (source_id, source_key, display_name)
@@ -29,6 +35,11 @@ function command() {
   return {
     actorId: 'collector',
     adapterVersion: 'collector-test@1',
+    aggregateMetadata: {
+      normalizationSnapshot: {
+        schemaVersion: 1,
+      },
+    },
     collectedAt: new Date('2026-07-23T01:00:00Z'),
     correlationId: 'observation-correlation',
     externalReference: { url: 'https://example.invalid/public' },
@@ -42,11 +53,42 @@ function command() {
 test('reference-only policy never stores a raw blob', async () => {
   const pool = await seedPolicy('reference_only');
   const result = await ingestObservation(pool, command());
-  const stored = await pool.query<{ raw_blob: string | null }>(
-    'select raw_blob from raw_observations',
+  const stored = await pool.query<{
+    aggregate_metadata: unknown;
+    external_reference: unknown;
+    raw_blob: string | null;
+  }>(
+    `select aggregate_metadata, external_reference, raw_blob
+       from raw_observations`,
   );
   assert.equal(result.blobStored, false);
   assert.equal(stored.rows[0]?.raw_blob, null);
+  assert.equal(stored.rows[0]?.aggregate_metadata, null);
+  assert.deepEqual(stored.rows[0]?.external_reference, {
+    url: 'https://example.invalid/public',
+  });
+  await pool.end();
+});
+
+test('aggregate-only policy stores structured metadata without blob or reference', async () => {
+  const pool = await seedPolicy('aggregate_only');
+  const result = await ingestObservation(pool, command());
+  const stored = await pool.query<{
+    aggregate_metadata: unknown;
+    external_reference: unknown;
+    raw_blob: string | null;
+  }>(
+    `select aggregate_metadata, external_reference, raw_blob
+       from raw_observations`,
+  );
+  assert.equal(result.blobStored, false);
+  assert.equal(stored.rows[0]?.raw_blob, null);
+  assert.equal(stored.rows[0]?.external_reference, null);
+  assert.deepEqual(stored.rows[0]?.aggregate_metadata, {
+    normalizationSnapshot: {
+      schemaVersion: 1,
+    },
+  });
   await pool.end();
 });
 
