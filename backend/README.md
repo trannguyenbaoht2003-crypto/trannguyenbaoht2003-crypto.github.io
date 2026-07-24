@@ -123,7 +123,7 @@ The GitHub Actions workflow starts PostgreSQL 17 and Redis 7, installs both lock
 npm run validate:community
 npm run lint
 npm test
-npm run build
+npm run build:pages
 npm run backend:typecheck
 npm run backend:test
 npm run backend:build
