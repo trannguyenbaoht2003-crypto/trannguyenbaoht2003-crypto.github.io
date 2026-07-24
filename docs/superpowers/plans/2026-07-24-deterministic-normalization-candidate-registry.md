@@ -237,9 +237,11 @@ const compareText = (left: string, right: string): number => (
 );
 ```
 
-Reject duplicates after trimming. Compute `normalizedSignature` only from the
-canonical selection payload. Implement `fingerprintCandidate` by explicitly
-constructing:
+Reject duplicates after trimming. Require exactly the seven V1 snapshot keys
+and a one-key aggregate wrapper, cap identifiers at 128 characters, and cap
+each selection array at 64 entries. Compute `normalizedSignature` only from
+the canonical selection payload. Implement `fingerprintCandidate` by
+explicitly constructing:
 
 ```ts
 {
@@ -304,6 +306,9 @@ for (const table of [
 
 Seed a normalized row whose subject revision belongs to another catalog and
 assert the insert is rejected by the composite foreign key.
+Also reject a catalog from another patch, a CandidateRevision whose patch
+does not own both Candidate and catalog, and a provenance link whose revision
+and observation differ by catalog, signature, or canonical payload.
 
 - [ ] **Step 2: Run RED**
 
@@ -347,6 +352,11 @@ create table normalized_observations (
     references game_entity_revisions(
       game_entity_revision_id,
       catalog_revision_id
+    ),
+  foreign key (catalog_revision_id, patch_id)
+    references catalog_revisions(
+      catalog_revision_id,
+      patch_id
     )
 );
 
@@ -358,13 +368,15 @@ create table candidates (
   game_mode_external_id text not null
     check (game_mode_external_id = 'aram_mayhem'),
   subject_game_entity_id uuid not null references game_entities(game_entity_id),
-  created_at timestamptz not null default clock_timestamp()
+  created_at timestamptz not null default clock_timestamp(),
+  unique (candidate_id, patch_id)
 );
 
 create table candidate_revisions (
   candidate_revision_id uuid primary key,
-  candidate_id uuid not null references candidates(candidate_id),
+  candidate_id uuid not null,
   revision integer not null check (revision > 0),
+  patch_id uuid not null,
   catalog_revision_id uuid not null
     references catalog_revision_seals(catalog_revision_id),
   normalized_signature text not null
@@ -373,7 +385,11 @@ create table candidate_revisions (
     check (jsonb_typeof(canonical_payload) = 'object'),
   created_at timestamptz not null default clock_timestamp(),
   unique (candidate_id, revision),
-  unique (candidate_id, catalog_revision_id, normalized_signature)
+  unique (candidate_id, catalog_revision_id, normalized_signature),
+  foreign key (candidate_id, patch_id)
+    references candidates(candidate_id, patch_id),
+  foreign key (catalog_revision_id, patch_id)
+    references catalog_revisions(catalog_revision_id, patch_id)
 );
 
 create table candidate_provenance (
@@ -397,6 +413,10 @@ create table candidate_provenance (
 
 Add indexes for revision and provenance lookup, then attach
 `reject_immutable_change()` triggers to all four tables.
+Add patch/catalog composite foreign keys to normalized observations and
+CandidateRevisions, store `patch_id` on CandidateRevision, and add a
+provenance insert trigger that verifies catalog, signature, and canonical
+payload equality across the immutable graph.
 
 - [ ] **Step 4: Run GREEN**
 
@@ -449,8 +469,9 @@ result `passed`.
 
 - [ ] **Step 2: Write RED tests for success, S12, replay, and rollback**
 
-Create a candidate helper that seeds a raw observation under
-`CATALOG_IDS.sourceId` and returns a command using stable UUIDs. Tests must
+Create a candidate helper that seeds a raw observation under a dedicated
+`aggregate_only` Source Policy revision and returns a command using stable
+UUIDs. Tests must
 assert:
 
 1. valid input creates counts `1/1/1/1` for the four new tables and exactly
@@ -462,6 +483,8 @@ assert:
    `NORMALIZATION_REPLAY_CONFLICT`;
 5. a pre-seeded conflicting provenance UUID causes a real late constraint
    error and leaves all before/after table, audit, and outbox counts equal.
+6. two concurrent commands for the same raw observation return the same
+   normalized observation and create one registry effect.
 
 - [ ] **Step 3: Run RED**
 
@@ -494,8 +517,8 @@ Do not add a write or change reason-code ordering.
 Implement the ordered transaction from the design:
 
 1. normalize before opening the public transaction;
-2. query an existing normalized observation first for replay;
-3. lock raw observation;
+2. exclusively lock the raw observation;
+3. query the normalized observation for replay after acquiring the lock;
 4. resolve active patch/catalog and `FOR SHARE OF acr`;
 5. call `validateCatalogSelection(client, ...)`;
 6. resolve subject entity and revision;
@@ -658,8 +681,9 @@ signature and runtime handler is still a no-op.
 
 - [ ] **Step 3: Extend governed observation metadata**
 
-Add optional `aggregateMetadata?: Record<string, unknown>` and persist it only
-when storage permission is `blob_allowed` or `aggregate_only`.
+Add optional `aggregateMetadata?: unknown`, validate it as the closed,
+bounded V1 wrapper from Task 1, and persist it only when storage permission is
+`blob_allowed` or `aggregate_only`.
 `reference_only` forces it to `null`; `aggregate_only` also forces external
 reference and raw blob to `null`. Add policy tests for both behaviors without
 changing prohibited-policy atomicity.
