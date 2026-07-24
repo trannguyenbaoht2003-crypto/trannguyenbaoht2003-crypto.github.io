@@ -1,4 +1,4 @@
-name: Sprint 2A quality gate
+name: Sprint 2B catalog authority gate
 
 on:
   workflow_dispatch:
@@ -16,7 +16,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: sprint-2a-quality-gate-${{ github.ref }}
+  group: sprint-2b-catalog-authority-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -94,6 +94,12 @@ jobs:
             "No publication",
             "No production credentials",
             "No deployment",
+            "CatalogSnapshotV1",
+            "catalog_import",
+            "CATALOG_ACTIVE_POINTER_CONFLICT",
+            "CATALOG_REVISION_NOT_ACTIVE",
+            "No external catalog fetch",
+            "No normalization",
           ]) {
             if (!runbook.includes(contract)) {
               throw new Error(`backend runbook is missing contract: ${contract}`);

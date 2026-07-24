@@ -1,6 +1,6 @@
 # Hải Đấu backend runbook
 
-This runbook covers the Sprint 2A production foundation only. PostgreSQL is the system of record; Redis/BullMQ is delivery infrastructure.
+This runbook covers the Sprint 2A production foundation and Sprint 2B catalog authority. PostgreSQL is the system of record; Redis/BullMQ is delivery infrastructure.
 
 ## Prerequisites
 
@@ -115,7 +115,25 @@ If Redis is unavailable:
 
 Do not edit an outbox identity or payload to recover delivery. Database triggers intentionally reject that mutation. Diagnose connectivity, restore Redis, and let the same PostgreSQL event be dispatched again.
 
-## Full Sprint 2A gate
+## Catalog authority operations
+
+Sprint 2B accepts only a `CatalogSnapshotV1` supplied to the application by a deterministic adapter. The snapshot contains structured game entities, compatibility rules, adapter version, and a source digest. It must not contain source HTML, transcripts, comments, raw community text, images, or credentials.
+
+Catalog import is an application command, not a network collector or operator CLI. It requires an active Patch and the exact active Source Policy revision. The idempotency scope is `catalog_import`: replaying the same canonical payload returns the recorded result, while reusing the key with changed input fails closed. Import writes the revision, entity/rule children, content seal, lifecycle, audit, and outbox atomically.
+
+A seal makes the revision and its children immutable. Any correction requires a new catalog revision; never edit a sealed row. Semantic validation reconstructs the snapshot from PostgreSQL, verifies the seal and references, and records an immutable passed or failed result. Failed validation history remains available for audit and cannot authorize activation.
+
+Activation requires the caller's expected current revision. A stale compare-and-swap fails with `CATALOG_ACTIVE_POINTER_CONFLICT` and creates no activation side effect. Read-only selection validation requires an exact active patch, `aram_mayhem` mode, and catalog revision; stale input returns only `CATALOG_REVISION_NOT_ACTIVE` before entity or rule evaluation.
+
+Catalog lifecycle events remain in PostgreSQL. The outbox dispatcher allowlist still contains only `RawObservationIngested`, so catalog events are not normalization jobs.
+
+- No external catalog fetch.
+- No normalization.
+- No Candidate, Evidence, AI, or Publication behavior.
+- No production credentials.
+- No deployment or infrastructure provisioning.
+
+## Full Sprint 2A–2B gate
 
 The GitHub Actions workflow starts PostgreSQL 17 and Redis 7, installs both lockfiles, and runs:
 
@@ -132,7 +150,7 @@ git diff --check
 
 It also requires a clean repository after generated-output checks and scans the workflow for write permissions or deployment commands.
 
-## Sprint 2A safety boundary
+## Sprint 2A–2B safety boundary
 
 - No AI.
 - No publication.
