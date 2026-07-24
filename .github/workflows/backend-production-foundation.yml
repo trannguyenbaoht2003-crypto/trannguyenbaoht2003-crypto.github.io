@@ -16,7 +16,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: sprint-2a-quality-gate-${{ github.ref }}
+  group: sprint-2b-catalog-authority-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
