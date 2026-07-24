@@ -91,7 +91,7 @@ npm run collect:community -- --input data/community-manual-input.json
 
 Đầu vào thủ công vẫn phải đi qua đúng các hàng rào tự động; không có đường tắt để đăng thẳng lên web.
 
-## Backend Sprint 2A
+## Backend Sprints 2A–2B
 
 Nền backend Node/Fastify + PostgreSQL/BullMQ được giữ trong package `backend/`, độc lập với bản build frontend tĩnh. Các lệnh điều phối từ thư mục gốc:
 
@@ -101,7 +101,7 @@ npm run backend:test
 npm run backend:build
 ```
 
-Cách chuẩn bị PostgreSQL 17, Redis 7, biến môi trường test, chạy migration contract, worker và phục hồi outbox khi Redis lỗi được ghi tại [backend runbook](backend/README.md). Sprint 2A không có AI, quyền publication, credential production hoặc bước deploy backend.
+Cách chuẩn bị PostgreSQL 17, Redis 7, biến môi trường test, chạy migration contract, worker và phục hồi outbox khi Redis lỗi được ghi tại [backend runbook](backend/README.md). Sprint 2B bổ sung catalog authority bất biến theo Patch với import idempotent, validation, compare-and-swap activation và kiểm tra selection chỉ đọc; frontend vẫn dùng đường dữ liệu tĩnh hiện hành. Hai sprint không có AI, quyền publication, credential production hoặc bước deploy backend.
 
 ## Triển khai
 
