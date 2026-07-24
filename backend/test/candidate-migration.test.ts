@@ -20,6 +20,10 @@ const IDS = {
   secondCatalogRevisionId: '61000000-0000-4000-8000-000000000006',
   secondNormalizedObservationId: '61000000-0000-4000-8000-000000000007',
   secondRawObservationId: '61000000-0000-4000-8000-000000000008',
+  mismatchedCandidateId: '61000000-0000-4000-8000-000000000009',
+  mismatchedCandidateRevisionId: '61000000-0000-4000-8000-000000000010',
+  mismatchedProvenanceId: '61000000-0000-4000-8000-000000000011',
+  wrongPatchId: '61000000-0000-4000-8000-000000000012',
 } as const;
 
 const SIGNATURE = 'b'.repeat(64);
@@ -213,6 +217,141 @@ test('normalized subject revision must belong to the pinned catalog', async () =
       ],
     ),
     /foreign key/,
+  );
+  await pool.end();
+});
+
+test('normalized observation patch must own the pinned catalog', async () => {
+  const pool = await resetDatabase();
+  await seedRegistryGraph(pool);
+  await insertRawObservation(pool, IDS.secondRawObservationId);
+  await pool.query(
+    `insert into patches (patch_id, patch_key, display_label)
+     values ($1, '99.99', 'Wrong patch')`,
+    [IDS.wrongPatchId],
+  );
+  const subjectRevision = await subjectRevisionId(
+    pool,
+    CATALOG_IDS.catalogRevisionId,
+  );
+
+  await assert.rejects(
+    pool.query(
+      `insert into normalized_observations
+        (normalized_observation_id, raw_observation_id, patch_id,
+         catalog_revision_id, game_mode_external_id,
+         subject_game_entity_revision_id, normalizer_version,
+         normalized_signature, canonical_payload)
+       values ($1, $2, $3, $4, 'aram_mayhem', $5,
+               'candidate-selection-v1', $6, $7::jsonb)`,
+      [
+        IDS.secondNormalizedObservationId,
+        IDS.secondRawObservationId,
+        IDS.wrongPatchId,
+        CATALOG_IDS.catalogRevisionId,
+        subjectRevision,
+        SIGNATURE,
+        JSON.stringify(PAYLOAD),
+      ],
+    ),
+    /foreign key/,
+  );
+  await pool.end();
+});
+
+test('candidate revision patch must own both candidate and catalog', async () => {
+  const pool = await resetDatabase();
+  await seedRegistryGraph(pool);
+  await pool.query(
+    `insert into patches (patch_id, patch_key, display_label)
+     values ($1, '99.99', 'Wrong patch')`,
+    [IDS.wrongPatchId],
+  );
+  const subject = await pool.query<{ game_entity_id: string }>(
+    `select subject_game_entity_id as game_entity_id
+       from candidates
+      where candidate_id = $1`,
+    [IDS.candidateId],
+  );
+  const subjectId = subject.rows[0]?.game_entity_id;
+  assert.ok(subjectId);
+  await pool.query(
+    `insert into candidates
+      (candidate_id, fingerprint, patch_id, game_mode_external_id,
+       subject_game_entity_id)
+     values ($1, $2, $3, 'aram_mayhem', $4)`,
+    [
+      IDS.mismatchedCandidateId,
+      'd'.repeat(64),
+      IDS.wrongPatchId,
+      subjectId,
+    ],
+  );
+
+  await assert.rejects(
+    pool.query(
+      `insert into candidate_revisions
+        (candidate_revision_id, candidate_id, revision, patch_id,
+         catalog_revision_id, normalized_signature, canonical_payload)
+       values ($1, $2, 1, $3, $4, $5, $6::jsonb)`,
+      [
+        IDS.mismatchedCandidateRevisionId,
+        IDS.mismatchedCandidateId,
+        IDS.wrongPatchId,
+        CATALOG_IDS.catalogRevisionId,
+        SIGNATURE,
+        JSON.stringify(PAYLOAD),
+      ],
+    ),
+    /foreign key/,
+  );
+  await pool.end();
+});
+
+test('provenance must link matching catalog signature and payload', async () => {
+  const pool = await resetDatabase();
+  await seedRegistryGraph(pool);
+  await insertRawObservation(pool, IDS.secondRawObservationId);
+  const subjectRevision = await subjectRevisionId(
+    pool,
+    CATALOG_IDS.catalogRevisionId,
+  );
+  const mismatchedPayload = {
+    ...PAYLOAD,
+    itemExternalIds: ['3006'],
+  };
+  await pool.query(
+    `insert into normalized_observations
+      (normalized_observation_id, raw_observation_id, patch_id,
+       catalog_revision_id, game_mode_external_id,
+       subject_game_entity_revision_id, normalizer_version,
+       normalized_signature, canonical_payload)
+     values ($1, $2, $3, $4, 'aram_mayhem', $5,
+             'candidate-selection-v1', $6, $7::jsonb)`,
+    [
+      IDS.secondNormalizedObservationId,
+      IDS.secondRawObservationId,
+      CATALOG_IDS.patchId,
+      CATALOG_IDS.catalogRevisionId,
+      subjectRevision,
+      'e'.repeat(64),
+      JSON.stringify(mismatchedPayload),
+    ],
+  );
+
+  await assert.rejects(
+    pool.query(
+      `insert into candidate_provenance
+        (candidate_provenance_id, candidate_revision_id,
+         normalized_observation_id, origin)
+       values ($1, $2, $3, 'collector_detected')`,
+      [
+        IDS.mismatchedProvenanceId,
+        IDS.candidateRevisionId,
+        IDS.secondNormalizedObservationId,
+      ],
+    ),
+    /candidate provenance graph mismatch/,
   );
   await pool.end();
 });
