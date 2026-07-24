@@ -240,6 +240,7 @@ async function resolveCandidateRevision(
   client: PoolClient,
   command: RegisterNormalizedObservationCommand,
   candidateId: string,
+  patchId: string,
   catalogRevisionId: string,
   normalizedSignature: string,
   canonicalPayload: unknown,
@@ -278,13 +279,14 @@ async function resolveCandidateRevision(
   }
   await client.query(
     `insert into candidate_revisions
-      (candidate_revision_id, candidate_id, revision,
+      (candidate_revision_id, candidate_id, revision, patch_id,
        catalog_revision_id, normalized_signature, canonical_payload)
-     values ($1, $2, $3, $4, $5, $6::jsonb)`,
+     values ($1, $2, $3, $4, $5, $6, $7::jsonb)`,
     [
       command.candidateRevisionId,
       candidateId,
       revisionNumber,
+      patchId,
       catalogRevisionId,
       normalizedSignature,
       JSON.stringify(canonicalPayload),
@@ -383,6 +385,7 @@ export async function registerNormalizedObservationInTransaction(
     client,
     command,
     candidate.candidate_id,
+    authority.patch_id,
     authority.catalog_revision_id,
     normalized.normalizedSignature,
     normalized.payload,
