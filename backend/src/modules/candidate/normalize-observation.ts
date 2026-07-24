@@ -5,8 +5,21 @@ import type {
   CandidateSelectionPayloadV1,
   NormalizationReasonCode,
   NormalizedObservationSnapshot,
+  ObservationAggregateMetadataV1,
   ObservationNormalizationSnapshotV1,
 } from './types.js';
+
+const MAX_IDENTIFIER_LENGTH = 128;
+const MAX_SELECTIONS_PER_TYPE = 64;
+const SNAPSHOT_KEYS = [
+  'augmentExternalIds',
+  'gameModeExternalId',
+  'itemExternalIds',
+  'origin',
+  'patchKey',
+  'schemaVersion',
+  'subjectExternalId',
+] as const;
 
 const CANDIDATE_ORIGINS = new Set<CandidateOrigin>([
   'collector_detected',
@@ -34,6 +47,9 @@ function requiredText(
   if (!normalized) {
     return fail(code);
   }
+  if (normalized.length > MAX_IDENTIFIER_LENGTH) {
+    return fail('NORMALIZATION_SCHEMA_UNSUPPORTED');
+  }
   return normalized;
 }
 
@@ -41,8 +57,22 @@ function compareText(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 
+function hasExactKeys(
+  value: Record<string, unknown>,
+  expected: readonly string[],
+): boolean {
+  const actual = Object.keys(value).sort(compareText);
+  return (
+    actual.length === expected.length
+    && actual.every((key, index) => key === expected[index])
+  );
+}
+
 function normalizeEntityIds(value: unknown): string[] {
-  if (!Array.isArray(value)) {
+  if (
+    !Array.isArray(value)
+    || value.length > MAX_SELECTIONS_PER_TYPE
+  ) {
     return fail('NORMALIZATION_SCHEMA_UNSUPPORTED');
   }
   const normalized = value.map((entry) => (
@@ -69,6 +99,7 @@ export function normalizeObservationSnapshot(
 ): NormalizedObservationSnapshot {
   if (
     !isRecord(value)
+    || !hasExactKeys(value, SNAPSHOT_KEYS)
     || value.schemaVersion !== 1
     || value.gameModeExternalId !== 'aram_mayhem'
   ) {
@@ -100,6 +131,23 @@ export function normalizeObservationSnapshot(
     normalizedSignature: hashCanonicalJson(payload),
     payload,
     snapshot,
+  };
+}
+
+export function normalizeObservationAggregateMetadata(
+  value: unknown,
+): ObservationAggregateMetadataV1 {
+  if (
+    !isRecord(value)
+    || !hasExactKeys(value, ['normalizationSnapshot'])
+  ) {
+    return fail('NORMALIZATION_SCHEMA_UNSUPPORTED');
+  }
+  const normalized = normalizeObservationSnapshot(
+    value.normalizationSnapshot,
+  );
+  return {
+    normalizationSnapshot: normalized.snapshot,
   };
 }
 
