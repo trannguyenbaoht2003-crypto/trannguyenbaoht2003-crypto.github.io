@@ -93,6 +93,12 @@ test('aggregate-only policy stores structured metadata without blob or reference
   assert.deepEqual(stored.rows[0]?.aggregate_metadata, {
     normalizationSnapshot: {
       schemaVersion: 1,
+      patchKey: '26.15',
+      gameModeExternalId: 'aram_mayhem',
+      origin: 'collector_detected',
+      subjectExternalId: 'samira',
+      augmentExternalIds: ['1194'],
+      itemExternalIds: ['3006', '6672'],
     },
   });
   await pool.end();
