@@ -1,10 +1,13 @@
-name: Backend production foundation
+name: Sprint 2A quality gate
 
 on:
   workflow_dispatch:
   pull_request:
     paths:
       - "backend/**"
+      - "package.json"
+      - "package-lock.json"
+      - "README.md"
       - ".github/workflows/backend-production-foundation.yml"
       - "docs/adr/**"
       - "docs/superpowers/**"
@@ -13,13 +16,13 @@ permissions:
   contents: read
 
 concurrency:
-  group: backend-production-foundation-${{ github.ref }}
+  group: sprint-2a-quality-gate-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 40
     services:
       postgres:
         image: postgres:17
@@ -50,26 +53,94 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "22.13.0"
           cache: npm
-          cache-dependency-path: backend/package-lock.json
+          cache-dependency-path: |
+            package-lock.json
+            backend/package-lock.json
+
+      - name: Root orchestration and runbook contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { readFile } from "node:fs/promises";
+
+          const rootPackage = JSON.parse(await readFile("package.json", "utf8"));
+          const expectedScripts = {
+            "backend:typecheck": "npm --prefix backend run typecheck",
+            "backend:test": "npm --prefix backend test",
+            "backend:build": "npm --prefix backend run build",
+          };
+          for (const [name, command] of Object.entries(expectedScripts)) {
+            if (rootPackage.scripts?.[name] !== command) {
+              throw new Error(`missing root orchestration script ${name}`);
+            }
+          }
+
+          const runbook = await readFile("backend/README.md", "utf8");
+          for (const contract of [
+            "PostgreSQL 17",
+            "Redis 7",
+            "TEST_DATABASE_URL",
+            "TEST_REDIS_URL",
+            "reference_only",
+            "retryable_failed",
+            "No AI",
+            "No publication",
+            "No production credentials",
+            "No deployment",
+          ]) {
+            if (!runbook.includes(contract)) {
+              throw new Error(`backend runbook is missing contract: ${contract}`);
+            }
+          }
+          NODE
+
+      - name: Install frontend dependencies
+        run: npm ci --cache /tmp/aram-root-npm-cache
+
       - name: Install backend dependencies
-        run: npm --prefix backend ci
+        run: npm --prefix backend ci --cache /tmp/aram-backend-npm-cache
+
+      - name: Validate community data
+        run: npm run validate:community
+
+      - name: Frontend lint
+        run: npm run lint
+
+      - name: Frontend tests
+        run: npm test
+
+      - name: Canonical frontend build
+        run: npm run build
+
       - name: Backend typecheck
-        run: npm --prefix backend run typecheck
+        run: npm run backend:typecheck
+
       - name: Backend tests
-        run: npm --prefix backend test
+        run: npm run backend:test
+
       - name: Backend build
-        run: npm --prefix backend run build
+        run: npm run backend:build
+
+      - name: Repository cleanliness
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          test -z "$(git status --short)"
+
       - name: Deployment guard
         shell: bash
         run: |
           set -euo pipefail
           workflow=".github/workflows/backend-production-foundation.yml"
-          executable="$RUNNER_TEMP/backend-workflow-before-guard.yml"
+          executable="$RUNNER_TEMP/sprint-2a-workflow-before-guard.yml"
           sed '/- name: Deployment guard/,$d' "$workflow" > "$executable"
           ! grep -Eq '(contents|packages|pages|id-token):[[:space:]]*write' "$workflow"
           ! grep -Eq 'git push|wrangler[[:space:]]+deploy|npm run deploy|actions/deploy-pages' "$executable"
