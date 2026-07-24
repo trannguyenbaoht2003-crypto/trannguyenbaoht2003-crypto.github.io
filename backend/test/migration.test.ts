@@ -14,9 +14,13 @@ function testDatabaseUrl(): string {
 }
 
 const expectedTables = [
+  'active_catalog_revisions',
   'active_source_policies',
   'audit_events',
+  'catalog_lifecycle_events',
+  'catalog_revision_seals',
   'catalog_revisions',
+  'catalog_validation_results',
   'compatibility_rules',
   'game_entities',
   'game_entity_revisions',
