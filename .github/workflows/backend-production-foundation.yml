@@ -151,7 +151,7 @@ jobs:
         run: |
           set -euo pipefail
           workflow=".github/workflows/backend-production-foundation.yml"
-          executable="$RUNNER_TEMP/sprint-2a-workflow-before-guard.yml"
+          executable="$RUNNER_TEMP/sprint-2b-catalog-authority-before-guard.yml"
           sed '/- name: Deployment guard/,$d' "$workflow" > "$executable"
           ! grep -Eq '(contents|packages|pages|id-token):[[:space:]]*write' "$workflow"
           ! grep -Eq 'git push|wrangler[[:space:]]+deploy|npm run deploy|actions/deploy-pages' "$executable"
