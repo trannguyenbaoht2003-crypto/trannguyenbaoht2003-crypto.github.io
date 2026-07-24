@@ -116,8 +116,8 @@ jobs:
       - name: Frontend tests
         run: npm test
 
-      - name: Canonical frontend build
-        run: npm run build
+      - name: Canonical frontend Pages build
+        run: npm run build:pages
 
       - name: Backend typecheck
         run: npm run backend:typecheck
