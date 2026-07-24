@@ -219,7 +219,7 @@ It also requires a clean repository after generated-output checks and scans the 
 
 - No Evidence.
 - No AI.
-- No Publication.
+- No Publication. No publication command or dependency.
 - No production credentials.
 - No deployment.
 - No merge.
