@@ -1,4 +1,4 @@
-import type { Pool } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 
 import type {
   CatalogSelectionReasonCode,
@@ -60,7 +60,7 @@ function selectedByType(
 }
 
 export async function validateCatalogSelection(
-  pool: Pool,
+  pool: Pool | PoolClient,
   input: CatalogSelectionInput,
 ): Promise<CatalogSelectionResult> {
   const activeResult = await pool.query<ActiveCatalogRow>(
