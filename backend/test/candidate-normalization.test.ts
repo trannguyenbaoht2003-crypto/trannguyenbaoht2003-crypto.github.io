@@ -48,6 +48,33 @@ test('duplicate and empty identifiers fail with stable codes', () => {
   );
 });
 
+test('snapshot boundary rejects additional or oversized input', () => {
+  assert.throws(
+    () => normalizeObservationSnapshot({
+      ...snapshot(),
+      sourceHtml: '<p>not structured game identity</p>',
+    }),
+    /NORMALIZATION_SCHEMA_UNSUPPORTED/,
+  );
+  assert.throws(
+    () => normalizeObservationSnapshot({
+      ...snapshot(),
+      subjectExternalId: 's'.repeat(129),
+    }),
+    /NORMALIZATION_SCHEMA_UNSUPPORTED/,
+  );
+  assert.throws(
+    () => normalizeObservationSnapshot({
+      ...snapshot(),
+      itemExternalIds: Array.from(
+        { length: 65 },
+        (_value, index) => `item-${index}`,
+      ),
+    }),
+    /NORMALIZATION_SCHEMA_UNSUPPORTED/,
+  );
+});
+
 test('origin and source-adjacent fields do not affect fingerprint', () => {
   const collector = normalizeObservationSnapshot(snapshot());
   const ai = normalizeObservationSnapshot({
