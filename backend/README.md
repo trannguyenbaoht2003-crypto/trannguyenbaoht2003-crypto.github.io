@@ -144,6 +144,12 @@ external IDs. The runtime validator trims IDs, rejects empty or duplicate
 IDs, and sorts augment and item selections by code-point order before hashing.
 It does not fetch, infer, or parse external source content.
 
+The aggregate wrapper may contain only `normalizationSnapshot`, and the
+snapshot may contain only those seven declared fields. Each identifier is at
+most 128 characters and each augment/item list has at most 64 entries.
+Additional fields or oversized values fail before idempotency hashing or
+storage.
+
 In operational terms, reference_only cannot supply a stored aggregate snapshot.
 Only `aggregate_only` or `blob_allowed` policy can retain the structured
 snapshot. Missing metadata fails with `NORMALIZATION_SNAPSHOT_UNAVAILABLE`;
@@ -167,6 +173,11 @@ active catalog revision. `CandidateRevision` pins the catalog revision, while
 the Candidate does not. The same fingerprint under the same catalog reuses
 the revision; the same fingerprint after a catalog refresh creates the next
 immutable revision on the same Candidate.
+
+PostgreSQL composite foreign keys require every normalized observation and
+CandidateRevision to use a catalog owned by the same patch. A provenance
+insert guard also requires its revision and normalized observation to share
+the catalog revision, normalized signature, and canonical payload.
 
 ### Provenance chain
 
