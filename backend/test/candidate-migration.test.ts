@@ -1,0 +1,218 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+
+import type { Pool } from 'pg';
+
+import { importCatalogRevision } from '../src/modules/catalog/import-catalog-revision.js';
+import {
+  CATALOG_IDS,
+  seedCatalogPrerequisites,
+  validCatalogSnapshot,
+} from './helpers/catalog.js';
+import { resetDatabase } from './helpers/database.js';
+
+const IDS = {
+  candidateId: '61000000-0000-4000-8000-000000000001',
+  candidateRevisionId: '61000000-0000-4000-8000-000000000002',
+  normalizedObservationId: '61000000-0000-4000-8000-000000000003',
+  provenanceId: '61000000-0000-4000-8000-000000000004',
+  rawObservationId: '61000000-0000-4000-8000-000000000005',
+  secondCatalogRevisionId: '61000000-0000-4000-8000-000000000006',
+  secondNormalizedObservationId: '61000000-0000-4000-8000-000000000007',
+  secondRawObservationId: '61000000-0000-4000-8000-000000000008',
+} as const;
+
+const SIGNATURE = 'b'.repeat(64);
+const FINGERPRINT = 'c'.repeat(64);
+const PAYLOAD = {
+  schemaVersion: 1,
+  augmentExternalIds: ['1194'],
+  itemExternalIds: ['3006', '6672'],
+};
+
+async function importCatalog(
+  pool: Pool,
+  catalogRevisionId: string = CATALOG_IDS.catalogRevisionId,
+  revision = 1,
+): Promise<void> {
+  const snapshot = validCatalogSnapshot();
+  if (revision > 1) {
+    snapshot.source.sourceDigest = 'd'.repeat(64);
+    const samira = snapshot.entities.find((entity) => (
+      entity.entityType === 'champion' && entity.externalId === 'samira'
+    ));
+    assert.ok(samira);
+    samira.attributes = { ...samira.attributes, revision };
+  }
+  await importCatalogRevision(pool, {
+    actorId: 'candidate-migration',
+    catalogRevisionId,
+    correlationId: `candidate-migration-${revision}`,
+    idempotencyKey: `candidate-migration-${revision}`,
+    patchId: CATALOG_IDS.patchId,
+    revision,
+    sourceId: CATALOG_IDS.sourceId,
+    sourcePolicyRevisionId: CATALOG_IDS.sourcePolicyRevisionId,
+    snapshot,
+  });
+}
+
+async function insertRawObservation(
+  pool: Pool,
+  rawObservationId: string,
+): Promise<void> {
+  await pool.query(
+    `insert into raw_observations
+      (raw_observation_id, source_id, source_policy_revision_id,
+       adapter_version, content_hash, collected_at)
+     values ($1, $2, $3, 'candidate-migration-v1', $4, clock_timestamp())`,
+    [
+      rawObservationId,
+      CATALOG_IDS.sourceId,
+      CATALOG_IDS.sourcePolicyRevisionId,
+      `content-${rawObservationId}`,
+    ],
+  );
+}
+
+async function subjectRevisionId(
+  pool: Pool,
+  catalogRevisionId: string,
+): Promise<string> {
+  const result = await pool.query<{ game_entity_revision_id: string }>(
+    `select ger.game_entity_revision_id
+       from game_entity_revisions ger
+       join game_entities ge on ge.game_entity_id = ger.game_entity_id
+      where ger.catalog_revision_id = $1
+        and ge.entity_type = 'champion'
+        and ge.canonical_external_id = 'samira'`,
+    [catalogRevisionId],
+  );
+  const value = result.rows[0]?.game_entity_revision_id;
+  assert.ok(value);
+  return value;
+}
+
+async function seedRegistryGraph(pool: Pool): Promise<void> {
+  await seedCatalogPrerequisites(pool);
+  await importCatalog(pool);
+  await insertRawObservation(pool, IDS.rawObservationId);
+  const subjectRevision = await subjectRevisionId(
+    pool,
+    CATALOG_IDS.catalogRevisionId,
+  );
+  const subject = await pool.query<{ game_entity_id: string }>(
+    `select game_entity_id
+       from game_entity_revisions
+      where game_entity_revision_id = $1`,
+    [subjectRevision],
+  );
+  const subjectId = subject.rows[0]?.game_entity_id;
+  assert.ok(subjectId);
+
+  await pool.query(
+    `insert into normalized_observations
+      (normalized_observation_id, raw_observation_id, patch_id,
+       catalog_revision_id, game_mode_external_id,
+       subject_game_entity_revision_id, normalizer_version,
+       normalized_signature, canonical_payload)
+     values ($1, $2, $3, $4, 'aram_mayhem', $5,
+             'candidate-selection-v1', $6, $7::jsonb)`,
+    [
+      IDS.normalizedObservationId,
+      IDS.rawObservationId,
+      CATALOG_IDS.patchId,
+      CATALOG_IDS.catalogRevisionId,
+      subjectRevision,
+      SIGNATURE,
+      JSON.stringify(PAYLOAD),
+    ],
+  );
+  await pool.query(
+    `insert into candidates
+      (candidate_id, fingerprint, patch_id, game_mode_external_id,
+       subject_game_entity_id)
+     values ($1, $2, $3, 'aram_mayhem', $4)`,
+    [IDS.candidateId, FINGERPRINT, CATALOG_IDS.patchId, subjectId],
+  );
+  await pool.query(
+    `insert into candidate_revisions
+      (candidate_revision_id, candidate_id, revision,
+       catalog_revision_id, normalized_signature, canonical_payload)
+     values ($1, $2, 1, $3, $4, $5::jsonb)`,
+    [
+      IDS.candidateRevisionId,
+      IDS.candidateId,
+      CATALOG_IDS.catalogRevisionId,
+      SIGNATURE,
+      JSON.stringify(PAYLOAD),
+    ],
+  );
+  await pool.query(
+    `insert into candidate_provenance
+      (candidate_provenance_id, candidate_revision_id,
+       normalized_observation_id, origin)
+     values ($1, $2, $3, 'collector_detected')`,
+    [
+      IDS.provenanceId,
+      IDS.candidateRevisionId,
+      IDS.normalizedObservationId,
+    ],
+  );
+}
+
+test('candidate registry history rejects update and delete', async () => {
+  const pool = await resetDatabase();
+  await seedRegistryGraph(pool);
+
+  for (const table of [
+    'normalized_observations',
+    'candidates',
+    'candidate_revisions',
+    'candidate_provenance',
+  ]) {
+    await assert.rejects(
+      pool.query(`update ${table} set created_at = clock_timestamp()`),
+      /immutable/,
+    );
+    await assert.rejects(
+      pool.query(`delete from ${table}`),
+      /immutable/,
+    );
+  }
+  await pool.end();
+});
+
+test('normalized subject revision must belong to the pinned catalog', async () => {
+  const pool = await resetDatabase();
+  await seedRegistryGraph(pool);
+  await importCatalog(pool, IDS.secondCatalogRevisionId, 2);
+  await insertRawObservation(pool, IDS.secondRawObservationId);
+  const firstSubjectRevision = await subjectRevisionId(
+    pool,
+    CATALOG_IDS.catalogRevisionId,
+  );
+
+  await assert.rejects(
+    pool.query(
+      `insert into normalized_observations
+        (normalized_observation_id, raw_observation_id, patch_id,
+         catalog_revision_id, game_mode_external_id,
+         subject_game_entity_revision_id, normalizer_version,
+         normalized_signature, canonical_payload)
+       values ($1, $2, $3, $4, 'aram_mayhem', $5,
+               'candidate-selection-v1', $6, $7::jsonb)`,
+      [
+        IDS.secondNormalizedObservationId,
+        IDS.secondRawObservationId,
+        CATALOG_IDS.patchId,
+        IDS.secondCatalogRevisionId,
+        firstSubjectRevision,
+        SIGNATURE,
+        JSON.stringify(PAYLOAD),
+      ],
+    ),
+    /foreign key/,
+  );
+  await pool.end();
+});
