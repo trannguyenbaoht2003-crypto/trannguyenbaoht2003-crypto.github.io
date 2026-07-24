@@ -23,6 +23,11 @@ create table normalized_observations (
     references game_entity_revisions(
       game_entity_revision_id,
       catalog_revision_id
+    ),
+  foreign key (catalog_revision_id, patch_id)
+    references catalog_revisions(
+      catalog_revision_id,
+      patch_id
     )
 );
 
@@ -41,7 +46,8 @@ create table candidates (
   game_mode_external_id text not null
     check (game_mode_external_id = 'aram_mayhem'),
   subject_game_entity_id uuid not null references game_entities(game_entity_id),
-  created_at timestamptz not null default clock_timestamp()
+  created_at timestamptz not null default clock_timestamp(),
+  unique (candidate_id, patch_id)
 );
 
 create index candidates_subject_idx
@@ -49,8 +55,9 @@ create index candidates_subject_idx
 
 create table candidate_revisions (
   candidate_revision_id uuid primary key,
-  candidate_id uuid not null references candidates(candidate_id),
+  candidate_id uuid not null,
   revision integer not null check (revision > 0),
+  patch_id uuid not null,
   catalog_revision_id uuid not null
     references catalog_revision_seals(catalog_revision_id),
   normalized_signature text not null
@@ -59,7 +66,11 @@ create table candidate_revisions (
     check (jsonb_typeof(canonical_payload) = 'object'),
   created_at timestamptz not null default clock_timestamp(),
   unique (candidate_id, revision),
-  unique (candidate_id, catalog_revision_id, normalized_signature)
+  unique (candidate_id, catalog_revision_id, normalized_signature),
+  foreign key (candidate_id, patch_id)
+    references candidates(candidate_id, patch_id),
+  foreign key (catalog_revision_id, patch_id)
+    references catalog_revisions(catalog_revision_id, patch_id)
 );
 
 create index candidate_revisions_catalog_idx
@@ -85,6 +96,36 @@ create table candidate_provenance (
 
 create index candidate_provenance_revision_idx
   on candidate_provenance (candidate_revision_id, created_at);
+
+create or replace function enforce_candidate_provenance_graph()
+returns trigger
+language plpgsql
+as $$
+declare
+  graph_matches boolean;
+begin
+  select (
+           cr.catalog_revision_id = no.catalog_revision_id
+           and cr.normalized_signature = no.normalized_signature
+           and cr.canonical_payload = no.canonical_payload
+         )
+    into graph_matches
+    from candidate_revisions cr
+    join normalized_observations no
+      on no.normalized_observation_id = new.normalized_observation_id
+   where cr.candidate_revision_id = new.candidate_revision_id;
+
+  if graph_matches is distinct from true then
+    raise exception 'candidate provenance graph mismatch'
+      using errcode = '23514';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger candidate_provenance_graph_guard
+before insert on candidate_provenance
+for each row execute function enforce_candidate_provenance_graph();
 
 create trigger normalized_observations_immutable
 before update or delete on normalized_observations
