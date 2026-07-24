@@ -25,8 +25,7 @@ export async function registerStoredObservationInTransaction(
   const result = await client.query<StoredObservationRow>(
     `select aggregate_metadata
        from raw_observations
-      where raw_observation_id = $1
-      for key share`,
+      where raw_observation_id = $1`,
     [source.observationId],
   );
   const aggregateMetadata = result.rows[0]?.aggregate_metadata;
