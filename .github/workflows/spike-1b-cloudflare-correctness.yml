@@ -1,0 +1,108 @@
+name: Sprint 1B-A Cloudflare Correctness
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'spikes/backend-correctness/common/**'
+      - 'spikes/backend-correctness/platform-a-cloudflare/**'
+      - '.github/workflows/spike-1b-cloudflare-correctness.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  correctness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify locked Common Harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f spikes/backend-correctness/common/common-harness.test.mjs
+          node --test spikes/backend-correctness/common/common-harness.test.mjs
+
+      - name: Run Platform A full suite three times
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p spikes/backend-correctness/platform-a-cloudflare/evidence
+          for run in 1 2 3; do
+            echo "=== Platform A full run ${run}/3 ==="
+            node --test \
+              spikes/backend-correctness/platform-a-cloudflare/platform-a.test.mjs \
+              spikes/backend-correctness/platform-a-cloudflare/platform-a.correctness.test.mjs \
+              2>&1 | tee "spikes/backend-correctness/platform-a-cloudflare/evidence/full-run-${run}.log"
+          done
+
+      - name: Produce JUnit report
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test --test-reporter=junit \
+            spikes/backend-correctness/platform-a-cloudflare/platform-a.test.mjs \
+            spikes/backend-correctness/platform-a-cloudflare/platform-a.correctness.test.mjs \
+            > spikes/backend-correctness/platform-a-cloudflare/evidence/test-report.xml
+
+      - name: Generate evidence bundle
+        run: node spikes/backend-correctness/platform-a-cloudflare/generate-evidence.mjs
+
+      - name: Verify evidence contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence_dir=spikes/backend-correctness/platform-a-cloudflare/evidence
+          for file in \
+            run-manifest.json \
+            scenario-results.jsonl \
+            test-report.xml \
+            failure-injection.jsonl \
+            record-counts-before.json \
+            record-counts-after.json \
+            checksums-before.json \
+            checksums-after.json \
+            duplicate-effects.json \
+            audit-coverage.json \
+            outbox-ledger.json \
+            restore-report.json \
+            immutable-diff.json \
+            correctness-summary.md; do
+            test -s "${evidence_dir}/${file}"
+          done
+          test "$(wc -l < "${evidence_dir}/scenario-results.jsonl")" -eq 24
+          test "$(wc -l < "${evidence_dir}/failure-injection.jsonl")" -eq 12
+          grep -q -- '- Status: PASS' "${evidence_dir}/correctness-summary.md"
+
+      - name: Production safety guard
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          ! grep -RniE 'wrangler[[:space:]]+deploy|--remote|CLOUDFLARE_API_TOKEN|CLOUDFLARE_ACCOUNT_ID' \
+            spikes/backend-correctness/platform-a-cloudflare \
+            --exclude='*.log' \
+            --exclude-dir=evidence
+          permissions_block="$(sed -n '/^permissions:/,/^jobs:/p' .github/workflows/spike-1b-cloudflare-correctness.yml)"
+          echo "${permissions_block}" | grep -q 'contents: read'
+          ! echo "${permissions_block}" | grep -q 'write'
+
+      - name: Upload Platform A evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sprint-1ba-evidence-${{ github.sha }}
+          path: spikes/backend-correctness/platform-a-cloudflare/evidence
+          if-no-files-found: error
