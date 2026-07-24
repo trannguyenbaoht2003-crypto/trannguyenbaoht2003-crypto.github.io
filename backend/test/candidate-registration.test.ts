@@ -315,6 +315,38 @@ test('concurrent identical source observations converge without a unique failure
   await pool.end();
 });
 
+test('concurrent replay of one raw observation returns one registry effect', async () => {
+  const pool = await resetDatabase();
+  await seedActiveCatalog(pool);
+  await seedRawObservation(pool);
+
+  const [first, second] = await Promise.all([
+    registerNormalizedObservation(pool, registrationCommand()),
+    registerNormalizedObservation(pool, registrationCommand({
+      candidateId: SECOND_IDS.candidateId,
+      candidateRevisionId: SECOND_IDS.candidateRevisionId,
+      normalizedObservationId: SECOND_IDS.normalizedObservationId,
+      provenanceId: THIRD_IDS.provenanceId,
+    })),
+  ]);
+
+  assert.equal(first.candidateId, second.candidateId);
+  assert.equal(first.candidateRevisionId, second.candidateRevisionId);
+  assert.equal(
+    first.normalizedObservationId,
+    second.normalizedObservationId,
+  );
+  assert.deepEqual(await registryCounts(pool), {
+    audit: 1,
+    candidates: 1,
+    normalized: 1,
+    outbox: 1,
+    provenance: 1,
+    revisions: 1,
+  });
+  await pool.end();
+});
+
 test('same fingerprint under a new active catalog creates an immutable second revision', async () => {
   const pool = await resetDatabase();
   await seedActiveCatalog(pool);
