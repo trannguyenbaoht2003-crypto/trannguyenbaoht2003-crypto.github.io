@@ -106,29 +106,45 @@ test('same import idempotency key rejects a different payload', async () => {
   await pool.end();
 });
 
-test('failure after child rows rolls back every import side effect', async () => {
+test('seal conflict after child inserts rolls back the second revision', async () => {
   const pool = await resetDatabase();
   await seedCatalogPrerequisites(pool);
-  const beforeAudit = await tableCount(pool, 'audit_events');
-  const beforeOutbox = await tableCount(pool, 'outbox_events');
+  await importCatalogRevision(pool, importCommand());
+  const beforeConflict = {
+    audit: await tableCount(pool, 'audit_events'),
+    canonicalEntities: await tableCount(pool, 'game_entities'),
+    entityRevisions: await tableCount(pool, 'game_entity_revisions'),
+    idempotency: await tableCount(pool, 'idempotency_records'),
+    lifecycle: await tableCount(pool, 'catalog_lifecycle_events'),
+    outbox: await tableCount(pool, 'outbox_events'),
+    revisions: await tableCount(pool, 'catalog_revisions'),
+    rules: await tableCount(pool, 'compatibility_rules'),
+    seals: await tableCount(pool, 'catalog_revision_seals'),
+  };
+  const conflicting = importCommand();
+  conflicting.catalogRevisionId = '40000000-0000-4000-8000-000000000006';
+  conflicting.correlationId = 'catalog-import-correlation-2';
+  conflicting.idempotencyKey = 'catalog-import-2';
+  conflicting.revision = 2;
 
   await assert.rejects(
-    importCatalogRevision(pool, importCommand(), {
-      afterChildren: async () => {
-        throw new Error('injected-catalog-import-failure');
-      },
-    }),
-    /injected-catalog-import-failure/,
+    importCatalogRevision(pool, conflicting),
+    /CATALOG_CONTENT_ALREADY_IMPORTED/,
   );
 
-  assert.equal(await tableCount(pool, 'catalog_revisions'), 0);
-  assert.equal(await tableCount(pool, 'catalog_revision_seals'), 0);
-  assert.equal(await tableCount(pool, 'catalog_lifecycle_events'), 0);
-  assert.equal(await tableCount(pool, 'game_entities'), 0);
-  assert.equal(await tableCount(pool, 'game_entity_revisions'), 0);
-  assert.equal(await tableCount(pool, 'compatibility_rules'), 0);
-  assert.equal(await tableCount(pool, 'idempotency_records'), 0);
-  assert.equal(await tableCount(pool, 'audit_events'), beforeAudit);
-  assert.equal(await tableCount(pool, 'outbox_events'), beforeOutbox);
+  assert.deepEqual(
+    {
+      audit: await tableCount(pool, 'audit_events'),
+      canonicalEntities: await tableCount(pool, 'game_entities'),
+      entityRevisions: await tableCount(pool, 'game_entity_revisions'),
+      idempotency: await tableCount(pool, 'idempotency_records'),
+      lifecycle: await tableCount(pool, 'catalog_lifecycle_events'),
+      outbox: await tableCount(pool, 'outbox_events'),
+      revisions: await tableCount(pool, 'catalog_revisions'),
+      rules: await tableCount(pool, 'compatibility_rules'),
+      seals: await tableCount(pool, 'catalog_revision_seals'),
+    },
+    beforeConflict,
+  );
   await pool.end();
 });
