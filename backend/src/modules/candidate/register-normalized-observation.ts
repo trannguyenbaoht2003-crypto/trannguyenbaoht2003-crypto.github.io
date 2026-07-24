@@ -137,7 +137,7 @@ async function lockRawObservation(
     `select raw_observation_id
        from raw_observations
       where raw_observation_id = $1
-      for key share`,
+      for update`,
     [rawObservationId],
   );
   if (result.rowCount !== 1) {
@@ -301,12 +301,12 @@ export async function registerNormalizedObservationInTransaction(
   command: RegisterNormalizedObservationCommand,
 ): Promise<RegisterNormalizedObservationResult> {
   const normalized = normalizeObservationSnapshot(command.snapshot);
+  await lockRawObservation(client, command.rawObservationId);
   const replay = await loadReplay(client, command.rawObservationId);
   if (replay) {
     return replayResult(replay, command, normalized);
   }
 
-  await lockRawObservation(client, command.rawObservationId);
   const authority = await lockActiveCatalog(
     client,
     normalized.snapshot.patchKey,
