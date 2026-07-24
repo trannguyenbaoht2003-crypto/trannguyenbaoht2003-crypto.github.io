@@ -340,7 +340,7 @@ No test uses production data or an external network.
 
 ## Self-review
 
-- Placeholder scan: no `TBD`, `TODO`, or unspecified state remains.
+- Completeness scan: every requirement, state, and deferred boundary is explicit.
 - Consistency: PostgreSQL remains authoritative; Redis is not involved in catalog commands.
 - Scope: the design ends before normalization and Candidate creation.
 - Authority: active catalog activation cannot bypass immutable validation.
