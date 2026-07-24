@@ -7,7 +7,6 @@ import type {
   CandidateOrigin,
   ObservationNormalizationSnapshotV1,
 } from '../../src/modules/candidate/types.js';
-import { CATALOG_IDS } from './catalog.js';
 
 export const CANDIDATE_IDS = {
   candidateId: '62000000-0000-4000-8000-000000000001',
@@ -15,6 +14,11 @@ export const CANDIDATE_IDS = {
   normalizedObservationId: '62000000-0000-4000-8000-000000000003',
   provenanceId: '62000000-0000-4000-8000-000000000004',
   rawObservationId: '62000000-0000-4000-8000-000000000005',
+} as const;
+
+const CANDIDATE_SOURCE_IDS = {
+  sourceId: '63000000-0000-4000-8000-000000000001',
+  sourcePolicyRevisionId: '63000000-0000-4000-8000-000000000002',
 } as const;
 
 export function validNormalizationSnapshot(
@@ -37,6 +41,24 @@ export async function seedRawObservation(
   aggregateMetadata: Record<string, unknown> | null = null,
 ): Promise<void> {
   await pool.query(
+    `insert into sources (source_id, source_key, display_name)
+     values ($1, 'candidate-test-source', 'Candidate test source')
+     on conflict (source_id) do nothing`,
+    [CANDIDATE_SOURCE_IDS.sourceId],
+  );
+  await pool.query(
+    `insert into source_policy_revisions
+      (source_policy_revision_id, source_id, revision, storage_permission,
+       collector_enabled, reason, created_by)
+     values ($1, $2, 1, 'aggregate_only', true,
+             'candidate test aggregate', 'candidate-test')
+     on conflict (source_policy_revision_id) do nothing`,
+    [
+      CANDIDATE_SOURCE_IDS.sourcePolicyRevisionId,
+      CANDIDATE_SOURCE_IDS.sourceId,
+    ],
+  );
+  await pool.query(
     `insert into raw_observations
       (raw_observation_id, source_id, source_policy_revision_id,
        adapter_version, aggregate_metadata, content_hash, collected_at)
@@ -44,8 +66,8 @@ export async function seedRawObservation(
              clock_timestamp())`,
     [
       rawObservationId,
-      CATALOG_IDS.sourceId,
-      CATALOG_IDS.sourcePolicyRevisionId,
+      CANDIDATE_SOURCE_IDS.sourceId,
+      CANDIDATE_SOURCE_IDS.sourcePolicyRevisionId,
       aggregateMetadata === null ? null : JSON.stringify(aggregateMetadata),
       `candidate-content-${rawObservationId}`,
     ],
