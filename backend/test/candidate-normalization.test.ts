@@ -75,6 +75,16 @@ test('snapshot boundary rejects additional or oversized input', () => {
   );
 });
 
+test('sparse selection arrays are rejected before hashing', () => {
+  assert.throws(
+    () => normalizeObservationSnapshot({
+      ...snapshot(),
+      itemExternalIds: Array<string>(1),
+    }),
+    /NORMALIZATION_ENTITY_ID_REQUIRED/,
+  );
+});
+
 test('origin and source-adjacent fields do not affect fingerprint', () => {
   const collector = normalizeObservationSnapshot(snapshot());
   const ai = normalizeObservationSnapshot({
