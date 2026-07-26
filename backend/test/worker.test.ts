@@ -78,6 +78,9 @@ async function closeRedis(connection: Redis): Promise<void> {
 async function seedObservationEvent(
   database: Pool,
   storagePermission: 'aggregate_only' | 'reference_only' = 'aggregate_only',
+  aggregateMetadata: unknown = storagePermission === 'aggregate_only'
+    ? { normalizationSnapshot: {} }
+    : null,
 ) {
   const sourceId = randomUUID();
   const policyRevisionId = randomUUID();
@@ -96,9 +99,6 @@ async function seedObservationEvent(
      values ($1, $2, 1, $3, true, 'worker test', 'test')`,
     [policyRevisionId, sourceId, storagePermission],
   );
-  const aggregateMetadata = storagePermission === 'aggregate_only'
-    ? { normalizationSnapshot: {} }
-    : null;
   await database.query(
     `insert into raw_observations
       (raw_observation_id, source_id, source_policy_revision_id, adapter_version,
@@ -659,6 +659,60 @@ test('reference-only observation completes once as non-normalizable', async () =
   assert.deepEqual(attempts.rows, [
     { attempt_number: 1, status: 'not_normalizable' },
   ]);
+});
+
+test('aggregate-only observations without a top-level snapshot are non-normalizable', async () => {
+  pool = await resetDatabase();
+  const missingMetadata = await seedObservationEvent(
+    pool,
+    'aggregate_only',
+    null,
+  );
+  const missingSnapshot = await seedObservationEvent(
+    pool,
+    'aggregate_only',
+    { retainedAggregate: true },
+  );
+  const { events, queue, workerConnection } = await queueHarness();
+  let normalizeCalls = 0;
+  const worker = createNormalizationWorker({
+    connection: workerConnection,
+    normalizeObservation: async () => {
+      normalizeCalls += 1;
+    },
+    pool,
+  });
+  cleanups.push(async () => worker.close());
+
+  const jobs = await Promise.all([
+    queue.add('RawObservationIngested', missingMetadata.jobData, {
+      attempts: 2,
+      jobId: missingMetadata.eventId,
+    }),
+    queue.add('RawObservationIngested', missingSnapshot.jobData, {
+      attempts: 2,
+      jobId: missingSnapshot.eventId,
+    }),
+  ]);
+  const results = await Promise.all(
+    jobs.map((job) => job.waitUntilFinished(events, 5_000)),
+  );
+
+  assert.deepEqual(
+    results.map((result) => result.outcome),
+    ['not_normalizable', 'not_normalizable'],
+  );
+  assert.equal(normalizeCalls, 0);
+  assert.equal(await tableCount(pool, 'normalization_effects'), 0);
+  const attempts = await pool.query<{ status: string }>(
+    `select status
+       from worker_job_attempts
+      order by job_id`,
+  );
+  assert.deepEqual(
+    attempts.rows.map((row) => row.status),
+    ['not_normalizable', 'not_normalizable'],
+  );
 });
 
 test('normalization worker has no publication dependency', async () => {
