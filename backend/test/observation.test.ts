@@ -123,6 +123,28 @@ test('aggregate-only policy rejects metadata outside the V1 boundary', async () 
   await pool.end();
 });
 
+test('aggregate-only policy rejects sparse selections before storage', async () => {
+  const pool = await seedPolicy('aggregate_only');
+  const sparseItems = Array<string>(1);
+  await assert.rejects(
+    ingestObservation(pool, {
+      ...command(),
+      aggregateMetadata: {
+        normalizationSnapshot: {
+          ...command().aggregateMetadata.normalizationSnapshot,
+          itemExternalIds: sparseItems,
+        },
+      },
+    }),
+    /NORMALIZATION_ENTITY_ID_REQUIRED/,
+  );
+  assert.equal(await tableCount(pool, 'raw_observations'), 0);
+  assert.equal(await tableCount(pool, 'audit_events'), 0);
+  assert.equal(await tableCount(pool, 'outbox_events'), 0);
+  assert.equal(await tableCount(pool, 'idempotency_records'), 0);
+  await pool.end();
+});
+
 test('same idempotency key and payload replays without duplicate side effects', async () => {
   const pool = await seedPolicy('blob_allowed');
   const first = await ingestObservation(pool, command());
