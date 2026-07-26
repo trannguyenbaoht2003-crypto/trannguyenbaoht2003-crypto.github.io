@@ -2,6 +2,88 @@ alter table game_entity_revisions
   add constraint game_entity_revisions_revision_catalog_unique
   unique (game_entity_revision_id, catalog_revision_id);
 
+create or replace function is_candidate_selection_payload_v1(payload jsonb)
+returns boolean
+language plpgsql
+immutable
+strict
+as $$
+declare
+  actual_key_count integer;
+  distinct_selection_count integer;
+  selection jsonb;
+  selection_count integer;
+  selection_key text;
+begin
+  if jsonb_typeof(payload) is distinct from 'object' then
+    return false;
+  end if;
+  select count(*)::integer
+    into actual_key_count
+    from jsonb_object_keys(payload);
+  if (
+    actual_key_count <> 3
+    or not payload ?& array[
+      'schemaVersion',
+      'augmentExternalIds',
+      'itemExternalIds'
+    ]
+    or payload -> 'schemaVersion' is distinct from '1'::jsonb
+  ) then
+    return false;
+  end if;
+
+  foreach selection_key in array array[
+    'augmentExternalIds',
+    'itemExternalIds'
+  ]
+  loop
+    selection := payload -> selection_key;
+    if (
+      jsonb_typeof(selection) is distinct from 'array'
+      or jsonb_array_length(selection) > 64
+      or exists (
+        select 1
+          from jsonb_array_elements(selection) as entry(value)
+         where jsonb_typeof(value) is distinct from 'string'
+      )
+      or exists (
+        select 1
+          from jsonb_array_elements_text(selection) as entry(value)
+         where char_length(value) = 0
+            or char_length(value) > 128
+            or value <> btrim(value)
+      )
+    ) then
+      return false;
+    end if;
+
+    select count(*)::integer,
+           count(distinct value)::integer
+      into selection_count, distinct_selection_count
+      from jsonb_array_elements_text(selection) as entry(value);
+    if selection_count <> distinct_selection_count then
+      return false;
+    end if;
+    if exists (
+      select 1
+        from (
+          select value,
+                 lag(value) over (order by ordinality) as previous_value
+            from jsonb_array_elements_text(selection)
+                 with ordinality as entry(value, ordinality)
+        ) ordered
+       where previous_value is not null
+         and previous_value collate "C" >= value collate "C"
+    ) then
+      return false;
+    end if;
+  end loop;
+
+  return true;
+end;
+$$;
+
 create table normalized_observations (
   normalized_observation_id uuid primary key,
   raw_observation_id uuid not null unique
@@ -17,7 +99,8 @@ create table normalized_observations (
   normalized_signature text not null
     check (normalized_signature ~ '^[a-f0-9]{64}$'),
   canonical_payload jsonb not null
-    check (jsonb_typeof(canonical_payload) = 'object'),
+    constraint normalized_observations_payload_v1_check
+    check (is_candidate_selection_payload_v1(canonical_payload)),
   created_at timestamptz not null default clock_timestamp(),
   foreign key (subject_game_entity_revision_id, catalog_revision_id)
     references game_entity_revisions(
@@ -63,7 +146,8 @@ create table candidate_revisions (
   normalized_signature text not null
     check (normalized_signature ~ '^[a-f0-9]{64}$'),
   canonical_payload jsonb not null
-    check (jsonb_typeof(canonical_payload) = 'object'),
+    constraint candidate_revisions_payload_v1_check
+    check (is_candidate_selection_payload_v1(canonical_payload)),
   created_at timestamptz not null default clock_timestamp(),
   unique (candidate_id, revision),
   unique (candidate_id, catalog_revision_id, normalized_signature),
