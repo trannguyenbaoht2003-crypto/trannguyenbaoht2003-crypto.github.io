@@ -75,7 +75,10 @@ async function closeRedis(connection: Redis): Promise<void> {
   }
 }
 
-async function seedObservationEvent(database: Pool) {
+async function seedObservationEvent(
+  database: Pool,
+  storagePermission: 'aggregate_only' | 'reference_only' = 'aggregate_only',
+) {
   const sourceId = randomUUID();
   const policyRevisionId = randomUUID();
   const observationId = randomUUID();
@@ -90,15 +93,24 @@ async function seedObservationEvent(database: Pool) {
     `insert into source_policy_revisions
       (source_policy_revision_id, source_id, revision, storage_permission,
        collector_enabled, reason, created_by)
-     values ($1, $2, 1, 'reference_only', true, 'worker test', 'test')`,
-    [policyRevisionId, sourceId],
+     values ($1, $2, 1, $3, true, 'worker test', 'test')`,
+    [policyRevisionId, sourceId, storagePermission],
   );
+  const aggregateMetadata = storagePermission === 'aggregate_only'
+    ? { normalizationSnapshot: {} }
+    : null;
   await database.query(
     `insert into raw_observations
       (raw_observation_id, source_id, source_policy_revision_id, adapter_version,
-       content_hash, collected_at)
-     values ($1, $2, $3, 'test-v1', $4, clock_timestamp())`,
-    [observationId, sourceId, policyRevisionId, `hash-${observationId}`],
+       aggregate_metadata, content_hash, collected_at)
+     values ($1, $2, $3, 'test-v1', $4::jsonb, $5, clock_timestamp())`,
+    [
+      observationId,
+      sourceId,
+      policyRevisionId,
+      JSON.stringify(aggregateMetadata),
+      `hash-${observationId}`,
+    ],
   );
   await database.query(
     `insert into outbox_events
@@ -128,14 +140,17 @@ async function seedObservationEvent(database: Pool) {
   };
 }
 
-async function seedCandidateObservationEvent(database: Pool) {
+async function seedCandidateObservationEvent(
+  database: Pool,
+  aggregateMetadata: Record<string, unknown> = {
+    normalizationSnapshot: validNormalizationSnapshot(),
+  },
+) {
   await seedActiveCatalog(database);
   const observationId = randomUUID();
   const eventId = randomUUID();
   const correlationId = randomUUID();
-  await seedRawObservation(database, observationId, {
-    normalizationSnapshot: validNormalizationSnapshot(),
-  });
+  await seedRawObservation(database, observationId, aggregateMetadata);
   await database.query(
     `insert into outbox_events
       (outbox_event_id, aggregate_type, aggregate_id, event_type, payload,
@@ -451,6 +466,91 @@ test('candidate registration survives lost acknowledgement without duplicates', 
     attempts.rows.map((row) => row.status),
     ['succeeded', 'duplicate_noop'],
   );
+});
+
+test('stored observation handler rejects a noncanonical aggregate wrapper atomically', async () => {
+  pool = await resetDatabase();
+  const {
+    eventId,
+    jobData,
+  } = await seedCandidateObservationEvent(pool, {
+    normalizationSnapshot: validNormalizationSnapshot(),
+    retainedSourceText: 'must not enter Candidate history',
+  });
+  const { events, queue, workerConnection } = await queueHarness();
+  const worker = createNormalizationWorker({
+    connection: workerConnection,
+    normalizeObservation: registerStoredObservationInTransaction,
+    pool,
+  });
+  cleanups.push(async () => worker.close());
+
+  const job = await queue.add('RawObservationIngested', jobData, {
+    attempts: 1,
+    jobId: eventId,
+  });
+  await assert.rejects(
+    job.waitUntilFinished(events, 5_000),
+    /NORMALIZATION_SCHEMA_UNSUPPORTED/,
+  );
+  for (const table of [
+    'normalization_effects',
+    'normalized_observations',
+    'candidates',
+    'candidate_revisions',
+    'candidate_provenance',
+  ]) {
+    assert.equal(await tableCount(pool, table), 0);
+  }
+  const attempts = await pool.query<{ status: string }>(
+    `select status from worker_job_attempts order by attempt_number`,
+  );
+  assert.deepEqual(
+    attempts.rows.map((row) => row.status),
+    ['failed_retryable'],
+  );
+});
+
+test('reference-only observation completes once as non-normalizable', async () => {
+  pool = await resetDatabase();
+  const {
+    eventId,
+    jobData,
+    observationId,
+  } = await seedObservationEvent(pool, 'reference_only');
+  const { events, queue, workerConnection } = await queueHarness();
+  const worker = createNormalizationWorker({
+    connection: workerConnection,
+    normalizeObservation: registerStoredObservationInTransaction,
+    pool,
+  });
+  cleanups.push(async () => worker.close());
+
+  const job = await queue.add('RawObservationIngested', jobData, {
+    attempts: 3,
+    backoff: { delay: 10, type: 'fixed' },
+    jobId: eventId,
+  });
+  const result = await job.waitUntilFinished(events, 5_000);
+
+  assert.deepEqual(result, {
+    observationId,
+    outcome: 'not_normalizable',
+  });
+  assert.equal(await tableCount(pool, 'normalization_effects'), 0);
+  assert.equal(await tableCount(pool, 'normalized_observations'), 0);
+  assert.equal(await tableCount(pool, 'candidates'), 0);
+  const attempts = await pool.query<{
+    attempt_number: number;
+    status: string;
+  }>(
+    `select attempt_number, status
+       from worker_job_attempts
+      order by attempt_number`,
+  );
+  assert.deepEqual(attempts.rows, [
+    { attempt_number: 1, status: 'not_normalizable' },
+  ]);
 });
 
 test('normalization worker has no publication dependency', async () => {
