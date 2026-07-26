@@ -11,6 +11,7 @@ import type {
 
 const MAX_IDENTIFIER_LENGTH = 128;
 const MAX_SELECTIONS_PER_TYPE = 64;
+const CANONICAL_IDENTIFIER_PATTERN = /^[!-~]+$/u;
 const SNAPSHOT_KEYS = [
   'augmentExternalIds',
   'gameModeExternalId',
@@ -48,6 +49,9 @@ function requiredText(
     return fail(code);
   }
   if (normalized.length > MAX_IDENTIFIER_LENGTH) {
+    return fail('NORMALIZATION_SCHEMA_UNSUPPORTED');
+  }
+  if (!CANONICAL_IDENTIFIER_PATTERN.test(normalized)) {
     return fail('NORMALIZATION_SCHEMA_UNSUPPORTED');
   }
   return normalized;
