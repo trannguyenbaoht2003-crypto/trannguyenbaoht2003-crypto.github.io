@@ -147,13 +147,21 @@ It does not fetch, infer, or parse external source content.
 The aggregate wrapper may contain only `normalizationSnapshot`, and the
 snapshot may contain only those seven declared fields. Each identifier is at
 most 128 characters and each augment/item list has at most 64 entries.
-Additional fields or oversized values fail before idempotency hashing or
-storage.
+Sparse JavaScript arrays, additional fields, or oversized values fail before
+idempotency hashing or storage. Both immutable payload columns also use the
+PostgreSQL `is_candidate_selection_payload_v1` check, which enforces the exact
+three-key V1 canonical payload, bounds, uniqueness, and code-point ordering
+even when application validation is bypassed.
 
-In operational terms, reference_only cannot supply a stored aggregate snapshot.
+In operational terms, `reference_only` cannot supply a stored aggregate snapshot.
 Only `aggregate_only` or `blob_allowed` policy can retain the structured
-snapshot. Missing metadata fails with `NORMALIZATION_SNAPSHOT_UNAVAILABLE`;
-malformed input fails through stable normalization reason codes.
+snapshot. The worker treats a policy that cannot retain the snapshot, or an
+authoritative observation without that snapshot, as terminal
+`not_normalizable`: it records one attempt before reserving a normalization
+effect, never calls the registrar, and does not retry. A callable observation
+whose metadata disappears still fails with
+`NORMALIZATION_SNAPSHOT_UNAVAILABLE`; malformed input fails through stable
+normalization reason codes.
 
 ### Fingerprint exclusions
 
@@ -176,8 +184,9 @@ immutable revision on the same Candidate.
 
 PostgreSQL composite foreign keys require every normalized observation and
 CandidateRevision to use a catalog owned by the same patch. A provenance
-insert guard also requires its revision and normalized observation to share
-the catalog revision, normalized signature, and canonical payload.
+insert guard also requires the Candidate, CandidateRevision, and normalized
+observation to share subject, patch, mode, catalog revision, normalized
+signature, and canonical payload.
 
 ### Provenance chain
 
@@ -196,6 +205,11 @@ The normalization worker reloads observation ID and correlation ID from the
 PostgreSQL outbox event and ignores source fields in the Redis payload. Its
 normalization reservation, normalized observation, Candidate,
 CandidateRevision, provenance, audit, and outbox writes share one transaction.
+Patch lifecycle writers lock the Patch row `FOR UPDATE`; candidate
+registration first locks that row `FOR SHARE` in its own statement, then reads
+the latest lifecycle event and locks the active-catalog pointer. This ordering
+prevents a withdrawal append from racing between lifecycle validation and
+Candidate creation.
 
 - Scenario S1: an injected failure before commit rolls back every domain,
   audit, outbox, and normalization-effect row; retry can succeed once.
