@@ -11,10 +11,11 @@ Candidate history with append-only provenance.
 
 **Architecture:** A pure normalizer canonicalizes the bounded V1 selection and
 derives a source-independent fingerprint. A PostgreSQL transaction locks the
-active catalog pointer, validates the selection, writes the normalized
-observation, canonical Candidate, catalog-pinned CandidateRevision,
-provenance, audit, and outbox, and shares the normalization worker's existing
-transaction so retries cannot create partial or duplicate effects.
+Patch lifecycle boundary and active catalog pointer, validates the selection,
+writes the normalized observation, canonical Candidate, catalog-pinned
+CandidateRevision, provenance, audit, and outbox, and shares the normalization
+worker's existing transaction so retries cannot create partial or duplicate
+effects.
 
 **Tech Stack:** Node.js 22.13+, TypeScript 5.9 strict, PostgreSQL 17,
 BullMQ 5, Redis 7, Node test runner.
@@ -239,8 +240,9 @@ const compareText = (left: string, right: string): number => (
 
 Reject duplicates after trimming. Require exactly the seven V1 snapshot keys
 and a one-key aggregate wrapper, cap identifiers at 128 characters, and cap
-each selection array at 64 entries. Compute `normalizedSignature` only from
-the canonical selection payload. Implement `fingerprintCandidate` by
+each selection array at 64 entries. Materialize and validate every array index
+so sparse arrays cannot bypass the validator. Compute `normalizedSignature`
+only from the canonical selection payload. Implement `fingerprintCandidate` by
 explicitly constructing:
 
 ```ts
@@ -308,7 +310,10 @@ Seed a normalized row whose subject revision belongs to another catalog and
 assert the insert is rejected by the composite foreign key.
 Also reject a catalog from another patch, a CandidateRevision whose patch
 does not own both Candidate and catalog, and a provenance link whose revision
-and observation differ by catalog, signature, or canonical payload.
+and observation differ by Candidate subject, patch, mode, catalog, signature,
+or canonical payload. Direct SQL must also fail for a payload with the wrong
+keys/version, empty or overlong IDs, more than 64 entries, duplicates, or
+non-canonical ordering.
 
 - [ ] **Step 2: Run RED**
 
@@ -415,8 +420,10 @@ Add indexes for revision and provenance lookup, then attach
 `reject_immutable_change()` triggers to all four tables.
 Add patch/catalog composite foreign keys to normalized observations and
 CandidateRevisions, store `patch_id` on CandidateRevision, and add a
-provenance insert trigger that verifies catalog, signature, and canonical
-payload equality across the immutable graph.
+strict immutable `is_candidate_selection_payload_v1(jsonb)` check to both
+payload columns. Add a provenance insert trigger that verifies Candidate
+subject, patch, mode, catalog, signature, and canonical payload equality
+across the immutable graph.
 
 - [ ] **Step 4: Run GREEN**
 
@@ -519,7 +526,10 @@ Implement the ordered transaction from the design:
 1. normalize before opening the public transaction;
 2. exclusively lock the raw observation;
 3. query the normalized observation for replay after acquiring the lock;
-4. resolve active patch/catalog and `FOR SHARE OF acr`;
+4. lock the Patch row `FOR SHARE` in a standalone statement, then read the
+   latest lifecycle event and active catalog in a fresh statement with
+   `FOR SHARE OF acr`; Patch lifecycle writers first lock that Patch row
+   `FOR UPDATE`;
 5. call `validateCatalogSelection(client, ...)`;
 6. resolve subject entity and revision;
 7. insert normalized observation;
@@ -673,6 +683,9 @@ Update existing callbacks to accept `(client, source)` and assert:
 - retry succeeds once;
 - lost acknowledgement produces `duplicate_noop` and does not duplicate any
   Candidate Registry row.
+- a `reference_only`, prohibited, or snapshot-less authoritative observation
+  returns terminal `not_normalizable`, records one attempt, does not invoke
+  the callback, does not reserve a normalization effect, and is not retried.
 
 - [ ] **Step 2: Run RED**
 
@@ -690,19 +703,22 @@ changing prohibited-policy atomicity.
 
 - [ ] **Step 4: Implement the stored-observation handler**
 
-Load `aggregate_metadata -> 'normalizationSnapshot'` from the immutable raw
-observation. Reject a missing value with
-`NORMALIZATION_SNAPSHOT_UNAVAILABLE`. Pass the bounded unknown value to Task
-1 runtime validation, generate row IDs with `randomUUID()`, use actor
+Load the full immutable `aggregate_metadata` wrapper and validate that it is
+exactly `{ normalizationSnapshot }` before extracting the snapshot. For a
+callable observation, reject a value that disappears with
+`NORMALIZATION_SNAPSHOT_UNAVAILABLE`. Pass the bounded unknown value to Task 1
+runtime validation, generate row IDs with `randomUUID()`, use actor
 `normalization-worker`, and retain the PostgreSQL outbox correlation ID.
 
 - [ ] **Step 5: Refactor the worker transaction**
 
 Change the authoritative outbox query to return aggregate ID, type, event
-type, payload observation ID, and correlation ID. Pass its context and the
-same transaction client to the callback after the normalization reservation.
-Do not use any Redis payload field beyond validating `job.id` against
-`outboxEventId`.
+type, payload observation ID, correlation ID, and authoritative Source Policy
+normalizability. Record terminal `not_normalizable` before the normalization
+reservation when the policy or stored snapshot cannot support normalization.
+Otherwise pass its context and the same transaction client to the callback
+after the reservation. Do not use any Redis payload field beyond validating
+`job.id` against `outboxEventId`.
 
 - [ ] **Step 6: Wire runtime**
 
@@ -792,7 +808,15 @@ Verify:
 - all new history tables have immutability triggers;
 - normalized subject uses an exact catalog composite foreign key;
 - active catalog and Candidate row locks cover races;
+- Patch lifecycle append and registration use the shared/exclusive Patch-row
+  lock protocol;
 - worker uses PostgreSQL source context and one transaction;
+- runtime and stored aggregate wrappers are closed, sparse arrays fail, and
+  both payload columns enforce canonical V1 at the database boundary;
+- provenance validates Candidate subject, patch, mode, catalog, signature,
+  and payload as one graph;
+- non-normalizable observations terminate once without callback, effect
+  reservation, or retry;
 - every successful T3 mutation writes audit/outbox;
 - dispatcher still allowlists only `RawObservationIngested`;
 - no network adapter, frontend data edit, Evidence/AI/Publication path,
@@ -835,3 +859,25 @@ git commit -m "docs(3a): document candidate registry operations"
   Publication, AI, external fetching, infrastructure, merge, or deployment.
 - Verification: no PASS claim is permitted until the full Actions gate and
   deploy dry-run are read at the exact committed SHA.
+
+## Round-two independent-review hardening
+
+The independent review found six correctness gaps that were reproduced with
+new RED contracts before production changes:
+
+- concurrent Patch lifecycle append could race candidate registration;
+- provenance did not prove that Candidate subject matched the normalized
+  subject;
+- the stored aggregate loader accepted wrapper siblings;
+- sparse JavaScript arrays bypassed per-element validation;
+- PostgreSQL accepted object-shaped but non-canonical payloads;
+- `reference_only` observations entered deterministic retry despite having no
+  permitted normalization snapshot.
+
+Each gap now has a focused regression contract and the corresponding minimal
+fix: the Patch shared/exclusive lock protocol, a complete provenance graph
+trigger, full-wrapper validation, dense array materialization, strict
+`is_candidate_selection_payload_v1` checks on both immutable payload columns,
+and terminal `not_normalizable` worker handling before effect reservation.
+The final PASS remains conditional on independent re-review plus quality and
+deploy-dry-run workflows succeeding at the exact documentation head.
