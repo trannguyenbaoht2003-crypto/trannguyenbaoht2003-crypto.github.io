@@ -137,14 +137,17 @@ signals, moderation state, or publication copy.
 The runtime shape is closed: the snapshot must contain exactly the seven
 declared properties, and the aggregate wrapper must contain only
 `normalizationSnapshot`. Every trimmed identifier is limited to 128
-characters and each augment/item list is limited to 64 entries. Input outside
-those bounds, including sparse arrays with missing indices, fails with
-`NORMALIZATION_SCHEMA_UNSUPPORTED` before it is hashed or stored.
+characters, must contain only printable non-space ASCII bytes `!` through
+`~`, and each augment/item list is limited to 64 entries. Shape, version,
+grammar, and bound failures use `NORMALIZATION_SCHEMA_UNSUPPORTED`; a sparse
+array materializes its missing index and fails with
+`NORMALIZATION_ENTITY_ID_REQUIRED` before hashing or storage.
 
 The pure normalizer:
 
 1. requires schema version `1` and mode `aram_mayhem`;
-2. trims every textual identifier and rejects an empty value;
+2. trims every textual identifier, rejects an empty value, then requires the
+   canonical value to match printable non-space ASCII `[!-~]+`;
 3. rejects duplicate augment or item IDs rather than silently collapsing
    malformed input;
 4. sorts augment and item IDs by code-point order because Sprint 3A models
@@ -224,8 +227,10 @@ catalog from another patch even if application validation is bypassed.
 The canonical payload is protected by
 `is_candidate_selection_payload_v1(jsonb)`, which requires exactly
 `schemaVersion`, `augmentExternalIds`, and `itemExternalIds`; schema version
-1; at most 64 non-empty, trimmed identifiers of at most 128 characters in
-each array; no duplicates; and strict code-point ordering.
+1; at most 64 non-empty identifiers of at most 128 characters in each array;
+printable non-space ASCII `[!-~]+`; no duplicates; and strict C-collation
+ordering. Because the runtime uses the same ASCII grammar, its string length,
+equality, and ordering are identical to the database rules.
 
 ### `candidates`
 
@@ -359,6 +364,10 @@ PostgreSQL is authoritative for every race:
 - the Candidate row lock serializes CandidateRevision numbering;
 - unique normalized observation and provenance constraints prevent duplicate
   effects;
+- the worker locks the authoritative raw-observation row `FOR UPDATE` before
+  reserving a normalization effect; concurrent outbox deliveries for that raw
+  row serialize, and conflict on either event ID or raw-observation ID is a
+  `duplicate_noop`;
 - audit and outbox rows are written inside the same transaction;
 - any failure after the first insert rolls back normalized observation,
   Candidate, CandidateRevision, provenance, audit, outbox, and the worker's
@@ -392,6 +401,9 @@ The source context is reloaded from the immutable PostgreSQL outbox row; Redis
 cannot override any of its fields. The production handler reads a bounded
 `ObservationNormalizationSnapshotV1` from permitted structured observation
 metadata. Source-specific fetching/parsing remains outside this sprint.
+The same source query takes the raw-observation `FOR UPDATE` lock before the
+effect insert, so the registrar's later lock is re-entrant rather than a
+shared-to-exclusive upgrade.
 
 A `reference_only` policy, prohibited policy, or authoritative observation
 without a stored top-level normalization snapshot is terminal
@@ -453,8 +465,11 @@ All implementation is test-first.
 
 - equivalent array orders produce one signature;
 - duplicate IDs and empty IDs fail with stable reason codes;
-- additional fields, sparse arrays, identifiers over 128 characters, and
-  lists over 64 entries fail closed;
+- additional fields, sparse arrays, identifiers outside printable non-space
+  ASCII, identifiers over 128 characters, and lists over 64 entries fail
+  closed;
+- whitespace and Unicode cases prove that runtime canonical output and direct
+  SQL payload acceptance use the same V1 grammar;
 - source, origin, reference, adapter version, and timestamps cannot change a
   fingerprint;
 - patch, mode, subject, or semantic selection changes the fingerprint.
@@ -495,6 +510,8 @@ All implementation is test-first.
 - PostgreSQL, not the Redis payload, selects the raw observation;
 - callback failure rolls back the normalization reservation and registration;
 - lost acknowledgement retry is `duplicate_noop`;
+- concurrent deliveries for one raw observation produce one accepted effect
+  and one `duplicate_noop`, without deadlock or duplicate registry rows;
 - reference-only or snapshot-less observations return terminal
   `not_normalizable` without callback, retry, or normalization effect;
 - duplicate normalized observations, revisions, provenance, audit, outbox,
