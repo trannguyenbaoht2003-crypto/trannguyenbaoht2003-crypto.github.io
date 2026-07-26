@@ -141,8 +141,11 @@ Sprint 3A consumes a bounded `ObservationNormalizationSnapshotV1` from
 permitted `aggregate_metadata`. It accepts schema version 1, patch key,
 `aram_mayhem`, origin, champion external ID, augment external IDs, and item
 external IDs. The runtime validator trims IDs, rejects empty or duplicate
-IDs, and sorts augment and item selections by code-point order before hashing.
-It does not fetch, infer, or parse external source content.
+IDs, then requires the canonical value to contain only printable non-space
+ASCII bytes `!` through `~`. This makes the 128-character limit, duplicate
+comparison, and augment/item ordering identical to PostgreSQL C-collation
+semantics before hashing. It does not fetch, infer, or parse external source
+content.
 
 The aggregate wrapper may contain only `normalizationSnapshot`, and the
 snapshot may contain only those seven declared fields. Each identifier is at
@@ -150,8 +153,9 @@ most 128 characters and each augment/item list has at most 64 entries.
 Sparse JavaScript arrays, additional fields, or oversized values fail before
 idempotency hashing or storage. Both immutable payload columns also use the
 PostgreSQL `is_candidate_selection_payload_v1` check, which enforces the exact
-three-key V1 canonical payload, bounds, uniqueness, and code-point ordering
-even when application validation is bypassed.
+three-key V1 canonical payload, printable non-space ASCII grammar, bounds,
+uniqueness, and C-collation ordering even when application validation is
+bypassed.
 
 In operational terms, reference_only cannot supply a stored aggregate snapshot.
 Only `aggregate_only` or `blob_allowed` policy can retain the structured
@@ -205,6 +209,11 @@ The normalization worker reloads observation ID and correlation ID from the
 PostgreSQL outbox event and ignores source fields in the Redis payload. Its
 normalization reservation, normalized observation, Candidate,
 CandidateRevision, provenance, audit, and outbox writes share one transaction.
+It locks the authoritative raw-observation row `FOR UPDATE` while loading the
+source, before reserving `normalization_effects`. Concurrent deliveries for
+that raw observation therefore serialize; conflict on either outbox event ID
+or raw observation ID returns `duplicate_noop` without invoking the registrar
+again.
 Patch lifecycle writers lock the Patch row `FOR UPDATE`; candidate
 registration first locks that row `FOR SHARE` in its own statement, then reads
 the latest lifecycle event and locks the active-catalog pointer. This ordering
