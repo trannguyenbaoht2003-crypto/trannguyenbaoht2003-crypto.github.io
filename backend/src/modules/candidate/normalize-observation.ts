@@ -75,7 +75,7 @@ function normalizeEntityIds(value: unknown): string[] {
   ) {
     return fail('NORMALIZATION_SCHEMA_UNSUPPORTED');
   }
-  const normalized = value.map((entry) => (
+  const normalized = Array.from(value, (entry) => (
     requiredText(entry, 'NORMALIZATION_ENTITY_ID_REQUIRED')
   ));
   if (new Set(normalized).size !== normalized.length) {
