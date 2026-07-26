@@ -106,13 +106,22 @@ declare
 begin
   select (
            cr.catalog_revision_id = no.catalog_revision_id
+           and cr.patch_id = no.patch_id
+           and c.patch_id = no.patch_id
+           and c.game_mode_external_id = no.game_mode_external_id
+           and c.subject_game_entity_id = ger.game_entity_id
            and cr.normalized_signature = no.normalized_signature
            and cr.canonical_payload = no.canonical_payload
          )
     into graph_matches
     from candidate_revisions cr
+    join candidates c
+      on c.candidate_id = cr.candidate_id
     join normalized_observations no
       on no.normalized_observation_id = new.normalized_observation_id
+    join game_entity_revisions ger
+      on ger.game_entity_revision_id =
+         no.subject_game_entity_revision_id
    where cr.candidate_revision_id = new.candidate_revision_id;
 
   if graph_matches is distinct from true then
