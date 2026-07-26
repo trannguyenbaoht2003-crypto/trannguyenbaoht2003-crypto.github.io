@@ -153,7 +153,7 @@ PostgreSQL `is_candidate_selection_payload_v1` check, which enforces the exact
 three-key V1 canonical payload, bounds, uniqueness, and code-point ordering
 even when application validation is bypassed.
 
-In operational terms, `reference_only` cannot supply a stored aggregate snapshot.
+In operational terms, reference_only cannot supply a stored aggregate snapshot.
 Only `aggregate_only` or `blob_allowed` policy can retain the structured
 snapshot. The worker treats a policy that cannot retain the snapshot, or an
 authoritative observation without that snapshot, as terminal
