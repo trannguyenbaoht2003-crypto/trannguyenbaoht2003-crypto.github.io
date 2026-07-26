@@ -27,6 +27,16 @@ export async function registerPatchEvent(
        on conflict (patch_id) do nothing`,
       [command.patchId, command.patchKey, command.displayLabel],
     );
+    const patchLock = await client.query(
+      `select patch_id
+         from patches
+        where patch_id = $1
+        for update`,
+      [command.patchId],
+    );
+    if (patchLock.rowCount !== 1) {
+      throw new Error('PATCH_NOT_FOUND');
+    }
     await client.query(
       `insert into patch_lifecycle_events
         (patch_lifecycle_event_id, patch_id, lifecycle_state, reason,
