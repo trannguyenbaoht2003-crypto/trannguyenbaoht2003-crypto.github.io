@@ -85,6 +85,24 @@ test('sparse selection arrays are rejected before hashing', () => {
   );
 });
 
+test('canonical identifiers are trimmed printable non-space ASCII', () => {
+  const normalized = normalizeObservationSnapshot({
+    ...snapshot(),
+    itemExternalIds: ['\t3006\n'],
+  });
+  assert.deepEqual(normalized.payload.itemExternalIds, ['3006']);
+
+  for (const identifier of ['item 3006', 'é', '😀']) {
+    assert.throws(
+      () => normalizeObservationSnapshot({
+        ...snapshot(),
+        itemExternalIds: [identifier],
+      }),
+      /NORMALIZATION_SCHEMA_UNSUPPORTED/,
+    );
+  }
+});
+
 test('origin and source-adjacent fields do not affect fingerprint', () => {
   const collector = normalizeObservationSnapshot(snapshot());
   const ai = normalizeObservationSnapshot({
