@@ -2,6 +2,20 @@ alter table game_entity_revisions
   add constraint game_entity_revisions_revision_catalog_unique
   unique (game_entity_revision_id, catalog_revision_id);
 
+alter table worker_job_attempts
+  drop constraint worker_job_attempts_status_check;
+
+alter table worker_job_attempts
+  add constraint worker_job_attempts_status_check
+  check (
+    status in (
+      'succeeded',
+      'duplicate_noop',
+      'not_normalizable',
+      'failed_retryable'
+    )
+  );
+
 create or replace function is_candidate_selection_payload_v1(payload jsonb)
 returns boolean
 language plpgsql
