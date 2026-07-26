@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { setTimeout as delay } from 'node:timers/promises';
 
 import type { Pool } from 'pg';
 
@@ -8,7 +9,9 @@ import { importCatalogRevision } from '../src/modules/catalog/import-catalog-rev
 import { validateCatalogRevision } from '../src/modules/catalog/validate-catalog-revision.js';
 import {
   registerNormalizedObservation,
+  registerNormalizedObservationInTransaction,
 } from '../src/modules/candidate/register-normalized-observation.js';
+import { registerPatchEvent } from '../src/modules/patch/register-patch-event.js';
 import {
   CANDIDATE_IDS,
   registrationCommand,
@@ -41,6 +44,32 @@ const SECOND_CATALOG_IDS = {
   catalogRevisionId: '62000000-0000-4000-8000-000000000031',
   validationResultId: '62000000-0000-4000-8000-000000000032',
 } as const;
+
+async function waitForSettlementOrPatchLock(
+  pool: Pool,
+  settled: () => boolean,
+): Promise<'lock_wait' | 'settled'> {
+  const deadline = Date.now() + 5_000;
+  while (Date.now() < deadline) {
+    if (settled()) {
+      return 'settled';
+    }
+    const waiting = await pool.query<{ waiting: boolean }>(
+      `select exists (
+         select 1
+           from pg_stat_activity
+          where pid <> pg_backend_pid()
+            and wait_event_type = 'Lock'
+            and query ilike '%patches%'
+       ) as waiting`,
+    );
+    if (waiting.rows[0]?.waiting) {
+      return 'lock_wait';
+    }
+    await delay(10);
+  }
+  throw new Error('timed out waiting for patch lock state');
+}
 
 async function registryCounts(pool: Pool) {
   const candidateAudit = await pool.query<{ count: string }>(
@@ -395,4 +424,120 @@ test('same fingerprint under a new active catalog creates an immutable second re
   assert.equal(await tableCount(pool, 'candidates'), 1);
   assert.equal(await tableCount(pool, 'candidate_provenance'), 2);
   await pool.end();
+});
+
+test('registration holds the patch lifecycle lock until commit', async () => {
+  const pool = await resetDatabase();
+  await seedActiveCatalog(pool);
+  await seedRawObservation(pool);
+  const registrationClient = await pool.connect();
+  let transactionOpen = true;
+  let writerSettled = false;
+  let writer: Promise<unknown> | undefined;
+
+  try {
+    await registrationClient.query('begin');
+    await registerNormalizedObservationInTransaction(
+      registrationClient,
+      registrationCommand(),
+    );
+    writer = registerPatchEvent(pool, {
+      actorId: 'patch-race-writer',
+      correlationId: 'patch-race-registration-first',
+      displayLabel: '26.15',
+      eventId: '62000000-0000-4000-8000-000000000041',
+      lifecycleState: 'withdrawn',
+      occurredAt: new Date('2026-07-25T00:00:00Z'),
+      patchId: CATALOG_IDS.patchId,
+      patchKey: '26.15',
+      reason: 'registration-first lock test',
+    }).finally(() => {
+      writerSettled = true;
+    });
+
+    assert.equal(
+      await waitForSettlementOrPatchLock(pool, () => writerSettled),
+      'lock_wait',
+    );
+    await registrationClient.query('commit');
+    transactionOpen = false;
+    await writer;
+    assert.equal(await tableCount(pool, 'candidates'), 1);
+  } finally {
+    if (transactionOpen) {
+      await registrationClient.query('rollback');
+    }
+    await writer?.catch(() => undefined);
+    registrationClient.release();
+    await pool.end();
+  }
+});
+
+test('withdrawal committed ahead of registration fails closed', async () => {
+  const pool = await resetDatabase();
+  await seedActiveCatalog(pool);
+  await seedRawObservation(pool);
+  const lifecycleClient = await pool.connect();
+  let transactionOpen = true;
+  let registrationSettled = false;
+
+  try {
+    await lifecycleClient.query('begin');
+    await lifecycleClient.query(
+      `select patch_id
+         from patches
+        where patch_id = $1
+        for update`,
+      [CATALOG_IDS.patchId],
+    );
+    await lifecycleClient.query(
+      `insert into patch_lifecycle_events
+        (patch_lifecycle_event_id, patch_id, lifecycle_state, reason,
+         actor_id, correlation_id, occurred_at)
+       values ($1, $2, 'withdrawn', 'withdrawal-first lock test',
+               'patch-race-writer', 'patch-race-withdrawal-first', $3)`,
+      [
+        '62000000-0000-4000-8000-000000000042',
+        CATALOG_IDS.patchId,
+        new Date('2026-07-25T00:00:00Z'),
+      ],
+    );
+
+    const registration = registerNormalizedObservation(
+      pool,
+      registrationCommand(),
+    ).then(
+      (value) => ({ status: 'fulfilled' as const, value }),
+      (error: unknown) => ({ error, status: 'rejected' as const }),
+    ).finally(() => {
+      registrationSettled = true;
+    });
+    assert.equal(
+      await waitForSettlementOrPatchLock(pool, () => registrationSettled),
+      'lock_wait',
+    );
+    await lifecycleClient.query('commit');
+    transactionOpen = false;
+
+    const outcome = await registration;
+    assert.equal(outcome.status, 'rejected');
+    assert.match(
+      String(outcome.status === 'rejected' ? outcome.error : ''),
+      /NORMALIZATION_ACTIVE_CATALOG_NOT_FOUND/,
+    );
+    assert.deepEqual(await registryCounts(pool), {
+      audit: 0,
+      candidates: 0,
+      normalized: 0,
+      outbox: 0,
+      provenance: 0,
+      revisions: 0,
+    });
+  } finally {
+    if (transactionOpen) {
+      await lifecycleClient.query('rollback');
+    }
+    lifecycleClient.release();
+    await pool.end();
+  }
 });
