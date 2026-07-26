@@ -66,14 +66,14 @@ begin
           from jsonb_array_elements_text(selection) as entry(value)
          where char_length(value) = 0
             or char_length(value) > 128
-            or value <> btrim(value)
+            or value collate "C" !~ '^[!-~]+$'
       )
     ) then
       return false;
     end if;
 
     select count(*)::integer,
-           count(distinct value)::integer
+           count(distinct (value collate "C"))::integer
       into selection_count, distinct_selection_count
       from jsonb_array_elements_text(selection) as entry(value);
     if selection_count <> distinct_selection_count then
