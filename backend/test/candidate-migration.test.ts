@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import test from 'node:test';
 
 import type { Pool } from 'pg';
@@ -9,7 +10,7 @@ import {
   seedCatalogPrerequisites,
   validCatalogSnapshot,
 } from './helpers/catalog.js';
-import { resetDatabase } from './helpers/database.js';
+import { resetDatabase, tableCount } from './helpers/database.js';
 
 const IDS = {
   candidateId: '61000000-0000-4000-8000-000000000001',
@@ -24,6 +25,12 @@ const IDS = {
   mismatchedCandidateRevisionId: '61000000-0000-4000-8000-000000000010',
   mismatchedProvenanceId: '61000000-0000-4000-8000-000000000011',
   wrongPatchId: '61000000-0000-4000-8000-000000000012',
+  subjectMismatchNormalizedObservationId:
+    '61000000-0000-4000-8000-000000000013',
+  subjectMismatchRawObservationId:
+    '61000000-0000-4000-8000-000000000014',
+  subjectMismatchProvenanceId:
+    '61000000-0000-4000-8000-000000000015',
 } as const;
 
 const SIGNATURE = 'b'.repeat(64);
@@ -40,6 +47,13 @@ async function importCatalog(
   revision = 1,
 ): Promise<void> {
   const snapshot = validCatalogSnapshot();
+  snapshot.entities.push({
+    entityType: 'champion',
+    externalId: 'jinx',
+    displayName: 'Jinx',
+    active: true,
+    attributes: {},
+  });
   if (revision > 1) {
     snapshot.source.sourceDigest = 'd'.repeat(64);
     const samira = snapshot.entities.find((entity) => (
@@ -82,6 +96,7 @@ async function insertRawObservation(
 async function subjectRevisionId(
   pool: Pool,
   catalogRevisionId: string,
+  subjectExternalId = 'samira',
 ): Promise<string> {
   const result = await pool.query<{ game_entity_revision_id: string }>(
     `select ger.game_entity_revision_id
@@ -89,8 +104,8 @@ async function subjectRevisionId(
        join game_entities ge on ge.game_entity_id = ger.game_entity_id
       where ger.catalog_revision_id = $1
         and ge.entity_type = 'champion'
-        and ge.canonical_external_id = 'samira'`,
-    [catalogRevisionId],
+        and ge.canonical_external_id = $2`,
+    [catalogRevisionId, subjectExternalId],
   );
   const value = result.rows[0]?.game_entity_revision_id;
   assert.ok(value);
@@ -353,6 +368,126 @@ test('provenance must link matching catalog signature and payload', async () => 
       ],
     ),
     /candidate provenance graph mismatch/,
+  );
+  await pool.end();
+});
+
+test('provenance subject must match the candidate subject', async () => {
+  const pool = await resetDatabase();
+  await seedRegistryGraph(pool);
+  await insertRawObservation(pool, IDS.subjectMismatchRawObservationId);
+  const jinxRevision = await subjectRevisionId(
+    pool,
+    CATALOG_IDS.catalogRevisionId,
+    'jinx',
+  );
+  await pool.query(
+    `insert into normalized_observations
+      (normalized_observation_id, raw_observation_id, patch_id,
+       catalog_revision_id, game_mode_external_id,
+       subject_game_entity_revision_id, normalizer_version,
+       normalized_signature, canonical_payload)
+     values ($1, $2, $3, $4, 'aram_mayhem', $5,
+             'candidate-selection-v1', $6, $7::jsonb)`,
+    [
+      IDS.subjectMismatchNormalizedObservationId,
+      IDS.subjectMismatchRawObservationId,
+      CATALOG_IDS.patchId,
+      CATALOG_IDS.catalogRevisionId,
+      jinxRevision,
+      SIGNATURE,
+      JSON.stringify(PAYLOAD),
+    ],
+  );
+
+  await assert.rejects(
+    pool.query(
+      `insert into candidate_provenance
+        (candidate_provenance_id, candidate_revision_id,
+         normalized_observation_id, origin)
+       values ($1, $2, $3, 'collector_detected')`,
+      [
+        IDS.subjectMismatchProvenanceId,
+        IDS.candidateRevisionId,
+        IDS.subjectMismatchNormalizedObservationId,
+      ],
+    ),
+    /candidate provenance graph mismatch/,
+  );
+  assert.equal(await tableCount(pool, 'candidate_provenance'), 1);
+  await pool.end();
+});
+
+test('candidate payload storage rejects noncanonical V1 shapes and bounds', async () => {
+  const pool = await resetDatabase();
+  await seedRegistryGraph(pool);
+  const subjectRevision = await subjectRevisionId(
+    pool,
+    CATALOG_IDS.catalogRevisionId,
+  );
+  const invalidPayloads = [
+    {
+      ...PAYLOAD,
+      retainedSourceText: 'must not enter immutable history',
+    },
+    {
+      ...PAYLOAD,
+      itemExternalIds: [3006],
+    },
+    {
+      ...PAYLOAD,
+      itemExternalIds: Array.from(
+        { length: 65 },
+        (_value, index) => `item-${index}`,
+      ),
+    },
+  ];
+
+  for (const payload of invalidPayloads) {
+    const rawObservationId = randomUUID();
+    await insertRawObservation(pool, rawObservationId);
+    await assert.rejects(
+      pool.query(
+        `insert into normalized_observations
+          (normalized_observation_id, raw_observation_id, patch_id,
+           catalog_revision_id, game_mode_external_id,
+           subject_game_entity_revision_id, normalizer_version,
+           normalized_signature, canonical_payload)
+         values ($1, $2, $3, $4, 'aram_mayhem', $5,
+                 'candidate-selection-v1', $6, $7::jsonb)`,
+        [
+          randomUUID(),
+          rawObservationId,
+          CATALOG_IDS.patchId,
+          CATALOG_IDS.catalogRevisionId,
+          subjectRevision,
+          'a'.repeat(64),
+          JSON.stringify(payload),
+        ],
+      ),
+      /check constraint|candidate selection payload/,
+    );
+  }
+
+  await assert.rejects(
+    pool.query(
+      `insert into candidate_revisions
+        (candidate_revision_id, candidate_id, revision, patch_id,
+         catalog_revision_id, normalized_signature, canonical_payload)
+       values ($1, $2, 2, $3, $4, $5, $6::jsonb)`,
+      [
+        randomUUID(),
+        IDS.candidateId,
+        CATALOG_IDS.patchId,
+        CATALOG_IDS.catalogRevisionId,
+        'f'.repeat(64),
+        JSON.stringify({
+          ...PAYLOAD,
+          retainedSourceText: 'must not enter immutable history',
+        }),
+      ],
+    ),
+    /check constraint|candidate selection payload/,
   );
   await pool.end();
 });
