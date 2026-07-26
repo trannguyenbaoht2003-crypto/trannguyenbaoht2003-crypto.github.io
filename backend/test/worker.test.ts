@@ -178,6 +178,38 @@ async function seedCandidateObservationEvent(
   };
 }
 
+async function seedDuplicateObservationEvent(
+  database: Pool,
+  observationId: string,
+) {
+  const eventId = randomUUID();
+  const correlationId = randomUUID();
+  await database.query(
+    `insert into outbox_events
+      (outbox_event_id, aggregate_type, aggregate_id, event_type, payload,
+       correlation_id, delivery_state, delivered_at)
+     values ($1, 'raw_observation', $2, 'RawObservationIngested', $3::jsonb,
+             $4, 'delivered', clock_timestamp())`,
+    [
+      eventId,
+      observationId,
+      JSON.stringify({ observationId }),
+      correlationId,
+    ],
+  );
+  return {
+    eventId,
+    jobData: {
+      aggregateId: randomUUID(),
+      aggregateType: 'tampered',
+      correlationId: randomUUID(),
+      eventType: 'RawObservationIngested',
+      outboxEventId: eventId,
+      payload: { observationId: randomUUID() },
+    } satisfies OutboxJobData,
+  };
+}
+
 test('worker success records one attempt and one normalization effect', async () => {
   pool = await resetDatabase();
   const {
@@ -465,6 +497,82 @@ test('candidate registration survives lost acknowledgement without duplicates', 
   assert.deepEqual(
     attempts.rows.map((row) => row.status),
     ['succeeded', 'duplicate_noop'],
+  );
+});
+
+test('concurrent deliveries for one raw observation serialize before effect reservation', async () => {
+  pool = await resetDatabase();
+  const first = await seedCandidateObservationEvent(pool);
+  const second = await seedDuplicateObservationEvent(
+    pool,
+    first.observationId,
+  );
+  const { events, queue, workerConnection } = await queueHarness();
+  const secondWorkerConnection = createWorkerConnection(redisUrl);
+  let normalizeCalls = 0;
+  const normalizeObservation = async (
+    client: PoolClient,
+    source: Parameters<typeof registerStoredObservationInTransaction>[1],
+  ) => {
+    normalizeCalls += 1;
+    return registerStoredObservationInTransaction(client, source);
+  };
+  const firstWorker = createNormalizationWorker({
+    connection: workerConnection,
+    normalizeObservation,
+    pool,
+  });
+  const secondWorker = createNormalizationWorker({
+    connection: secondWorkerConnection,
+    normalizeObservation,
+    pool,
+  });
+  cleanups.push(async () => {
+    await Promise.all([firstWorker.close(), secondWorker.close()]);
+    await closeRedis(secondWorkerConnection);
+  });
+  await Promise.all([
+    firstWorker.waitUntilReady(),
+    secondWorker.waitUntilReady(),
+  ]);
+
+  const [firstJob, secondJob] = await Promise.all([
+    queue.add('RawObservationIngested', first.jobData, {
+      attempts: 1,
+      jobId: first.eventId,
+    }),
+    queue.add('RawObservationIngested', second.jobData, {
+      attempts: 1,
+      jobId: second.eventId,
+    }),
+  ]);
+  const results = await Promise.all([
+    firstJob.waitUntilFinished(events, 5_000),
+    secondJob.waitUntilFinished(events, 5_000),
+  ]);
+
+  assert.deepEqual(
+    results.map((result) => result.outcome).sort(),
+    ['accepted_for_normalization', 'duplicate_noop'],
+  );
+  assert.equal(normalizeCalls, 1);
+  for (const table of [
+    'normalization_effects',
+    'normalized_observations',
+    'candidates',
+    'candidate_revisions',
+    'candidate_provenance',
+  ]) {
+    assert.equal(await tableCount(pool, table), 1);
+  }
+  const attempts = await pool.query<{ status: string }>(
+    `select status
+       from worker_job_attempts
+      order by status`,
+  );
+  assert.deepEqual(
+    attempts.rows.map((row) => row.status),
+    ['duplicate_noop', 'succeeded'],
   );
 });
 
