@@ -34,6 +34,9 @@ BullMQ 5, Redis 7, Node test runner.
 - Keep mode V1 fixed to `aram_mayhem`.
 - Treat augment and item arrays as semantic sets: reject duplicates and sort
   by code-point order.
+- After trimming, require every V1 identifier to use printable non-space
+  ASCII `[!-~]+`; this makes length, equality, and ordering identical in
+  TypeScript and PostgreSQL C collation.
 - Fingerprint only patch, mode, subject, and normalized signature; exclude
   source, origin, IDs, references, adapter versions, and timestamps.
 - CandidateRevision, not Candidate, pins the catalog revision.
@@ -241,8 +244,10 @@ const compareText = (left: string, right: string): number => (
 Reject duplicates after trimming. Require exactly the seven V1 snapshot keys
 and a one-key aggregate wrapper, cap identifiers at 128 characters, and cap
 each selection array at 64 entries. Materialize and validate every array index
-so sparse arrays cannot bypass the validator. Compute `normalizedSignature`
-only from the canonical selection payload. Implement `fingerprintCandidate` by
+so sparse arrays cannot bypass the validator. After trimming, reject any
+identifier outside printable non-space ASCII `[!-~]+`. Compute
+`normalizedSignature` only from the canonical selection payload. Implement
+`fingerprintCandidate` by
 explicitly constructing:
 
 ```ts
@@ -313,7 +318,8 @@ does not own both Candidate and catalog, and a provenance link whose revision
 and observation differ by Candidate subject, patch, mode, catalog, signature,
 or canonical payload. Direct SQL must also fail for a payload with the wrong
 keys/version, empty or overlong IDs, more than 64 entries, duplicates, or
-non-canonical ordering.
+non-canonical ordering. Cross-layer cases must include tabs, internal
+whitespace, non-ASCII BMP text, and non-BMP text.
 
 - [ ] **Step 2: Run RED**
 
@@ -421,7 +427,9 @@ Add indexes for revision and provenance lookup, then attach
 Add patch/catalog composite foreign keys to normalized observations and
 CandidateRevisions, store `patch_id` on CandidateRevision, and add a
 strict immutable `is_candidate_selection_payload_v1(jsonb)` check to both
-payload columns. Add a provenance insert trigger that verifies Candidate
+payload columns. The function requires printable non-space ASCII and applies
+C collation to duplicate and ordering checks so it matches the runtime
+grammar exactly. Add a provenance insert trigger that verifies Candidate
 subject, patch, mode, catalog, signature, and canonical payload equality
 across the immutable graph.
 
@@ -686,6 +694,8 @@ Update existing callbacks to accept `(client, source)` and assert:
 - a `reference_only`, prohibited, or snapshot-less authoritative observation
   returns terminal `not_normalizable`, records one attempt, does not invoke
   the callback, does not reserve a normalization effect, and is not retried.
+- two concurrent deliveries for the same raw observation return one accepted
+  result and one `duplicate_noop`, with one effect and one registry graph.
 
 - [ ] **Step 2: Run RED**
 
@@ -714,11 +724,13 @@ runtime validation, generate row IDs with `randomUUID()`, use actor
 
 Change the authoritative outbox query to return aggregate ID, type, event
 type, payload observation ID, correlation ID, and authoritative Source Policy
-normalizability. Record terminal `not_normalizable` before the normalization
-reservation when the policy or stored snapshot cannot support normalization.
-Otherwise pass its context and the same transaction client to the callback
-after the reservation. Do not use any Redis payload field beyond validating
-`job.id` against `outboxEventId`.
+normalizability, and lock the raw observation `FOR UPDATE` before any effect
+reservation. Record terminal `not_normalizable` before the reservation when
+the policy or stored snapshot cannot support normalization. Otherwise insert
+the effect with all-conflict no-op semantics, so either repeated event ID or
+repeated raw-observation ID returns `duplicate_noop`; only a newly reserved
+effect invokes the callback with the same transaction client. Do not use any
+Redis payload field beyond validating `job.id` against `outboxEventId`.
 
 - [ ] **Step 6: Wire runtime**
 
@@ -813,10 +825,14 @@ Verify:
 - worker uses PostgreSQL source context and one transaction;
 - runtime and stored aggregate wrappers are closed, sparse arrays fail, and
   both payload columns enforce canonical V1 at the database boundary;
+- the runtime and PostgreSQL share printable non-space ASCII identifier
+  grammar and C-equivalent length/equality/order semantics;
 - provenance validates Candidate subject, patch, mode, catalog, signature,
   and payload as one graph;
 - non-normalizable observations terminate once without callback, effect
   reservation, or retry;
+- the worker takes the raw-row exclusive lock before effect reservation and
+  concurrent duplicate deliveries converge to one effect;
 - every successful T3 mutation writes audit/outbox;
 - dispatcher still allowlists only `RawObservationIngested`;
 - no network adapter, frontend data edit, Evidence/AI/Publication path,
@@ -862,7 +878,7 @@ git commit -m "docs(3a): document candidate registry operations"
 
 ## Round-two independent-review hardening
 
-The independent review found six correctness gaps that were reproduced with
+The independent review found eight correctness gaps that were reproduced with
 new RED contracts before production changes:
 
 - concurrent Patch lifecycle append could race candidate registration;
@@ -872,12 +888,20 @@ new RED contracts before production changes:
 - sparse JavaScript arrays bypassed per-element validation;
 - PostgreSQL accepted object-shaped but non-canonical payloads;
 - `reference_only` observations entered deterministic retry despite having no
-  permitted normalization snapshot.
+  permitted normalization snapshot;
+- runtime and PostgreSQL used different whitespace, Unicode length, equality,
+  and ordering semantics for canonical identifiers;
+- the worker held `KEY SHARE` on a raw observation before later requesting
+  `FOR UPDATE`, allowing concurrent deliveries to deadlock or hit raw-effect
+  uniqueness as a retryable failure.
 
 Each gap now has a focused regression contract and the corresponding minimal
 fix: the Patch shared/exclusive lock protocol, a complete provenance graph
 trigger, full-wrapper validation, dense array materialization, strict
 `is_candidate_selection_payload_v1` checks on both immutable payload columns,
-and terminal `not_normalizable` worker handling before effect reservation.
+terminal `not_normalizable` worker handling before effect reservation, a
+shared printable non-space ASCII/C-collation identifier grammar, and
+raw-observation `FOR UPDATE` serialization before an all-conflict effect
+reservation.
 The final PASS remains conditional on independent re-review plus quality and
 deploy-dry-run workflows succeeding at the exact documentation head.
