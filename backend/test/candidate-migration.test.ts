@@ -441,6 +441,22 @@ test('candidate payload storage rejects noncanonical V1 shapes and bounds', asyn
         (_value, index) => `item-${index}`,
       ),
     },
+    {
+      ...PAYLOAD,
+      itemExternalIds: ['\t3006\t'],
+    },
+    {
+      ...PAYLOAD,
+      itemExternalIds: ['item 3006'],
+    },
+    {
+      ...PAYLOAD,
+      itemExternalIds: ['é'],
+    },
+    {
+      ...PAYLOAD,
+      itemExternalIds: ['😀'],
+    },
   ];
 
   for (const payload of invalidPayloads) {
@@ -483,7 +499,7 @@ test('candidate payload storage rejects noncanonical V1 shapes and bounds', asyn
         'f'.repeat(64),
         JSON.stringify({
           ...PAYLOAD,
-          retainedSourceText: 'must not enter immutable history',
+          itemExternalIds: ['\t3006\t'],
         }),
       ],
     ),
