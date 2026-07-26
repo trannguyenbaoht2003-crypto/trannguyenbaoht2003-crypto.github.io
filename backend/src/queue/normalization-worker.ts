@@ -88,11 +88,12 @@ async function loadObservationSource(
        from outbox_events event
        join raw_observations observation
          on observation.raw_observation_id = event.aggregate_id
-       join source_policy_revisions policy
+      join source_policy_revisions policy
          on policy.source_policy_revision_id =
             observation.source_policy_revision_id
       where event.outbox_event_id = $1
-      for key share of event, observation, policy`,
+      for key share of event, policy
+      for update of observation`,
     [outboxEventId],
   );
   const event = result.rows[0];
@@ -191,7 +192,7 @@ export function createNormalizationWorker(
             `insert into normalization_effects
               (outbox_event_id, raw_observation_id, effect_state)
              values ($1, $2, 'accepted_for_normalization')
-             on conflict (outbox_event_id) do nothing
+             on conflict do nothing
              returning outbox_event_id`,
             [context.outboxEventId, source.observationId],
           );
