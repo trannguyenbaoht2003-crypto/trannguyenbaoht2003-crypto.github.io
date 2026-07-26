@@ -150,25 +150,35 @@ async function lockActiveCatalog(
   patchKey: string,
   gameModeExternalId: 'aram_mayhem',
 ): Promise<ActiveCatalogRow> {
+  const patch = await client.query<{ patch_id: string }>(
+    `select patch_id
+       from patches
+      where patch_key = $1
+      for share`,
+    [patchKey],
+  );
+  const patchId = patch.rows[0]?.patch_id;
+  if (!patchId) {
+    throw new Error('NORMALIZATION_ACTIVE_CATALOG_NOT_FOUND');
+  }
+
   const result = await client.query<ActiveCatalogRow>(
-    `select p.patch_id,
+    `select acr.patch_id,
             acr.catalog_revision_id
-       from patches p
-       join active_catalog_revisions acr
-         on acr.patch_id = p.patch_id
+       from active_catalog_revisions acr
+      where acr.patch_id = $1
         and acr.game_mode_external_id = $2
-      where p.patch_key = $1
         and (
           select ple.lifecycle_state
             from patch_lifecycle_events ple
-           where ple.patch_id = p.patch_id
+           where ple.patch_id = acr.patch_id
            order by ple.occurred_at desc,
                     ple.created_at desc,
                     ple.patch_lifecycle_event_id desc
            limit 1
         ) = 'active'
-      for share of p, acr`,
-    [patchKey, gameModeExternalId],
+      for share of acr`,
+    [patchId, gameModeExternalId],
   );
   const authority = result.rows[0];
   if (!authority) {
