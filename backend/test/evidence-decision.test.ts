@@ -376,7 +376,7 @@ test('concurrent T4 commands lock shared Evidence in canonical observation order
   }));
 
   await pool.query(
-    \`create function test_pause_evidence_insert()
+    `create function test_pause_evidence_insert()
        returns trigger
        language plpgsql
        as $function$
@@ -387,7 +387,7 @@ test('concurrent T4 commands lock shared Evidence in canonical observation order
        $function$;
      create trigger test_pause_evidence_insert
        before insert on evidence_records
-       for each row execute function test_pause_evidence_insert()\`,
+       for each row execute function test_pause_evidence_insert()`,
   );
 
   const first = evidenceDecisionCommand({
