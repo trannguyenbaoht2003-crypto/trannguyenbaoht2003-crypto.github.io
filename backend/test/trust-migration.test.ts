@@ -274,6 +274,60 @@ test('deferred Claim seal rejects late membership and wrong statement hash', asy
   await pool.end();
 });
 
+test('deferred Evidence snapshot rejects a forged Claim statement hash', async () => {
+  const pool = await resetDatabase();
+  await seedTrustClaimSet(pool);
+
+  await assert.rejects(
+    withTransaction(pool, async (client) => {
+      await client.query(
+        `insert into evidence_input_snapshots
+          (evidence_input_snapshot_id, claim_id, candidate_id,
+           candidate_revision_id, patch_id, catalog_revision_id,
+           candidate_claim_set_seal_id, claim_set_hash,
+           claim_statement_hash, evidence_policy_revision_id,
+           association_count, input_hash, created_by, evaluated_at)
+         select
+           '75000000-0000-4000-8000-000000000005',
+           claim.claim_id, claim.candidate_id,
+           claim.candidate_revision_id, claim.patch_id,
+           claim.catalog_revision_id,
+           seal.candidate_claim_set_seal_id, seal.claim_set_hash,
+           $2, $3,
+           0,
+           sha256_text_tuple_v1(
+             array[
+               'TrustTupleV1',
+               'EvidenceInputSnapshotV1',
+               claim.candidate_revision_id::text,
+               claim.patch_id::text,
+               claim.catalog_revision_id::text,
+               claim.claim_id::text,
+               seal.claim_set_hash,
+               $2,
+               $3::uuid::text,
+               '0'
+             ]
+           ),
+           'direct-sql',
+           '2026-07-28T02:30:00.000Z'
+          from candidate_claims claim
+          join candidate_claim_set_seals seal
+            on seal.candidate_revision_id =
+               claim.candidate_revision_id
+         where claim.claim_id = $1`,
+        [
+          TRUST_IDS.requiredClaimId,
+          '0'.repeat(64),
+          TRUST_IDS.evidencePolicyId,
+        ],
+      );
+    }),
+    /claim statement hash mismatch/,
+  );
+  await pool.end();
+});
+
 test('Evidence pointer graph rejects another Claim and backward movement', async () => {
   const pool = await resetDatabase();
   await seedTrustClaimSet(pool);
