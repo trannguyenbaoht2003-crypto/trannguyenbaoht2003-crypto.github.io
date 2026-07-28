@@ -131,3 +131,30 @@ export interface RecordClaimEvidenceDecisionResult {
   inputHash: string;
   replayed: boolean;
 }
+
+export interface CompleteHumanReviewCommand {
+  actorId: string;
+  candidateId: string;
+  candidateRevisionId: string;
+  completedAt: string;
+  correlationId: string;
+  humanReviewId: string;
+  idempotencyKey: string;
+  outcome: HumanReviewOutcome;
+  permissionUsed: 'reviewer';
+  reason: string;
+  reviewInputSnapshotId: string;
+  reviewPolicyRevisionId: string;
+  reviewQuorumEvaluationId: string;
+}
+
+export interface CompleteHumanReviewResult {
+  candidateRevisionId: string;
+  humanReviewId: string;
+  inputHash: string;
+  quorumEvaluationId: string;
+  confirmedReviewerCount: number;
+  requiredConfirmedReviews: number;
+  quorumSatisfied: boolean;
+  replayed: boolean;
+}
