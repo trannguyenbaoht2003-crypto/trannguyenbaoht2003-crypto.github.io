@@ -383,30 +383,21 @@ export interface ActivateEligibilityPolicyRevisionCommand {
 
 - [ ] **Step 1: Write migration RED contracts**
 
-Define `GATE_TABLES` exactly as:
+Define the Task 2 policy foundation exactly as:
 
 ```ts
-const GATE_TABLES = [
+const GATE_POLICY_TABLES = [
   'active_eligibility_policy_revision',
-  'candidate_eligibility_evaluation_reasons',
-  'candidate_eligibility_evaluations',
-  'current_candidate_eligibility_evaluations',
-  'current_candidate_moderation_decisions',
-  'eligibility_input_snapshot_required_claims',
-  'eligibility_input_snapshots',
   'eligibility_policy_revisions',
-  'eligibility_recalculation_effects',
-  'moderation_decisions',
-  'moderation_input_snapshot_provenance',
-  'moderation_input_snapshots',
   'moderation_policy_revisions',
 ] as const;
 ```
 
-Assert all tables exist, all history tables have `reject_immutable_change`
-triggers, current/active pointer tables remain narrow mutable state, and
-migration `0008_moderation_eligibility.sql` appears after `0007` with a stable
-SHA-256 checksum.
+Assert all three tables exist, both policy history tables have
+`reject_immutable_change` triggers, the active pointer remains narrow mutable
+state, and migration `0008_moderation_eligibility.sql` appears after `0007`
+with a stable SHA-256 checksum. Task 3 extends this contract with Moderation
+tables; Task 4 extends it to the exact complete 13-table Sprint 4A schema.
 
 - [ ] **Step 2: Run and preserve RED**
 
