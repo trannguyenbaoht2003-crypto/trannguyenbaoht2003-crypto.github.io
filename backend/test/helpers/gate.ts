@@ -13,8 +13,17 @@ import type {
 import type {
   RegisterEligibilityPolicyRevisionCommand,
 } from '../../src/modules/eligibility/register-eligibility-policy-revision.js';
+import {
+  activateEligibilityPolicyRevision,
+} from '../../src/modules/eligibility/activate-eligibility-policy-revision.js';
+import {
+  completeHumanReview,
+} from '../../src/modules/trust/complete-human-review.js';
 import { TRUST_IDS } from './trust.js';
-import { seedTrustReviewContext } from './trust.js';
+import {
+  humanReviewCommand,
+  seedTrustReviewContext,
+} from './trust.js';
 import type { Pool } from 'pg';
 
 export const GATE_IDS = {
@@ -30,6 +39,14 @@ export const GATE_IDS = {
     '76000000-0000-4000-8000-000000000006',
   secondModerationDecisionId:
     '76000000-0000-4000-8000-000000000007',
+  eligibilityInputSnapshotId:
+    '76000000-0000-4000-8000-000000000008',
+  eligibilityEvaluationId:
+    '76000000-0000-4000-8000-000000000009',
+  secondEligibilityInputSnapshotId:
+    '76000000-0000-4000-8000-000000000010',
+  secondEligibilityEvaluationId:
+    '76000000-0000-4000-8000-000000000011',
 } as const;
 
 export function moderationPolicyCommand(
@@ -106,4 +123,34 @@ export async function seedModerationContext(pool: Pool): Promise<void> {
     pool,
     moderationPolicyCommand(),
   );
+}
+
+export async function seedActivatedGateContext(pool: Pool): Promise<void> {
+  await seedTrustReviewContext(pool);
+  await registerModerationPolicyRevision(
+    pool,
+    moderationPolicyCommand(),
+  );
+  await registerEligibilityPolicyRevision(
+    pool,
+    eligibilityPolicyCommand(),
+  );
+  await activateEligibilityPolicyRevision(
+    pool,
+    activationCommand(),
+  );
+}
+
+export async function seedSatisfiedReviewQuorum(pool: Pool): Promise<void> {
+  await completeHumanReview(pool, humanReviewCommand());
+  await completeHumanReview(pool, humanReviewCommand({
+    actorId: 'reviewer-b',
+    completedAt: '2026-07-28T05:01:00.000Z',
+    correlationId: 'human-review-2',
+    humanReviewId: TRUST_IDS.secondHumanReviewId,
+    idempotencyKey: 'human-review-2',
+    reviewInputSnapshotId: TRUST_IDS.secondReviewInputSnapshotId,
+    reviewQuorumEvaluationId:
+      TRUST_IDS.secondReviewQuorumEvaluationId,
+  }));
 }
