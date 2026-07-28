@@ -219,8 +219,10 @@ test('PostgreSQL rejects an Eligibility snapshot whose Review becomes stale befo
   const normalizedObservationId = randomUUID();
   const provenanceId = randomUUID();
   const client = await pool.connect();
+  let transactionOpen = false;
   try {
     await client.query('begin');
+    transactionOpen = true;
     const authority = await loadEligibilityAuthority(
       client,
       CANDIDATE_IDS.candidateId,
@@ -359,12 +361,17 @@ test('PostgreSQL rejects an Eligibility snapshot whose Review becomes stale befo
       ],
     );
 
+    const commit = client.query('commit').finally(() => {
+      transactionOpen = false;
+    });
     await assert.rejects(
-      client.query('commit'),
+      commit,
       /eligibility input snapshot seal mismatch/,
     );
   } finally {
-    await client.query('rollback');
+    if (transactionOpen) {
+      await client.query('rollback');
+    }
     client.release();
     await pool.end();
   }
