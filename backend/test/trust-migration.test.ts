@@ -6,11 +6,15 @@ import {
   completeHumanReview,
 } from '../src/modules/trust/complete-human-review.js';
 import {
+  hashCanonicalTupleV1,
+} from '../src/modules/trust/normalize-trust-input.js';
+import {
   recordClaimEvidenceDecision,
 } from '../src/modules/trust/record-claim-evidence-decision.js';
 import { resetDatabase } from './helpers/database.js';
 import {
   TRUST_IDS,
+  appendAiProvenance,
   evidenceDecisionCommand,
   humanReviewCommand,
   seedTrustClaimSet,
@@ -324,6 +328,157 @@ test('deferred Evidence snapshot rejects a forged Claim statement hash', async (
       );
     }),
     /claim statement hash mismatch/,
+  );
+  await pool.end();
+});
+
+test('deferred Review snapshot rejects AI provenance under a non-AI policy', async () => {
+  const pool = await resetDatabase();
+  await seedTrustReviewContext(pool, false);
+  await appendAiProvenance(pool);
+  await completeHumanReview(pool, humanReviewCommand());
+
+  const sourceResult = await pool.query<{
+    candidate_claim_set_seal_id: string;
+    candidate_id: string;
+    candidate_normalized_signature: string;
+    candidate_revision_id: string;
+    catalog_revision_id: string;
+    claim_decision_set_hash: string;
+    claim_set_hash: string;
+    patch_id: string;
+    provenance_set_hash: string;
+  }>(
+    `select candidate_id, candidate_revision_id, patch_id,
+            catalog_revision_id, candidate_normalized_signature,
+            candidate_claim_set_seal_id, claim_set_hash,
+            provenance_set_hash, claim_decision_set_hash
+       from review_input_snapshots
+      where review_input_snapshot_id = $1`,
+    [TRUST_IDS.reviewInputSnapshotId],
+  );
+  const source = sourceResult.rows[0];
+  assert.ok(source);
+
+  const claims = await pool.query<{
+    claim_evidence_decision_id: string | null;
+    claim_id: string;
+    importance: string;
+  }>(
+    `select member.claim_id, member.importance,
+            member.claim_evidence_decision_id
+       from review_input_snapshot_claims member
+       join candidate_claims claim
+         on claim.claim_id = member.claim_id
+      where member.review_input_snapshot_id = $1
+      order by claim.claim_key collate "C"`,
+    [TRUST_IDS.reviewInputSnapshotId],
+  );
+  const provenance = await pool.query<{
+    candidate_provenance_id: string;
+    origin: string;
+  }>(
+    `select candidate_provenance_id, origin
+       from review_input_snapshot_provenance
+      where review_input_snapshot_id = $1
+      order by candidate_provenance_id::text collate "C"`,
+    [TRUST_IDS.reviewInputSnapshotId],
+  );
+  assert.equal(provenance.rows.some(
+    (entry) => entry.origin === 'ai_generated',
+  ), true);
+
+  const nonAiPolicyId = '75000000-0000-4000-8000-000000000006';
+  const forgedSnapshotId = '75000000-0000-4000-8000-000000000007';
+  const inputHash = hashCanonicalTupleV1([
+    'TrustTupleV1',
+    'ReviewInputSnapshotV1',
+    source.candidate_id,
+    source.candidate_revision_id,
+    source.patch_id,
+    source.catalog_revision_id,
+    source.candidate_normalized_signature,
+    source.claim_set_hash,
+    nonAiPolicyId,
+    String(claims.rows.length),
+    ...claims.rows.flatMap((claim) => [
+      claim.claim_id,
+      claim.importance,
+      claim.claim_evidence_decision_id ?? '@null',
+    ]),
+    String(provenance.rows.length),
+    ...provenance.rows.flatMap((entry) => [
+      entry.candidate_provenance_id,
+      entry.origin,
+    ]),
+  ]);
+
+  await assert.rejects(
+    withTransaction(pool, async (client) => {
+      await client.query(
+        `insert into review_policy_revisions
+          (review_policy_revision_id, policy_key, revision,
+           minimum_confirmed_reviews, require_distinct_reviewers,
+           required_permission, applies_to_ai_provenance,
+           reason, created_by)
+         values ($1, 'human-review-no-ai', 1, 2, true, 'reviewer',
+                 false, 'AI provenance is outside this policy.',
+                 'direct-sql')`,
+        [nonAiPolicyId],
+      );
+      await client.query(
+        `insert into review_input_snapshots
+          (review_input_snapshot_id, candidate_id,
+           candidate_revision_id, patch_id, catalog_revision_id,
+           candidate_normalized_signature,
+           candidate_claim_set_seal_id, claim_set_hash,
+           claim_count, provenance_count, provenance_set_hash,
+           claim_decision_set_hash, review_policy_revision_id,
+           input_hash, created_by)
+         values (
+           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
+           $13, $14, 'direct-sql'
+         )`,
+        [
+          forgedSnapshotId,
+          source.candidate_id,
+          source.candidate_revision_id,
+          source.patch_id,
+          source.catalog_revision_id,
+          source.candidate_normalized_signature,
+          source.candidate_claim_set_seal_id,
+          source.claim_set_hash,
+          claims.rows.length,
+          provenance.rows.length,
+          source.provenance_set_hash,
+          source.claim_decision_set_hash,
+          nonAiPolicyId,
+          inputHash,
+        ],
+      );
+      await client.query(
+        `insert into review_input_snapshot_claims
+          (review_input_snapshot_id, claim_id,
+           candidate_revision_id, importance,
+           claim_evidence_decision_id, ordinal)
+         select $1, claim_id, candidate_revision_id, importance,
+                claim_evidence_decision_id, ordinal
+           from review_input_snapshot_claims
+          where review_input_snapshot_id = $2`,
+        [forgedSnapshotId, TRUST_IDS.reviewInputSnapshotId],
+      );
+      await client.query(
+        `insert into review_input_snapshot_provenance
+          (review_input_snapshot_id, candidate_provenance_id,
+           candidate_revision_id, origin, ordinal)
+         select $1, candidate_provenance_id,
+                candidate_revision_id, origin, ordinal
+           from review_input_snapshot_provenance
+          where review_input_snapshot_id = $2`,
+        [forgedSnapshotId, TRUST_IDS.reviewInputSnapshotId],
+      );
+    }),
+    /review policy does not apply to AI provenance/,
   );
   await pool.end();
 });
