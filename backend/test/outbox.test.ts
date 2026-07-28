@@ -6,8 +6,14 @@ import { Queue } from 'bullmq';
 import type { Pool } from 'pg';
 
 import { createQueueConnection } from '../src/queue/connection.js';
-import { NORMALIZATION_QUEUE_NAME } from '../src/queue/names.js';
-import { dispatchOutbox } from '../src/queue/outbox-dispatcher.js';
+import {
+  ELIGIBILITY_QUEUE_NAME,
+  NORMALIZATION_QUEUE_NAME,
+} from '../src/queue/names.js';
+import {
+  dispatchOutbox,
+  type OutboxQueue,
+} from '../src/queue/outbox-dispatcher.js';
 import { resetDatabase } from './helpers/database.js';
 
 const redisUrl = process.env.TEST_REDIS_URL;
@@ -141,4 +147,57 @@ test('queue failure keeps the immutable payload and schedules a database-backed 
   assert.equal(delivery.rows[0]?.available, true);
   assert.equal(delivery.rows[0]?.lease_token, null);
   assert.deepEqual(delivery.rows[0]?.payload, payload);
+});
+
+test('dispatch routes normalization and trust events to separate queues', async () => {
+  pool = await resetDatabase();
+  const rawEventId = randomUUID();
+  const rawAggregateId = randomUUID();
+  const gateEventId = randomUUID();
+  const candidateRevisionId = randomUUID();
+  await pool.query(
+    `insert into outbox_events
+      (outbox_event_id, aggregate_type, aggregate_id, event_type,
+       payload, correlation_id)
+     values
+       ($1, 'raw_observation', $2, 'RawObservationIngested',
+        $3::jsonb, $4),
+       ($5, 'candidate_revision', $6, 'ModerationDecisionRecorded',
+        $7::jsonb, $8)`,
+    [
+      rawEventId,
+      rawAggregateId,
+      JSON.stringify({ observationId: rawAggregateId }),
+      randomUUID(),
+      gateEventId,
+      candidateRevisionId,
+      JSON.stringify({ candidateRevisionId }),
+      randomUUID(),
+    ],
+  );
+  const normalizationJobs: string[] = [];
+  const eligibilityJobs: string[] = [];
+  const eligibilityQueue: OutboxQueue = {
+    async add(_name, _data, options) {
+      eligibilityJobs.push(String(options.jobId));
+    },
+  };
+  const normalizationQueue: OutboxQueue = {
+    async add(_name, _data, options) {
+      normalizationJobs.push(String(options.jobId));
+    },
+  };
+
+  const result = await dispatchOutbox({
+    pool,
+    queues: {
+      eligibility: eligibilityQueue,
+      normalization: normalizationQueue,
+    },
+  });
+
+  assert.deepEqual(result, { claimed: 2, delivered: 2, failed: 0 });
+  assert.deepEqual(normalizationJobs, [rawEventId]);
+  assert.deepEqual(eligibilityJobs, [gateEventId]);
+  assert.notEqual(ELIGIBILITY_QUEUE_NAME, NORMALIZATION_QUEUE_NAME);
 });
