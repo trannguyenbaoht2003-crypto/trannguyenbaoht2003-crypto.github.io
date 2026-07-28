@@ -9,7 +9,16 @@ import type { OutboxJobData } from './names.js';
 const DEFAULT_BATCH_SIZE = 25;
 const DEFAULT_LEASE_MS = 30_000;
 const DEFAULT_RETRY_DELAY_MS = 1_000;
-const DISPATCHED_EVENT_TYPES = ['RawObservationIngested'] as const;
+const NORMALIZATION_EVENT_TYPES = ['RawObservationIngested'] as const;
+const ELIGIBILITY_EVENT_TYPES = [
+  'CandidateRegistered',
+  'CandidateRevisionRegistered',
+  'CandidateProvenanceAdded',
+  'CandidateClaimSetDefined',
+  'ClaimEvidenceDecisionRecorded',
+  'HumanReviewCompleted',
+  'ModerationDecisionRecorded',
+] as const;
 
 interface ClaimedOutboxEvent {
   aggregate_id: string;
@@ -28,7 +37,11 @@ export interface DispatchOutboxOptions {
   batchSize?: number;
   leaseMs?: number;
   pool: Pool;
-  queue: OutboxQueue;
+  queue?: OutboxQueue;
+  queues?: {
+    eligibility: OutboxQueue;
+    normalization: OutboxQueue;
+  };
   retryDelayMs?: number;
 }
 
@@ -43,6 +56,7 @@ async function claimEvents(
   batchSize: number,
   leaseMs: number,
   leaseToken: string,
+  eventTypes: readonly string[],
 ): Promise<ClaimedOutboxEvent[]> {
   return withTransaction(pool, async (client) => {
     const result = await client.query<ClaimedOutboxEvent>(
@@ -68,8 +82,8 @@ async function claimEvents(
                  event.aggregate_id,
                  event.event_type,
                  event.payload,
-                 event.correlation_id`,
-      [DISPATCHED_EVENT_TYPES, batchSize, leaseToken, leaseMs],
+                 event.correlation_id ,
+      [eventTypes, batchSize, leaseToken, leaseMs],
     );
     return result.rows;
   });
@@ -78,12 +92,19 @@ async function claimEvents(
 export async function dispatchOutbox(
   options: DispatchOutboxOptions,
 ): Promise<DispatchOutboxResult> {
+  if (!options.queue && !options.queues) {
+    throw new Error('OUTBOX_QUEUE_REQUIRED');
+  }
+  const eventTypes = options.queues
+    ? [...NORMALIZATION_EVENT_TYPES, ...ELIGIBILITY_EVENT_TYPES]
+    : [...NORMALIZATION_EVENT_TYPES];
   const leaseToken = randomUUID();
   const events = await claimEvents(
     options.pool,
     options.batchSize ?? DEFAULT_BATCH_SIZE,
     options.leaseMs ?? DEFAULT_LEASE_MS,
     leaseToken,
+    eventTypes,
   );
   let delivered = 0;
   let failed = 0;
@@ -99,7 +120,14 @@ export async function dispatchOutbox(
     };
 
     try {
-      await options.queue.add(event.event_type, jobData, {
+      const queue = options.queues
+        ? (
+            event.event_type === 'RawObservationIngested'
+              ? options.queues.normalization
+              : options.queues.eligibility
+          )
+        : options.queue!;
+      await queue.add(event.event_type, jobData, {
         attempts: 3,
         backoff: { delay: DEFAULT_RETRY_DELAY_MS, type: 'exponential' },
         jobId: event.outbox_event_id,
