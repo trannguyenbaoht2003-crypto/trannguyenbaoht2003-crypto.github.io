@@ -647,6 +647,266 @@ test('Review pointer rejects rollback between equal-time evaluations', async () 
   }
 });
 
+test('deferred Review snapshot rejects a decision that becomes current before commit', async () => {
+  const pool = await resetDatabase();
+  await seedTrustReviewContext(pool);
+  await completeHumanReview(pool, humanReviewCommand());
+
+  const sourceResult = await pool.query<{
+    candidate_claim_set_seal_id: string;
+    candidate_id: string;
+    candidate_normalized_signature: string;
+    candidate_revision_id: string;
+    catalog_revision_id: string;
+    claim_decision_set_hash: string;
+    claim_set_hash: string;
+    patch_id: string;
+    provenance_set_hash: string;
+  }>(
+    `select candidate_id, candidate_revision_id, patch_id,
+            catalog_revision_id, candidate_normalized_signature,
+            candidate_claim_set_seal_id, claim_set_hash,
+            provenance_set_hash, claim_decision_set_hash
+       from review_input_snapshots
+      where review_input_snapshot_id = $1`,
+    [TRUST_IDS.reviewInputSnapshotId],
+  );
+  const source = sourceResult.rows[0];
+  assert.ok(source);
+
+  const claims = await pool.query<{
+    claim_evidence_decision_id: string | null;
+    claim_id: string;
+    importance: string;
+  }>(
+    `select member.claim_id, member.importance,
+            member.claim_evidence_decision_id
+       from review_input_snapshot_claims member
+       join candidate_claims claim
+         on claim.claim_id = member.claim_id
+      where member.review_input_snapshot_id = $1
+      order by claim.claim_key collate "C"`,
+    [TRUST_IDS.reviewInputSnapshotId],
+  );
+  const provenance = await pool.query<{
+    candidate_provenance_id: string;
+    origin: string;
+  }>(
+    `select candidate_provenance_id, origin
+       from review_input_snapshot_provenance
+      where review_input_snapshot_id = $1
+      order by candidate_provenance_id::text collate "C"`,
+    [TRUST_IDS.reviewInputSnapshotId],
+  );
+  const supportingResult = await pool.query<{
+    candidate_claim_set_seal_id: string;
+    candidate_id: string;
+    candidate_revision_id: string;
+    catalog_revision_id: string;
+    claim_set_hash: string;
+    patch_id: string;
+    statement_hash: string;
+  }>(
+    `select claim.candidate_id, claim.candidate_revision_id,
+            claim.patch_id, claim.catalog_revision_id,
+            claim.statement_hash,
+            seal.candidate_claim_set_seal_id,
+            seal.claim_set_hash
+       from candidate_claims claim
+       join candidate_claim_set_seals seal
+         on seal.candidate_revision_id =
+            claim.candidate_revision_id
+      where claim.claim_id = $1`,
+    [TRUST_IDS.supportingClaimId],
+  );
+  const supporting = supportingResult.rows[0];
+  assert.ok(supporting);
+  assert.equal(
+    claims.rows.find(
+      (claim) => claim.claim_id === TRUST_IDS.supportingClaimId,
+    )?.claim_evidence_decision_id,
+    null,
+  );
+
+  const reviewPolicyId = '75000000-0000-4000-8000-000000000009';
+  const reviewSnapshotId = '75000000-0000-4000-8000-000000000010';
+  const evidenceSnapshotId = '75000000-0000-4000-8000-000000000011';
+  const evidenceDecisionId = '75000000-0000-4000-8000-000000000012';
+  const reviewInputHash = hashCanonicalTupleV1([
+    'TrustTupleV1',
+    'ReviewInputSnapshotV1',
+    source.candidate_id,
+    source.candidate_revision_id,
+    source.patch_id,
+    source.catalog_revision_id,
+    source.candidate_normalized_signature,
+    source.claim_set_hash,
+    reviewPolicyId,
+    String(claims.rows.length),
+    ...claims.rows.flatMap((claim) => [
+      claim.claim_id,
+      claim.importance,
+      claim.claim_evidence_decision_id ?? '@null',
+    ]),
+    String(provenance.rows.length),
+    ...provenance.rows.flatMap((entry) => [
+      entry.candidate_provenance_id,
+      entry.origin,
+    ]),
+  ]);
+  const evidenceInputHash = hashCanonicalTupleV1([
+    'TrustTupleV1',
+    'EvidenceInputSnapshotV1',
+    supporting.candidate_revision_id,
+    supporting.patch_id,
+    supporting.catalog_revision_id,
+    TRUST_IDS.supportingClaimId,
+    supporting.claim_set_hash,
+    supporting.statement_hash,
+    TRUST_IDS.evidencePolicyId,
+    '0',
+  ]);
+
+  try {
+    await assert.rejects(
+      withTransaction(pool, async (client) => {
+        await client.query(
+          `insert into review_policy_revisions
+            (review_policy_revision_id, policy_key, revision,
+             minimum_confirmed_reviews, require_distinct_reviewers,
+             required_permission, applies_to_ai_provenance,
+             reason, created_by)
+           values ($1, 'review-current-at-commit', 1, 2, true,
+                   'reviewer', true,
+                   'Review snapshots must be current at commit.',
+                   'direct-sql')`,
+          [reviewPolicyId],
+        );
+        await client.query(
+          `insert into review_input_snapshots
+            (review_input_snapshot_id, candidate_id,
+             candidate_revision_id, patch_id, catalog_revision_id,
+             candidate_normalized_signature,
+             candidate_claim_set_seal_id, claim_set_hash,
+             claim_count, provenance_count, provenance_set_hash,
+             claim_decision_set_hash, review_policy_revision_id,
+             input_hash, created_by)
+           values (
+             $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
+             $13, $14, 'direct-sql'
+           )`,
+          [
+            reviewSnapshotId,
+            source.candidate_id,
+            source.candidate_revision_id,
+            source.patch_id,
+            source.catalog_revision_id,
+            source.candidate_normalized_signature,
+            source.candidate_claim_set_seal_id,
+            source.claim_set_hash,
+            claims.rows.length,
+            provenance.rows.length,
+            source.provenance_set_hash,
+            source.claim_decision_set_hash,
+            reviewPolicyId,
+            reviewInputHash,
+          ],
+        );
+        await client.query(
+          `insert into review_input_snapshot_claims
+            (review_input_snapshot_id, claim_id,
+             candidate_revision_id, importance,
+             claim_evidence_decision_id, ordinal)
+           select $1, claim_id, candidate_revision_id, importance,
+                  claim_evidence_decision_id, ordinal
+             from review_input_snapshot_claims
+            where review_input_snapshot_id = $2`,
+          [reviewSnapshotId, TRUST_IDS.reviewInputSnapshotId],
+        );
+        await client.query(
+          `insert into review_input_snapshot_provenance
+            (review_input_snapshot_id, candidate_provenance_id,
+             candidate_revision_id, origin, ordinal)
+           select $1, candidate_provenance_id,
+                  candidate_revision_id, origin, ordinal
+             from review_input_snapshot_provenance
+            where review_input_snapshot_id = $2`,
+          [reviewSnapshotId, TRUST_IDS.reviewInputSnapshotId],
+        );
+        await client.query(
+          `insert into evidence_input_snapshots
+            (evidence_input_snapshot_id, claim_id, candidate_id,
+             candidate_revision_id, patch_id, catalog_revision_id,
+             candidate_claim_set_seal_id, claim_set_hash,
+             claim_statement_hash, evidence_policy_revision_id,
+             association_count, input_hash, created_by, evaluated_at)
+           values (
+             $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 0, $11,
+             'direct-sql', '2026-07-28T04:00:00.000Z'
+           )`,
+          [
+            evidenceSnapshotId,
+            TRUST_IDS.supportingClaimId,
+            supporting.candidate_id,
+            supporting.candidate_revision_id,
+            supporting.patch_id,
+            supporting.catalog_revision_id,
+            supporting.candidate_claim_set_seal_id,
+            supporting.claim_set_hash,
+            supporting.statement_hash,
+            TRUST_IDS.evidencePolicyId,
+            evidenceInputHash,
+          ],
+        );
+        await client.query(
+          `insert into claim_evidence_decisions
+            (claim_evidence_decision_id, claim_id,
+             evidence_input_snapshot_id, candidate_id,
+             candidate_revision_id, patch_id, catalog_revision_id,
+             evidence_policy_revision_id, decision,
+             evaluator_actor_id, reason, correlation_id, evaluated_at)
+           values (
+             $1, $2, $3, $4, $5, $6, $7, $8, 'insufficient',
+             'direct-sql', 'No qualifying Evidence exists.',
+             'review-stale-before-commit',
+             '2026-07-28T04:00:00.000Z'
+           )`,
+          [
+            evidenceDecisionId,
+            TRUST_IDS.supportingClaimId,
+            evidenceSnapshotId,
+            supporting.candidate_id,
+            supporting.candidate_revision_id,
+            supporting.patch_id,
+            supporting.catalog_revision_id,
+            TRUST_IDS.evidencePolicyId,
+          ],
+        );
+        await client.query(
+          `insert into current_claim_evidence_decisions
+            (claim_id, candidate_id, candidate_revision_id,
+             patch_id, catalog_revision_id,
+             evidence_policy_revision_id,
+             claim_evidence_decision_id)
+           values ($1, $2, $3, $4, $5, $6, $7)`,
+          [
+            TRUST_IDS.supportingClaimId,
+            supporting.candidate_id,
+            supporting.candidate_revision_id,
+            supporting.patch_id,
+            supporting.catalog_revision_id,
+            TRUST_IDS.evidencePolicyId,
+            evidenceDecisionId,
+          ],
+        );
+      }),
+      /review snapshot claim decision is not current/,
+    );
+  } finally {
+    await pool.end();
+  }
+});
+
 test('deferred Review snapshot and quorum headers reject forged membership', async () => {
   const pool = await resetDatabase();
   await seedTrustReviewContext(pool);
