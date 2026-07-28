@@ -663,6 +663,401 @@ begin
 end;
 $$;
 
+create or replace function enforce_eligibility_input_snapshot_seal()
+returns trigger
+language plpgsql
+as $
+declare
+  snapshot_id uuid;
+  snapshot eligibility_input_snapshots%rowtype;
+  actual_required_claim_count integer;
+  member_count integer;
+  required_claim_tokens text[];
+  expected_required_claim_set_hash text;
+  expected_input_hash text;
+  moderation_input_hash text;
+  review_input_hash text;
+  actual_moderation_current boolean;
+  actual_review_current boolean;
+begin
+  snapshot_id := new.eligibility_input_snapshot_id;
+  select *
+    into snapshot
+    from eligibility_input_snapshots
+   where eligibility_input_snapshot_id = snapshot_id;
+  if not found then
+    raise exception 'eligibility input snapshot missing'
+      using errcode = '23514';
+  end if;
+
+  select count(*)::integer
+    into actual_required_claim_count
+    from candidate_claims
+   where candidate_revision_id = snapshot.candidate_revision_id
+     and importance = 'required';
+  select count(*)::integer
+    into member_count
+    from eligibility_input_snapshot_required_claims
+   where eligibility_input_snapshot_id = snapshot_id;
+
+  if actual_required_claim_count = 0
+     or member_count <> actual_required_claim_count
+     or snapshot.required_claim_count <> actual_required_claim_count
+     or exists (
+       select 1
+         from candidate_claims claim
+         left join current_claim_evidence_decisions current_decision
+           on current_decision.claim_id = claim.claim_id
+        where claim.candidate_revision_id =
+              snapshot.candidate_revision_id
+          and claim.importance = 'required'
+          and not exists (
+            select 1
+              from eligibility_input_snapshot_required_claims member
+              left join claim_evidence_decisions decision
+                on decision.claim_evidence_decision_id =
+                   member.claim_evidence_decision_id
+             where member.eligibility_input_snapshot_id = snapshot_id
+               and member.claim_id = claim.claim_id
+               and member.candidate_revision_id =
+                   snapshot.candidate_revision_id
+               and member.claim_key = claim.claim_key
+               and member.importance = claim.importance
+               and member.claim_evidence_decision_id is not distinct from
+                   current_decision.claim_evidence_decision_id
+               and member.evidence_decision is not distinct from
+                   decision.decision
+               and member.evidence_policy_revision_id is not distinct from
+                   decision.evidence_policy_revision_id
+               and member.decision_current =
+                   (current_decision.claim_evidence_decision_id is not null)
+          )
+     )
+     or exists (
+       select 1
+         from eligibility_input_snapshot_required_claims member
+        where member.eligibility_input_snapshot_id = snapshot_id
+          and not exists (
+            select 1
+              from candidate_claims claim
+              left join current_claim_evidence_decisions current_decision
+                on current_decision.claim_id = claim.claim_id
+              left join claim_evidence_decisions decision
+                on decision.claim_evidence_decision_id =
+                   current_decision.claim_evidence_decision_id
+             where claim.candidate_revision_id =
+                   snapshot.candidate_revision_id
+               and claim.importance = 'required'
+               and claim.claim_id = member.claim_id
+               and claim.claim_key = member.claim_key
+               and member.claim_evidence_decision_id is not distinct from
+                   current_decision.claim_evidence_decision_id
+               and member.evidence_decision is not distinct from
+                   decision.decision
+               and member.evidence_policy_revision_id is not distinct from
+                   decision.evidence_policy_revision_id
+          )
+     ) then
+    raise exception
+      'eligibility input snapshot required Claim membership mismatch'
+      using errcode = '23514';
+  end if;
+
+  select array_agg(
+           entry.token
+           order by entry.claim_key collate "C", entry.part
+         )
+    into required_claim_tokens
+    from (
+      select member.claim_key,
+             part.part,
+             part.token
+        from eligibility_input_snapshot_required_claims member
+        cross join lateral (
+          values
+            (1, member.claim_id::text),
+            (2, member.claim_key),
+            (3, coalesce(
+                  member.claim_evidence_decision_id::text,
+                  '@null'
+                )),
+            (4, coalesce(member.evidence_decision, '@null')),
+            (5, coalesce(
+                  member.evidence_policy_revision_id::text,
+                  '@null'
+                )),
+            (6, member.decision_current::text)
+        ) as part(part, token)
+       where member.eligibility_input_snapshot_id = snapshot_id
+    ) as entry;
+
+  expected_required_claim_set_hash := sha256_text_tuple_v1(
+    array[
+      'TrustTupleV1',
+      'EligibilityRequiredClaimSetV1',
+      snapshot.candidate_revision_id::text,
+      actual_required_claim_count::text
+    ] || coalesce(required_claim_tokens, array[]::text[])
+  );
+
+  if snapshot.moderation_decision_id is null then
+    moderation_input_hash := null;
+    actual_moderation_current := false;
+  else
+    select decision.input_hash
+      into moderation_input_hash
+      from moderation_decisions decision
+     where decision.moderation_decision_id =
+           snapshot.moderation_decision_id
+       and decision.candidate_id = snapshot.candidate_id
+       and decision.candidate_revision_id =
+           snapshot.candidate_revision_id
+       and decision.moderation_policy_revision_id =
+           snapshot.moderation_policy_revision_id
+       and decision.outcome = snapshot.moderation_outcome;
+    if not found then
+      raise exception 'eligibility input snapshot Moderation mismatch'
+        using errcode = '23514';
+    end if;
+    select exists (
+      select 1
+        from current_candidate_moderation_decisions current_decision
+        join moderation_decisions decision
+          on decision.moderation_decision_id =
+             current_decision.moderation_decision_id
+       where current_decision.candidate_revision_id =
+             snapshot.candidate_revision_id
+         and current_decision.moderation_policy_revision_id =
+             snapshot.moderation_policy_revision_id
+         and current_decision.moderation_decision_id =
+             snapshot.moderation_decision_id
+         and not exists (
+           select 1
+             from candidate_provenance live
+            where live.candidate_revision_id =
+                  snapshot.candidate_revision_id
+              and not exists (
+                select 1
+                  from moderation_input_snapshot_provenance member
+                 where member.moderation_input_snapshot_id =
+                       decision.moderation_input_snapshot_id
+                   and member.candidate_provenance_id =
+                       live.candidate_provenance_id
+                   and member.origin = live.origin
+              )
+         )
+         and not exists (
+           select 1
+             from moderation_input_snapshot_provenance member
+            where member.moderation_input_snapshot_id =
+                  decision.moderation_input_snapshot_id
+              and not exists (
+                select 1
+                  from candidate_provenance live
+                 where live.candidate_revision_id =
+                       snapshot.candidate_revision_id
+                   and live.candidate_provenance_id =
+                       member.candidate_provenance_id
+                   and live.origin = member.origin
+              )
+         )
+    ) into actual_moderation_current;
+  end if;
+
+  if snapshot.review_quorum_evaluation_id is null then
+    review_input_hash := null;
+    actual_review_current := false;
+  else
+    select evaluation.input_hash
+      into review_input_hash
+      from review_quorum_evaluations evaluation
+     where evaluation.review_quorum_evaluation_id =
+           snapshot.review_quorum_evaluation_id
+       and evaluation.candidate_id = snapshot.candidate_id
+       and evaluation.candidate_revision_id =
+           snapshot.candidate_revision_id
+       and evaluation.review_policy_revision_id =
+           snapshot.review_policy_revision_id
+       and evaluation.quorum_satisfied =
+           snapshot.review_quorum_satisfied;
+    if not found then
+      raise exception 'eligibility input snapshot Review mismatch'
+        using errcode = '23514';
+    end if;
+    select exists (
+      select 1
+        from current_review_quorum_evaluations current_review
+       where current_review.candidate_revision_id =
+             snapshot.candidate_revision_id
+         and current_review.review_policy_revision_id =
+             snapshot.review_policy_revision_id
+         and current_review.review_quorum_evaluation_id =
+             snapshot.review_quorum_evaluation_id
+    ) into actual_review_current;
+  end if;
+
+  expected_input_hash := sha256_text_tuple_v1(
+    array[
+      'TrustTupleV1',
+      'EligibilityInputSnapshotV1',
+      snapshot.candidate_id::text,
+      snapshot.candidate_revision_id::text,
+      snapshot.patch_id::text,
+      snapshot.catalog_revision_id::text,
+      snapshot.candidate_normalized_signature,
+      snapshot.candidate_claim_set_seal_id::text,
+      snapshot.claim_set_hash,
+      snapshot.eligibility_policy_revision_id::text,
+      snapshot.evidence_policy_revision_id::text,
+      snapshot.review_policy_revision_id::text,
+      snapshot.moderation_policy_revision_id::text,
+      coalesce(snapshot.moderation_decision_id::text, '@null'),
+      coalesce(moderation_input_hash, '@null'),
+      coalesce(snapshot.moderation_outcome, '@null'),
+      actual_moderation_current::text,
+      coalesce(snapshot.review_quorum_evaluation_id::text, '@null'),
+      coalesce(review_input_hash, '@null'),
+      coalesce(snapshot.review_quorum_satisfied::text, 'false'),
+      actual_review_current::text,
+      actual_required_claim_count::text
+    ] || coalesce(required_claim_tokens, array[]::text[])
+  );
+
+  if snapshot.required_claim_set_hash <>
+       expected_required_claim_set_hash
+     or snapshot.input_hash <> expected_input_hash
+     or snapshot.moderation_current <> actual_moderation_current
+     or snapshot.review_current <> actual_review_current then
+    raise exception 'eligibility input snapshot seal mismatch'
+      using errcode = '23514';
+  end if;
+  return new;
+end;
+$;
+
+create or replace function enforce_eligibility_evaluation_result()
+returns trigger
+language plpgsql
+as $
+declare
+  evaluation_id uuid;
+  evaluation candidate_eligibility_evaluations%rowtype;
+  snapshot eligibility_input_snapshots%rowtype;
+  expected_outcome text;
+  expected_reasons text[];
+  actual_reasons text[];
+begin
+  evaluation_id := new.candidate_eligibility_evaluation_id;
+  select *
+    into evaluation
+    from candidate_eligibility_evaluations
+   where candidate_eligibility_evaluation_id = evaluation_id;
+  if not found then
+    raise exception 'eligibility evaluation missing'
+      using errcode = '23514';
+  end if;
+  select *
+    into snapshot
+    from eligibility_input_snapshots
+   where eligibility_input_snapshot_id =
+         evaluation.eligibility_input_snapshot_id;
+
+  if snapshot.moderation_current
+     and snapshot.moderation_outcome = 'blocked' then
+    expected_outcome := 'ineligible';
+    expected_reasons := array['moderation_blocked'];
+  elsif exists (
+    select 1
+      from eligibility_input_snapshot_required_claims member
+     where member.eligibility_input_snapshot_id =
+           snapshot.eligibility_input_snapshot_id
+       and member.decision_current
+       and member.evidence_policy_revision_id =
+           snapshot.evidence_policy_revision_id
+       and member.evidence_decision = 'contradicted'
+  ) then
+    expected_outcome := 'ineligible';
+    expected_reasons := array['required_claim_contradicted'];
+  else
+    select array_agg(reason order by reason)
+      into expected_reasons
+      from (
+        select 'moderation_missing'::text as reason
+         where snapshot.moderation_outcome is null
+        union
+        select 'moderation_stale'
+         where snapshot.moderation_outcome is not null
+           and not snapshot.moderation_current
+        union
+        select 'moderation_needs_review'
+         where snapshot.moderation_outcome = 'needs_review'
+           and snapshot.moderation_current
+        union
+        select 'required_claim_decision_missing'
+          from eligibility_input_snapshot_required_claims member
+         where member.eligibility_input_snapshot_id =
+               snapshot.eligibility_input_snapshot_id
+           and member.evidence_decision is null
+        union
+        select 'required_claim_decision_stale'
+          from eligibility_input_snapshot_required_claims member
+         where member.eligibility_input_snapshot_id =
+               snapshot.eligibility_input_snapshot_id
+           and member.evidence_decision is not null
+           and not member.decision_current
+        union
+        select 'required_claim_policy_mismatch'
+          from eligibility_input_snapshot_required_claims member
+         where member.eligibility_input_snapshot_id =
+               snapshot.eligibility_input_snapshot_id
+           and member.evidence_decision is not null
+           and member.decision_current
+           and member.evidence_policy_revision_id <>
+               snapshot.evidence_policy_revision_id
+        union
+        select 'required_claim_insufficient'
+          from eligibility_input_snapshot_required_claims member
+         where member.eligibility_input_snapshot_id =
+               snapshot.eligibility_input_snapshot_id
+           and member.evidence_decision = 'insufficient'
+           and member.decision_current
+           and member.evidence_policy_revision_id =
+               snapshot.evidence_policy_revision_id
+        union
+        select 'review_quorum_missing'
+         where snapshot.review_quorum_evaluation_id is null
+        union
+        select 'review_quorum_stale'
+         where snapshot.review_quorum_evaluation_id is not null
+           and not snapshot.review_current
+        union
+        select 'review_quorum_unsatisfied'
+         where snapshot.review_quorum_evaluation_id is not null
+           and snapshot.review_current
+           and not snapshot.review_quorum_satisfied
+      ) reasons;
+    if coalesce(cardinality(expected_reasons), 0) = 0 then
+      expected_outcome := 'eligible';
+      expected_reasons := array['all_requirements_satisfied'];
+    else
+      expected_outcome := 'needs_review';
+    end if;
+  end if;
+
+  select array_agg(reason_code order by ordinal)
+    into actual_reasons
+    from candidate_eligibility_evaluation_reasons
+   where candidate_eligibility_evaluation_id = evaluation_id;
+  if evaluation.outcome <> expected_outcome
+     or evaluation.reason_count <> cardinality(expected_reasons)
+     or actual_reasons is distinct from expected_reasons then
+    raise exception 'eligibility evaluation result mismatch'
+      using errcode = '23514';
+  end if;
+  return new;
+end;
+$;
+
 create or replace function enforce_current_candidate_moderation_graph()
 returns trigger
 language plpgsql
@@ -773,6 +1168,25 @@ create trigger moderation_decision_graph_guard
 before insert on moderation_decisions
 for each row execute function enforce_moderation_decision_graph();
 
+create constraint trigger eligibility_input_snapshot_seal_from_header
+after insert on eligibility_input_snapshots
+deferrable initially deferred
+for each row execute function enforce_eligibility_input_snapshot_seal();
+
+create constraint trigger eligibility_input_snapshot_seal_from_member
+after insert on eligibility_input_snapshot_required_claims
+deferrable initially deferred
+for each row execute function enforce_eligibility_input_snapshot_seal();
+
+create constraint trigger eligibility_evaluation_result_from_header
+after insert on candidate_eligibility_evaluations
+deferrable initially deferred
+for each row execute function enforce_eligibility_evaluation_result();
+
+create constraint trigger eligibility_evaluation_result_from_reason
+after insert on candidate_eligibility_evaluation_reasons
+deferrable initially deferred
+for each row execute function enforce_eligibility_evaluation_result();
 create trigger current_candidate_moderation_graph_guard
 before insert or update or delete
 on current_candidate_moderation_decisions
