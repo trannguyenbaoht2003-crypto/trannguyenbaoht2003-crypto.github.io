@@ -9,7 +9,16 @@ import { NORMALIZATION_QUEUE_NAME, type OutboxJobData } from './names.js';
 
 export interface NormalizationWorkerResult {
   observationId: string;
-  outcome: 'accepted_for_normalization' | 'duplicate_noop';
+  outcome:
+    | 'accepted_for_normalization'
+    | 'duplicate_noop'
+    | 'not_normalizable';
+}
+
+export interface NormalizationSourceContext {
+  correlationId: string;
+  observationId: string;
+  outboxEventId: string;
 }
 
 interface WorkerHookContext {
@@ -21,8 +30,15 @@ interface WorkerHookContext {
 interface SourceOutboxEvent {
   aggregate_id: string;
   aggregate_type: string;
+  correlation_id: string;
   event_type: string;
+  normalizable: boolean;
   payload_observation_id: string | null;
+}
+
+interface LoadedNormalizationSource {
+  context: NormalizationSourceContext;
+  normalizable: boolean;
 }
 
 export interface CreateNormalizationWorkerOptions {
@@ -30,7 +46,10 @@ export interface CreateNormalizationWorkerOptions {
   beforeCommit?: (context: WorkerHookContext) => Promise<void>;
   concurrency?: number;
   connection: Redis;
-  normalizeObservation: (observationId: string) => Promise<void>;
+  normalizeObservation: (
+    client: PoolClient,
+    source: NormalizationSourceContext,
+  ) => Promise<unknown>;
   pool: Pool;
 }
 
@@ -47,18 +66,34 @@ function validateJobEnvelope(job: Job<OutboxJobData>): string {
   return job.id;
 }
 
-async function loadObservationId(
+async function loadObservationSource(
   client: PoolClient,
   outboxEventId: string,
-): Promise<string> {
+): Promise<LoadedNormalizationSource> {
   const result = await client.query<SourceOutboxEvent>(
-    `select aggregate_id,
-            aggregate_type,
-            event_type,
-            payload ->> 'observationId' as payload_observation_id
-       from outbox_events
-      where outbox_event_id = $1
-      for key share`,
+    `select event.aggregate_id,
+            event.aggregate_type,
+            event.correlation_id,
+            event.event_type,
+            event.payload ->> 'observationId' as payload_observation_id,
+            (
+              policy.storage_permission in (
+                'aggregate_only',
+                'blob_allowed'
+              )
+              and observation.aggregate_metadata is not null
+              and jsonb_typeof(observation.aggregate_metadata) = 'object'
+              and observation.aggregate_metadata ? 'normalizationSnapshot'
+            ) as normalizable
+       from outbox_events event
+       join raw_observations observation
+         on observation.raw_observation_id = event.aggregate_id
+      join source_policy_revisions policy
+         on policy.source_policy_revision_id =
+            observation.source_policy_revision_id
+      where event.outbox_event_id = $1
+      for key share of event, policy
+      for update of observation`,
     [outboxEventId],
   );
   const event = result.rows[0];
@@ -70,13 +105,20 @@ async function loadObservationId(
   ) {
     throw new Error('INVALID_SOURCE_OUTBOX_EVENT');
   }
-  return event.aggregate_id;
+  return {
+    context: {
+      correlationId: event.correlation_id,
+      observationId: event.aggregate_id,
+      outboxEventId,
+    },
+    normalizable: event.normalizable,
+  };
 }
 
 async function recordAttempt(
   client: PoolClient,
   context: WorkerHookContext,
-  status: 'succeeded' | 'duplicate_noop',
+  status: 'succeeded' | 'duplicate_noop' | 'not_normalizable',
 ): Promise<void> {
   await client.query(
     `insert into worker_job_attempts
@@ -134,29 +176,40 @@ export function createNormalizationWorker(
 
       try {
         const result = await withTransaction(options.pool, async (client) => {
-          const observationId = await loadObservationId(client, context.outboxEventId);
+          const loadedSource = await loadObservationSource(
+            client,
+            context.outboxEventId,
+          );
+          const source = loadedSource.context;
+          if (!loadedSource.normalizable) {
+            await recordAttempt(client, context, 'not_normalizable');
+            return {
+              observationId: source.observationId,
+              outcome: 'not_normalizable' as const,
+            };
+          }
           const reserved = await client.query(
             `insert into normalization_effects
               (outbox_event_id, raw_observation_id, effect_state)
              values ($1, $2, 'accepted_for_normalization')
-             on conflict (outbox_event_id) do nothing
+             on conflict do nothing
              returning outbox_event_id`,
-            [context.outboxEventId, observationId],
+            [context.outboxEventId, source.observationId],
           );
 
           if (reserved.rowCount === 0) {
             await recordAttempt(client, context, 'duplicate_noop');
             return {
-              observationId,
+              observationId: source.observationId,
               outcome: 'duplicate_noop' as const,
             };
           }
 
-          await options.normalizeObservation(observationId);
+          await options.normalizeObservation(client, source);
           await options.beforeCommit?.(context);
           await recordAttempt(client, context, 'succeeded');
           return {
-            observationId,
+            observationId: source.observationId,
             outcome: 'accepted_for_normalization' as const,
           };
         });

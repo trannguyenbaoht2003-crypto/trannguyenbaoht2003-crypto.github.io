@@ -1,5 +1,10 @@
+import assert from 'node:assert/strict';
+
 import type { Pool } from 'pg';
 
+import { activateCatalogRevision } from '../../src/modules/catalog/activate-catalog-revision.js';
+import { importCatalogRevision } from '../../src/modules/catalog/import-catalog-revision.js';
+import { validateCatalogRevision } from '../../src/modules/catalog/validate-catalog-revision.js';
 import { registerPatchEvent } from '../../src/modules/patch/register-patch-event.js';
 import { activateSourcePolicy } from '../../src/modules/source-policy/activate-source-policy.js';
 import type { CatalogSnapshotV1 } from '../../src/modules/catalog/types.js';
@@ -105,5 +110,40 @@ export async function seedCatalogPrerequisites(pool: Pool): Promise<void> {
     patchId: CATALOG_IDS.patchId,
     patchKey: '26.15',
     reason: 'catalog test patch',
+  });
+}
+
+export async function seedActiveCatalog(
+  pool: Pool,
+  snapshot: CatalogSnapshotV1 = validCatalogSnapshot(),
+): Promise<void> {
+  await seedCatalogPrerequisites(pool);
+  await importCatalogRevision(pool, {
+    actorId: 'catalog-test',
+    catalogRevisionId: CATALOG_IDS.catalogRevisionId,
+    correlationId: 'catalog-selection-import',
+    idempotencyKey: 'catalog-selection-import',
+    patchId: CATALOG_IDS.patchId,
+    revision: 1,
+    sourceId: CATALOG_IDS.sourceId,
+    sourcePolicyRevisionId: CATALOG_IDS.sourcePolicyRevisionId,
+    snapshot,
+  });
+  const validation = await validateCatalogRevision(pool, {
+    actorId: 'catalog-validator',
+    catalogRevisionId: CATALOG_IDS.catalogRevisionId,
+    catalogValidationResultId: '42000000-0000-4000-8000-000000000001',
+    correlationId: 'catalog-selection-validation',
+    reason: 'selection test validation',
+    validatorRulesetVersion: 'catalog-rules-v1',
+  });
+  assert.equal(validation.result, 'passed');
+  await activateCatalogRevision(pool, {
+    actorId: 'catalog-operator',
+    catalogRevisionId: CATALOG_IDS.catalogRevisionId,
+    correlationId: 'catalog-selection-activation',
+    expectedCurrentCatalogRevisionId: null,
+    patchId: CATALOG_IDS.patchId,
+    reason: 'selection test activation',
   });
 }

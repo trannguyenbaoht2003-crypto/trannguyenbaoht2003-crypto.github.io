@@ -5,7 +5,13 @@ import { ingestObservation } from '../src/modules/collector/ingest-observation.j
 import { activateSourcePolicy } from '../src/modules/source-policy/activate-source-policy.js';
 import { resetDatabase, tableCount } from './helpers/database.js';
 
-async function seedPolicy(storagePermission: 'blob_allowed' | 'reference_only' | 'prohibited') {
+async function seedPolicy(
+  storagePermission:
+    | 'aggregate_only'
+    | 'blob_allowed'
+    | 'reference_only'
+    | 'prohibited',
+) {
   const pool = await resetDatabase();
   await pool.query(`
     insert into sources (source_id, source_key, display_name)
@@ -29,6 +35,17 @@ function command() {
   return {
     actorId: 'collector',
     adapterVersion: 'collector-test@1',
+    aggregateMetadata: {
+      normalizationSnapshot: {
+        schemaVersion: 1,
+        patchKey: '26.15',
+        gameModeExternalId: 'aram_mayhem',
+        origin: 'collector_detected',
+        subjectExternalId: 'samira',
+        augmentExternalIds: ['1194'],
+        itemExternalIds: ['3006', '6672'],
+      },
+    },
     collectedAt: new Date('2026-07-23T01:00:00Z'),
     correlationId: 'observation-correlation',
     externalReference: { url: 'https://example.invalid/public' },
@@ -42,11 +59,89 @@ function command() {
 test('reference-only policy never stores a raw blob', async () => {
   const pool = await seedPolicy('reference_only');
   const result = await ingestObservation(pool, command());
-  const stored = await pool.query<{ raw_blob: string | null }>(
-    'select raw_blob from raw_observations',
+  const stored = await pool.query<{
+    aggregate_metadata: unknown;
+    external_reference: unknown;
+    raw_blob: string | null;
+  }>(
+    `select aggregate_metadata, external_reference, raw_blob
+       from raw_observations`,
   );
   assert.equal(result.blobStored, false);
   assert.equal(stored.rows[0]?.raw_blob, null);
+  assert.equal(stored.rows[0]?.aggregate_metadata, null);
+  assert.deepEqual(stored.rows[0]?.external_reference, {
+    url: 'https://example.invalid/public',
+  });
+  await pool.end();
+});
+
+test('aggregate-only policy stores structured metadata without blob or reference', async () => {
+  const pool = await seedPolicy('aggregate_only');
+  const result = await ingestObservation(pool, command());
+  const stored = await pool.query<{
+    aggregate_metadata: unknown;
+    external_reference: unknown;
+    raw_blob: string | null;
+  }>(
+    `select aggregate_metadata, external_reference, raw_blob
+       from raw_observations`,
+  );
+  assert.equal(result.blobStored, false);
+  assert.equal(stored.rows[0]?.raw_blob, null);
+  assert.equal(stored.rows[0]?.external_reference, null);
+  assert.deepEqual(stored.rows[0]?.aggregate_metadata, {
+    normalizationSnapshot: {
+      schemaVersion: 1,
+      patchKey: '26.15',
+      gameModeExternalId: 'aram_mayhem',
+      origin: 'collector_detected',
+      subjectExternalId: 'samira',
+      augmentExternalIds: ['1194'],
+      itemExternalIds: ['3006', '6672'],
+    },
+  });
+  await pool.end();
+});
+
+test('aggregate-only policy rejects metadata outside the V1 boundary', async () => {
+  const pool = await seedPolicy('aggregate_only');
+  await assert.rejects(
+    ingestObservation(pool, {
+      ...command(),
+      aggregateMetadata: {
+        ...command().aggregateMetadata,
+        sourceHtml: '<p>must not be retained</p>',
+      },
+    }),
+    /NORMALIZATION_SCHEMA_UNSUPPORTED/,
+  );
+  assert.equal(await tableCount(pool, 'raw_observations'), 0);
+  assert.equal(await tableCount(pool, 'audit_events'), 0);
+  assert.equal(await tableCount(pool, 'outbox_events'), 0);
+  assert.equal(await tableCount(pool, 'idempotency_records'), 0);
+  await pool.end();
+});
+
+test('aggregate-only policy rejects sparse selections before storage', async () => {
+  const pool = await seedPolicy('aggregate_only');
+  const sparseItems = Array<string>(1);
+  await assert.rejects(
+    ingestObservation(pool, {
+      ...command(),
+      aggregateMetadata: {
+        normalizationSnapshot: {
+          ...command().aggregateMetadata.normalizationSnapshot,
+          itemExternalIds: sparseItems,
+        },
+      },
+    }),
+    /NORMALIZATION_ENTITY_ID_REQUIRED/,
+  );
+  assert.equal(await tableCount(pool, 'raw_observations'), 0);
+  assert.equal(await tableCount(pool, 'audit_events'), 0);
+  assert.equal(await tableCount(pool, 'outbox_events'), 0);
+  assert.equal(await tableCount(pool, 'idempotency_records'), 0);
   await pool.end();
 });
 
