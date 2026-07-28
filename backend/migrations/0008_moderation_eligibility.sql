@@ -887,12 +887,84 @@ begin
     select exists (
       select 1
         from current_review_quorum_evaluations current_review
+        join review_quorum_evaluations evaluation
+          on evaluation.review_quorum_evaluation_id =
+             current_review.review_quorum_evaluation_id
        where current_review.candidate_revision_id =
              snapshot.candidate_revision_id
          and current_review.review_policy_revision_id =
              snapshot.review_policy_revision_id
          and current_review.review_quorum_evaluation_id =
              snapshot.review_quorum_evaluation_id
+         and not exists (
+           select 1
+             from candidate_provenance live
+            where live.candidate_revision_id =
+                  snapshot.candidate_revision_id
+              and not exists (
+                select 1
+                  from review_input_snapshot_provenance member
+                 where member.review_input_snapshot_id =
+                       evaluation.review_input_snapshot_id
+                   and member.candidate_provenance_id =
+                       live.candidate_provenance_id
+                   and member.origin = live.origin
+              )
+         )
+         and not exists (
+           select 1
+             from review_input_snapshot_provenance member
+            where member.review_input_snapshot_id =
+                  evaluation.review_input_snapshot_id
+              and not exists (
+                select 1
+                  from candidate_provenance live
+                 where live.candidate_revision_id =
+                       snapshot.candidate_revision_id
+                   and live.candidate_provenance_id =
+                       member.candidate_provenance_id
+                   and live.origin = member.origin
+              )
+         )
+         and not exists (
+           select 1
+             from candidate_claims claim
+             left join current_claim_evidence_decisions current_evidence
+               on current_evidence.claim_id = claim.claim_id
+            where claim.candidate_revision_id =
+                  snapshot.candidate_revision_id
+              and not exists (
+                select 1
+                  from review_input_snapshot_claims member
+                 where member.review_input_snapshot_id =
+                       evaluation.review_input_snapshot_id
+                   and member.claim_id = claim.claim_id
+                   and member.importance = claim.importance
+                   and member.claim_evidence_decision_id
+                       is not distinct from
+                       current_evidence.claim_evidence_decision_id
+              )
+         )
+         and not exists (
+           select 1
+             from review_input_snapshot_claims member
+            where member.review_input_snapshot_id =
+                  evaluation.review_input_snapshot_id
+              and not exists (
+                select 1
+                  from candidate_claims claim
+                  left join current_claim_evidence_decisions
+                    current_evidence
+                    on current_evidence.claim_id = claim.claim_id
+                 where claim.candidate_revision_id =
+                       snapshot.candidate_revision_id
+                   and claim.claim_id = member.claim_id
+                   and claim.importance = member.importance
+                   and current_evidence.claim_evidence_decision_id
+                       is not distinct from
+                       member.claim_evidence_decision_id
+              )
+         )
     ) into actual_review_current;
   end if;
 
