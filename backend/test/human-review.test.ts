@@ -330,3 +330,100 @@ test('AI provenance changes Review input but never becomes Evidence', async () =
   );
   await pool.end();
 });
+
+test('T4 and T5 overlap commits one internally exact Review snapshot', async () => {
+  const pool = await resetDatabase();
+  await seedTrustReviewContext(pool);
+
+  await Promise.all([
+    recordClaimEvidenceDecision(pool, evidenceDecisionCommand({
+      associations: [],
+      claimId: TRUST_IDS.supportingClaimId,
+      correlationId: 'overlap-evidence',
+      decision: 'insufficient',
+      decisionId: TRUST_IDS.secondEvidenceDecisionId,
+      evidenceInputSnapshotId: TRUST_IDS.secondEvidenceInputSnapshotId,
+      idempotencyKey: 'overlap-evidence',
+      reason: 'No Evidence exists for this Claim.',
+    })),
+    completeHumanReview(pool, humanReviewCommand({
+      correlationId: 'overlap-review',
+      idempotencyKey: 'overlap-review',
+    })),
+  ]);
+
+  const snapshot = await pool.query<{
+    claim_count: number;
+    child_count: number;
+    second_claim_decision: string | null;
+  }>(
+    `select snapshot.claim_count,
+            count(member.*)::integer as child_count,
+            max(member.claim_evidence_decision_id::text)
+              filter (where member.claim_id = $1)
+              as second_claim_decision
+       from review_input_snapshots snapshot
+       join review_input_snapshot_claims member
+         on member.review_input_snapshot_id =
+            snapshot.review_input_snapshot_id
+      group by snapshot.review_input_snapshot_id`,
+    [TRUST_IDS.supportingClaimId],
+  );
+  assert.equal(snapshot.rows[0]?.claim_count, 2);
+  assert.equal(snapshot.rows[0]?.child_count, 2);
+  assert.ok(
+    snapshot.rows[0]?.second_claim_decision === null
+    || snapshot.rows[0]?.second_claim_decision ===
+       TRUST_IDS.secondEvidenceDecisionId,
+  );
+  await pool.end();
+});
+
+test('Candidate provenance append and T5 serialize to a complete snapshot', async () => {
+  const pool = await resetDatabase();
+  await seedTrustReviewContext(pool, false);
+
+  await Promise.all([
+    appendAiProvenance(pool),
+    completeHumanReview(pool, humanReviewCommand({
+      correlationId: 'overlap-provenance-review',
+      idempotencyKey: 'overlap-provenance-review',
+    })),
+  ]);
+
+  const snapshot = await pool.query<{
+    child_count: number;
+    provenance_count: number;
+  }>(
+    `select snapshot.provenance_count,
+            count(member.*)::integer as child_count
+       from review_input_snapshots snapshot
+       join review_input_snapshot_provenance member
+         on member.review_input_snapshot_id =
+            snapshot.review_input_snapshot_id
+      group by snapshot.review_input_snapshot_id`,
+  );
+  assert.equal(
+    snapshot.rows[0]?.provenance_count,
+    snapshot.rows[0]?.child_count,
+  );
+  assert.ok([1, 2].includes(snapshot.rows[0]?.provenance_count ?? 0));
+  await pool.end();
+});
+
+test('non-reviewer permission fails before any Review persistence', async () => {
+  const pool = await resetDatabase();
+  await seedTrustReviewContext(pool);
+
+  await assert.rejects(
+    completeHumanReview(pool, {
+      ...humanReviewCommand(),
+      permissionUsed: 'publisher',
+    } as unknown as Parameters<typeof completeHumanReview>[1]),
+    /REVIEW_PERMISSION_REQUIRED/,
+  );
+  assert.equal(await tableCount(pool, 'human_reviews'), 0);
+  assert.equal(await tableCount(pool, 'review_input_snapshots'), 0);
+  assert.equal(await tableCount(pool, 'review_quorum_evaluations'), 0);
+  await pool.end();
+});
