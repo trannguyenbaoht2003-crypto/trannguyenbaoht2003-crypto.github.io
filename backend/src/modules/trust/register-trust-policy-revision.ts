@@ -216,7 +216,18 @@ export async function registerTrustPolicyRevision(
   pool: Pool,
   input: RegisterTrustPolicyRevisionCommand,
 ): Promise<RegisterTrustPolicyRevisionResult> {
-  const command = normalizeCommand(input);
+  let command: RegisterTrustPolicyRevisionCommand;
+  try {
+    command = normalizeCommand(input);
+  } catch (error) {
+    if (
+      error instanceof Error
+      && error.message.startsWith('TRUST_OBJECT_KEYS_INVALID')
+    ) {
+      throw error;
+    }
+    throw new Error('TRUST_POLICY_INVALID', { cause: error });
+  }
   const payloadHash = policyPayloadHash(command);
   try {
     return await withTransaction(pool, async (client) => {
