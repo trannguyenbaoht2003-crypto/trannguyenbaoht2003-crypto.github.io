@@ -1227,6 +1227,7 @@ declare
   expected_input_hash text;
   missing_claim boolean;
   missing_provenance boolean;
+  stale_claim_decision boolean;
   ordinal_mismatch boolean;
   revision_signature text;
   policy_allows_ai boolean;
@@ -1312,6 +1313,21 @@ begin
 
   if missing_claim or missing_provenance then
     raise exception 'review input snapshot membership incomplete'
+      using errcode = '23514';
+  end if;
+
+  select exists (
+    select 1
+      from review_input_snapshot_claims member
+      left join current_claim_evidence_decisions current
+        on current.claim_id = member.claim_id
+     where member.review_input_snapshot_id = snapshot_id
+       and current.claim_evidence_decision_id is distinct from
+           member.claim_evidence_decision_id
+  ) into stale_claim_decision;
+
+  if stale_claim_decision then
+    raise exception 'review snapshot claim decision changed before commit'
       using errcode = '23514';
   end if;
 
