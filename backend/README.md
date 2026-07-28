@@ -2,8 +2,9 @@
 
 This runbook covers the Sprint 2A production foundation, Sprint 2B catalog
 authority, Sprint 3A deterministic normalization and Candidate Registry, and
-Sprint 3B Evidence v3 and Human Review persistence. PostgreSQL is the system
-of record; Redis/BullMQ is delivery infrastructure.
+Sprint 3B Evidence v3 and Human Review persistence, plus Sprint 4A Moderation
+and Eligibility. PostgreSQL is the system of record; Redis/BullMQ is delivery
+infrastructure.
 
 ## Prerequisites
 
@@ -75,7 +76,7 @@ REDIS_URL=redis://127.0.0.1:6379 \
 npm --prefix backend start
 ```
 
-Start the normalization worker in a separate terminal:
+Start the normalization and Eligibility workers in a separate terminal:
 
 ```bash
 DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/hai_dau_test \
@@ -114,7 +115,7 @@ If Redis is unavailable:
 3. a later dispatcher pass reclaims the same event;
 4. the deterministic `jobId` prevents a second logical BullMQ job;
 5. the worker reloads authoritative event data from PostgreSQL;
-6. a retry after a lost acknowledgement records `duplicate_noop` and creates no second normalization effect.
+6. a retry after a lost acknowledgement records `duplicate_noop` and creates no second normalization or Eligibility effect.
 
 Do not edit an outbox identity or payload to recover delivery. Database triggers intentionally reject that mutation. Diagnose connectivity, restore Redis, and let the same PostgreSQL event be dispatched again.
 
@@ -128,7 +129,8 @@ A seal makes the revision and its children immutable. Any correction requires a 
 
 Activation requires the caller's expected current revision. A stale compare-and-swap fails with `CATALOG_ACTIVE_POINTER_CONFLICT` and creates no activation side effect. Read-only selection validation requires an exact active patch, `aram_mayhem` mode, and catalog revision; stale input returns only `CATALOG_REVISION_NOT_ACTIVE` before entity or rule evaluation.
 
-Catalog lifecycle events remain in PostgreSQL. The outbox dispatcher allowlist still contains only `RawObservationIngested`, so catalog events are not normalization jobs.
+Catalog lifecycle events remain in PostgreSQL. They are not part of either
+the normalization or Eligibility queue allowlist.
 
 - No external catalog fetch.
 - No normalization.
@@ -230,8 +232,8 @@ Candidate creation.
   retaining one provenance row per observation.
 
 A retry after commit returns `duplicate_noop` and does not create another
-registry effect. Candidate outbox events are not dispatched in Sprint 3A:
-the dispatcher allowlist remains limited to `RawObservationIngested`.
+registry effect. Candidate lifecycle events now enter the Sprint 4A
+Eligibility re-evaluation queue; they never enter the normalization queue.
 
 ## Evidence v3 and Human Review persistence
 
@@ -342,11 +344,81 @@ transaction. Failure before commit rolls back every write. A lost-ack replay
 with the same payload creates no duplicate graph; a changed payload under the
 same key fails closed.
 
-Trust-layer outbox events are not dispatched in Sprint 3B. The dispatcher
-allowlist remains limited to `RawObservationIngested`; trust events are stored
-in PostgreSQL for later explicitly authorized consumers.
+`CandidateClaimSetDefined`, `ClaimEvidenceDecisionRecorded`, and
+`HumanReviewCompleted` now enter the Sprint 4A Eligibility queue. The worker
+uses only their outbox event IDs to reload authority from PostgreSQL.
 
-## Full Sprint 2A–3B gate
+## Moderation and Eligibility
+
+Sprint 4A adds backend-only, revision-scoped Moderation and Eligibility. It
+does not add Publication, UI, auth, a production scheduler, or a deployment
+path.
+
+### Policy operations
+
+Moderation and Eligibility policy revisions are immutable. Registration
+validates the exact subordinate Evidence, Review, and Moderation policy graph.
+Activation uses a narrow compare-and-swap pointer and records audit, outbox,
+and idempotency effects atomically. Operators must supply the expected current
+Eligibility policy revision; a stale expectation fails closed.
+
+### Moderation decision history
+
+Each Moderation command snapshots the exact CandidateRevision, claim-set seal,
+and complete provenance membership before appending one of `clear`,
+`needs_review`, or `blocked`. There is No default clear: a revision without a
+current Moderation decision remains unresolved. History is immutable, and the
+current pointer can only advance by timestamp and PostgreSQL sequence.
+
+### Eligibility input snapshot
+
+Eligibility snapshots pin the active Eligibility policy and its subordinate
+policies, CandidateRevision identity, claim-set seal, current Moderation,
+current Review quorum, and every required Claim with its current Evidence
+decision or explicit absence. Deferred PostgreSQL seals recompute exact
+membership, currentness, hashes, outcome, and reason rows at commit.
+
+Only required Claims determine Eligibility. Supporting and informational
+Claims remain auditable in the sealed Candidate claim set but do not directly
+change the Eligibility result.
+
+The deterministic precedence is:
+
+1. current `blocked` Moderation or a current contradicted required Claim is
+   `ineligible`;
+2. missing, stale, or `needs_review` Moderation; missing, stale, mismatched, or
+   insufficient required Evidence; and missing, stale, mismatched, or
+   unsatisfied Review quorum are `needs_review`;
+3. only current `clear` Moderation, supported required Claims under the pinned
+   policy, and a satisfied current Review quorum are `eligible`.
+
+Stale Eligibility reads needs_review. The read boundary reloads live
+PostgreSQL authority and never continues serving an old `eligible` result
+after provenance, required Evidence, Review, Moderation, or policy context
+changes.
+
+### Eligibility re-evaluation queue
+
+The dispatcher routes `RawObservationIngested` only to normalization. It
+routes `CandidateRegistered`, `CandidateRevisionRegistered`,
+`CandidateProvenanceAdded`, `CandidateClaimSetDefined`,
+`ClaimEvidenceDecisionRecorded`, `HumanReviewCompleted`, and
+`ModerationDecisionRecorded` only to `hai-dau-eligibility-v1`.
+
+PostgreSQL remains Eligibility authority. Redis carries the immutable outbox
+event identity, not Candidate IDs, policy IDs, outcomes, hashes, or other
+trust values. The worker validates the authoritative event graph, derives
+stable evaluation IDs, and records one recalculation effect. Duplicate or
+lost-ack delivery returns `duplicate_noop`; an event arriving before the claim
+seal or active policy records `not_evaluable_yet`. Queue failures record
+`ELIGIBILITY_EVALUATION_FAILED` and are retryable.
+
+Manual recovery calls `evaluateCandidateEligibility` with an explicit
+idempotency key after a queue outage, policy activation, or corrected data.
+It uses the same PostgreSQL transaction and rule engine as the worker; there
+is no privileged override.
+
+## Full Sprint 2A–4A gate
 
 The GitHub Actions workflow starts PostgreSQL 17 and Redis 7, installs both lockfiles, and runs:
 
@@ -363,18 +435,17 @@ git diff --check
 
 It also requires a clean repository after generated-output checks and scans the workflow for write permissions or deployment commands.
 
-## Sprint 2A–3B safety boundary
+## Sprint 2A–4A safety boundary
 
 - No AI discovery or generated Candidate workflow.
-- No Moderation.
-- No Eligibility.
 - No Publication. No publication command or dependency.
+- No UI.
+- No auth.
 - No production credentials.
 - No deployment.
 - No merge.
 - No external crawler.
 - No production infrastructure provisioning.
 
-Sprint 3B persists Evidence and Human Review inputs only. It creates no
-Moderation or Eligibility decision and has no publication dependency or
-command.
+Sprint 4A stops at backend Moderation and Eligibility authority. It has no
+publication dependency or command and does not merge or deploy itself.
