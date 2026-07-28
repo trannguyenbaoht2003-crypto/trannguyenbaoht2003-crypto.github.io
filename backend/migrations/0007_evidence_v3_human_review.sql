@@ -1327,7 +1327,7 @@ begin
   ) into stale_claim_decision;
 
   if stale_claim_decision then
-    raise exception 'review snapshot claim decision changed before commit'
+    raise exception 'review snapshot claim decision is not current'
       using errcode = '23514';
   end if;
 
