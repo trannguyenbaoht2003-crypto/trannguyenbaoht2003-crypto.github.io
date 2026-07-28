@@ -1,14 +1,18 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { defineCandidateClaimSet } from '../src/modules/trust/define-candidate-claim-set.js';
 import {
   recordClaimEvidenceDecision,
 } from '../src/modules/trust/record-claim-evidence-decision.js';
+import { CANDIDATE_IDS } from './helpers/candidate.js';
 import { resetDatabase, tableCount } from './helpers/database.js';
 import {
   CROSS_PATCH_IDS,
   TRUST_IDS,
+  claimSetCommand,
   evidenceDecisionCommand,
+  requiredClaim,
   seedCrossPatchClaimSet,
   seedSecondTrustCandidate,
   seedTrustClaimSet,
@@ -353,3 +357,115 @@ test('S20 cross-patch Evidence requires explicit revalidation and a new decision
   assert.equal(await tableCount(pool, 'current_claim_evidence_decisions'), 2);
   await pool.end();
 });
+
+test('concurrent T4 commands lock shared Evidence in canonical observation order', async () => {
+  const pool = await resetDatabase();
+  await seedTrustClaimSet(pool);
+  await seedSecondTrustCandidate(pool);
+  const secondClaimId = '73000000-0000-4000-8000-000000000027';
+  await defineCandidateClaimSet(pool, claimSetCommand({
+    candidateId: TRUST_IDS.secondCandidateId,
+    candidateRevisionId: TRUST_IDS.secondCandidateRevisionId,
+    claims: [requiredClaim({
+      claimId: secondClaimId,
+      claimKey: 'concurrent-build',
+      statement: 'The concurrent build is effective for this patch.',
+    })],
+    correlationId: 'concurrent-evidence-claim-set',
+    idempotencyKey: 'concurrent-evidence-claim-set',
+  }));
+
+  await pool.query(
+    \`create function test_pause_evidence_insert()
+       returns trigger
+       language plpgsql
+       as $function$
+       begin
+         perform pg_sleep(0.25);
+         return new;
+       end
+       $function$;
+     create trigger test_pause_evidence_insert
+       before insert on evidence_records
+       for each row execute function test_pause_evidence_insert()\`,
+  );
+
+  const first = evidenceDecisionCommand({
+    associations: [
+      {
+        associationId: '73000000-0000-4000-8000-000000000101',
+        crossPatchRevalidated: false,
+        evidenceId: TRUST_IDS.evidenceId,
+        normalizedObservationId: CANDIDATE_IDS.normalizedObservationId,
+        revalidationReason: null,
+        stance: 'supports',
+      },
+      {
+        associationId: '73000000-0000-4000-8000-000000000104',
+        crossPatchRevalidated: false,
+        evidenceId: TRUST_IDS.alternateEvidenceId,
+        normalizedObservationId: TRUST_IDS.secondNormalizedObservationId,
+        revalidationReason: null,
+        stance: 'supports',
+      },
+    ],
+    correlationId: 'concurrent-evidence-first',
+    decisionId: '73000000-0000-4000-8000-000000000105',
+    evidenceInputSnapshotId:
+      '73000000-0000-4000-8000-000000000106',
+    idempotencyKey: 'concurrent-evidence-first',
+  });
+  const second = evidenceDecisionCommand({
+    associations: [
+      {
+        associationId: '73000000-0000-4000-8000-000000000102',
+        crossPatchRevalidated: false,
+        evidenceId: TRUST_IDS.alternateEvidenceId,
+        normalizedObservationId: TRUST_IDS.secondNormalizedObservationId,
+        revalidationReason: null,
+        stance: 'supports',
+      },
+      {
+        associationId: '73000000-0000-4000-8000-000000000103',
+        crossPatchRevalidated: false,
+        evidenceId: TRUST_IDS.evidenceId,
+        normalizedObservationId: CANDIDATE_IDS.normalizedObservationId,
+        revalidationReason: null,
+        stance: 'supports',
+      },
+    ],
+    candidateId: TRUST_IDS.secondCandidateId,
+    candidateRevisionId: TRUST_IDS.secondCandidateRevisionId,
+    claimId: secondClaimId,
+    correlationId: 'concurrent-evidence-second',
+    decisionId: '73000000-0000-4000-8000-000000000107',
+    evidenceInputSnapshotId:
+      '73000000-0000-4000-8000-000000000108',
+    idempotencyKey: 'concurrent-evidence-second',
+  });
+
+  let outcomes: PromiseSettledResult<unknown>[] = [];
+  try {
+    outcomes = await Promise.allSettled([
+      recordClaimEvidenceDecision(pool, first),
+      recordClaimEvidenceDecision(pool, second),
+    ]);
+  } finally {
+    await pool.query(
+      'drop trigger test_pause_evidence_insert on evidence_records',
+    );
+    await pool.query('drop function test_pause_evidence_insert()');
+    await pool.end();
+  }
+
+  assert.deepEqual(
+    outcomes.map((outcome) => outcome.status),
+    ['fulfilled', 'fulfilled'],
+    outcomes.map((outcome) => (
+      outcome.status === 'rejected'
+        ? String(outcome.reason)
+        : 'fulfilled'
+    )).join('\n'),
+  );
+});
+
