@@ -1,6 +1,12 @@
 import type {
   RegisterModerationPolicyRevisionCommand,
 } from '../../src/modules/moderation/register-moderation-policy-revision.js';
+import {
+  registerModerationPolicyRevision,
+} from '../../src/modules/moderation/register-moderation-policy-revision.js';
+import type {
+  RecordCandidateModerationDecisionCommand,
+} from '../../src/modules/moderation/record-candidate-moderation-decision.js';
 import type {
   ActivateEligibilityPolicyRevisionCommand,
 } from '../../src/modules/eligibility/activate-eligibility-policy-revision.js';
@@ -8,12 +14,22 @@ import type {
   RegisterEligibilityPolicyRevisionCommand,
 } from '../../src/modules/eligibility/register-eligibility-policy-revision.js';
 import { TRUST_IDS } from './trust.js';
+import { seedTrustReviewContext } from './trust.js';
+import type { Pool } from 'pg';
 
 export const GATE_IDS = {
   moderationPolicyId: '76000000-0000-4000-8000-000000000001',
   eligibilityPolicyId: '76000000-0000-4000-8000-000000000002',
   alternateEligibilityPolicyId:
     '76000000-0000-4000-8000-000000000003',
+  moderationInputSnapshotId:
+    '76000000-0000-4000-8000-000000000004',
+  moderationDecisionId:
+    '76000000-0000-4000-8000-000000000005',
+  secondModerationInputSnapshotId:
+    '76000000-0000-4000-8000-000000000006',
+  secondModerationDecisionId:
+    '76000000-0000-4000-8000-000000000007',
 } as const;
 
 export function moderationPolicyCommand(
@@ -63,4 +79,31 @@ export function activationCommand(
     reason: 'Activate the first CandidateRevision Eligibility policy.',
     ...overrides,
   };
+}
+
+export function moderationDecisionCommand(
+  overrides: Partial<RecordCandidateModerationDecisionCommand> = {},
+): RecordCandidateModerationDecisionCommand {
+  return {
+    actorId: 'candidate-moderator',
+    candidateId: '62000000-0000-4000-8000-000000000001',
+    candidateRevisionId: '62000000-0000-4000-8000-000000000002',
+    correlationId: 'moderation-decision-v1',
+    decisionId: GATE_IDS.moderationDecisionId,
+    evaluatedAt: '2026-07-28T11:00:00.000Z',
+    idempotencyKey: 'moderation-decision-v1',
+    inputSnapshotId: GATE_IDS.moderationInputSnapshotId,
+    moderationPolicyRevisionId: GATE_IDS.moderationPolicyId,
+    outcome: 'clear',
+    reason: 'CandidateRevision content passed Moderation.',
+    ...overrides,
+  };
+}
+
+export async function seedModerationContext(pool: Pool): Promise<void> {
+  await seedTrustReviewContext(pool, false);
+  await registerModerationPolicyRevision(
+    pool,
+    moderationPolicyCommand(),
+  );
 }
