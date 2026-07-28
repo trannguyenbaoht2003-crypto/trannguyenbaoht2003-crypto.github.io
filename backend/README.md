@@ -1,8 +1,9 @@
 # Hải Đấu backend runbook
 
 This runbook covers the Sprint 2A production foundation, Sprint 2B catalog
-authority, and Sprint 3A deterministic normalization and Candidate Registry.
-PostgreSQL is the system of record; Redis/BullMQ is delivery infrastructure.
+authority, Sprint 3A deterministic normalization and Candidate Registry, and
+Sprint 3B Evidence v3 and Human Review persistence. PostgreSQL is the system
+of record; Redis/BullMQ is delivery infrastructure.
 
 ## Prerequisites
 
@@ -232,7 +233,120 @@ A retry after commit returns `duplicate_noop` and does not create another
 registry effect. Candidate outbox events are not dispatched in Sprint 3A:
 the dispatcher allowlist remains limited to `RawObservationIngested`.
 
-## Full Sprint 2A–3A gate
+## Evidence v3 and Human Review persistence
+
+Sprint 3B adds Claim-level Evidence and completed Human Review history to an
+immutable CandidateRevision. It does not turn either result into publication
+authority. PostgreSQL remains authoritative, and all commands reload their
+Candidate, CandidateRevision, Claim, Evidence, provenance, and current
+decision inputs from PostgreSQL rather than accepting Redis delivery data as
+a trust input.
+
+Evidence and Review policy revisions are immutable and explicitly pinned by
+each downstream record. Sprint 3B has no active-policy pointer and defines no
+confidence score or hidden default. The cross-layer `TrustTupleV1` grammar
+hashes UTF-8 byte-length-prefixed tokens with SHA-256, so TypeScript and
+PostgreSQL recompute identical claim-set, Evidence-snapshot, review-snapshot,
+and quorum hashes.
+
+### Candidate claim-set seal
+
+`defineCandidateClaimSet` creates the complete Claim set and its Candidate
+claim-set seal in one transaction. Every Claim pins its Candidate,
+CandidateRevision, Patch, and CatalogRevision; a set must contain at least one
+Claim and at least one `required` Claim. Claim keys use printable non-space
+ASCII, statements are exact bounded UTF-8 values, and the canonical seal sorts
+by claim key using C ordering.
+
+The seal is immutable and unique per CandidateRevision. A replay with the
+same idempotency key and payload returns the recorded result without another
+Claim, seal, audit, or outbox row. A second key cannot append to, remove from,
+or replace the sealed set. Existing CandidateRevisions are not backfilled with
+invented Claims and cannot enter Evidence or Review until sealed.
+
+### Evidence records and associations
+
+An Evidence record references one authoritative NormalizedObservation and its
+RawObservation, Source, Source Policy revision, Patch, and content hash. It
+does not copy source text, HTML, comments, transcripts, images, blobs, or
+external references into the trust graph. AI provenance is not Evidence.
+
+An Evidence association belongs to one Claim and has stance `supports`,
+`contradicts`, or `context_only`. Cross-patch revalidation is explicit: when
+the Evidence source Patch differs from the Claim Patch, the association must
+set the revalidation flag and provide a non-empty reason. This makes the
+Evidence available to a new Patch-specific decision; it never carries an old
+Patch decision forward.
+
+### Evidence input snapshot and decision history
+
+Each Evidence input snapshot pins the Claim, Candidate, CandidateRevision,
+Patch, CatalogRevision, Candidate claim-set seal, Claim statement hash,
+Evidence policy revision, and exact ordered association membership. Deferred
+PostgreSQL guards recompute the count and canonical hash at commit.
+
+Each Claim-level decision is immutable and is one of `supported`,
+`insufficient`, or `contradicted`. `supported` needs at least one `supports`
+association, `contradicted` needs at least one `contradicts` association, and
+`insufficient` may use an empty input set. Before the first evaluation, a
+Claim has no decision; absence is not silently converted to `insufficient`.
+
+Evidence decision history is append-only. Re-evaluation creates a new input
+snapshot and decision, then advances only that Claim's narrow current pointer.
+Semantic replay succeeds only while its decision remains current, and stale
+input cannot move the pointer backward. Multiple required Claims therefore
+retain independent current decisions. A new Patch requires a new Claim,
+Evidence input snapshot, and decision.
+
+### Human Review input snapshot
+
+`completeHumanReview` snapshots the exact CandidateRevision visible to the
+reviewer: normalized signature, Patch, CatalogRevision, claim-set seal, every
+Claim and its current Evidence decision or explicit absence, every Candidate
+provenance row and origin, and the exact Review policy revision. A new current
+Evidence decision or new provenance changes the input hash, so reviews of
+different snapshots never combine.
+
+Sprint 3B persists only immutable reviews with status `completed`, permission
+`reviewer`, and outcome `confirmed`, `changes_requested`, or `declined`.
+There is no shared `approved` state. Only a distinct review matching
+`completed + confirmed + reviewer`, the same CandidateRevision, policy, and
+exact input hash is eligible to count.
+
+### Review quorum
+
+Every Review quorum evaluation stores its required confirmed count, exact
+eligible Review membership, distinct reviewer identities, calculated count,
+input hash, and `quorum_satisfied` result. The evaluation history is
+append-only; one narrow current pointer exists per CandidateRevision and
+Review policy revision. Reviews with a different input hash, wrong permission,
+non-confirmed outcome, duplicate reviewer, wrong policy, or wrong Candidate
+cannot be counted.
+
+Concurrent completions serialize and each successful command records a new
+immutable review and quorum evaluation. The first review may leave quorum
+unsatisfied; a later distinct eligible reviewer may advance the pointer to a
+satisfied evaluation without overwriting history.
+
+### Transactions, replay, and dispatch boundary
+
+Trust commands acquire locks in the shared order Candidate → CandidateRevision → Claim.
+Claim rows are ordered canonically before any Evidence/association or
+current-pointer lock. This keeps Evidence re-evaluation, Human Review snapshot
+creation, and Sprint 3A provenance appends deadlock-free.
+
+Policy registration, claim-set definition, Evidence decisions, and Human
+Review completion write their domain history, current pointer when applicable,
+audit event, outbox event, and idempotency result in one PostgreSQL
+transaction. Failure before commit rolls back every write. A lost-ack replay
+with the same payload creates no duplicate graph; a changed payload under the
+same key fails closed.
+
+Trust-layer outbox events are not dispatched in Sprint 3B. The dispatcher
+allowlist remains limited to `RawObservationIngested`; trust events are stored
+in PostgreSQL for later explicitly authorized consumers.
+
+## Full Sprint 2A–3B gate
 
 The GitHub Actions workflow starts PostgreSQL 17 and Redis 7, installs both lockfiles, and runs:
 
@@ -249,10 +363,11 @@ git diff --check
 
 It also requires a clean repository after generated-output checks and scans the workflow for write permissions or deployment commands.
 
-## Sprint 2A–3A safety boundary
+## Sprint 2A–3B safety boundary
 
-- No Evidence.
-- No AI.
+- No AI discovery or generated Candidate workflow.
+- No Moderation.
+- No Eligibility.
 - No Publication. No publication command or dependency.
 - No production credentials.
 - No deployment.
@@ -260,6 +375,6 @@ It also requires a clean repository after generated-output checks and scans the 
 - No external crawler.
 - No production infrastructure provisioning.
 
-The worker registers deterministic Candidates only. It creates no Evidence,
-review, eligibility, or publication decision and has no publication
-dependency or command.
+Sprint 3B persists Evidence and Human Review inputs only. It creates no
+Moderation or Eligibility decision and has no publication dependency or
+command.
