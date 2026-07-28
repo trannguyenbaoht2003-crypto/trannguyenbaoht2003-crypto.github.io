@@ -6,8 +6,10 @@ import {
 } from '../src/modules/trust/record-claim-evidence-decision.js';
 import { resetDatabase, tableCount } from './helpers/database.js';
 import {
+  CROSS_PATCH_IDS,
   TRUST_IDS,
   evidenceDecisionCommand,
+  seedCrossPatchClaimSet,
   seedSecondTrustCandidate,
   seedTrustClaimSet,
 } from './helpers/trust.js';
@@ -284,5 +286,70 @@ test('late Decision identity conflict rolls back new Evidence graph', async () =
     /claim_evidence_decisions_pkey/,
   );
   assert.deepEqual(await evidenceCounts(pool), before);
+  await pool.end();
+});
+
+test('S20 cross-patch Evidence requires explicit revalidation and a new decision', async () => {
+  const pool = await resetDatabase();
+  await seedTrustClaimSet(pool);
+  await recordClaimEvidenceDecision(pool, evidenceDecisionCommand());
+  await seedCrossPatchClaimSet(pool);
+
+  const crossPatchCommand = evidenceDecisionCommand({
+    associations: [
+      {
+        associationId: CROSS_PATCH_IDS.associationId,
+        crossPatchRevalidated: false,
+        evidenceId: TRUST_IDS.evidenceId,
+        normalizedObservationId:
+          evidenceDecisionCommand().associations[0]!.normalizedObservationId,
+        revalidationReason: null,
+        stance: 'supports',
+      },
+    ],
+    candidateId: CROSS_PATCH_IDS.candidateId,
+    candidateRevisionId: CROSS_PATCH_IDS.candidateRevisionId,
+    claimId: CROSS_PATCH_IDS.claimId,
+    correlationId: 'cross-patch-decision',
+    decisionId: CROSS_PATCH_IDS.decisionId,
+    evidenceInputSnapshotId: CROSS_PATCH_IDS.inputSnapshotId,
+    idempotencyKey: 'cross-patch-decision',
+  });
+  await assert.rejects(
+    recordClaimEvidenceDecision(pool, crossPatchCommand),
+    /EVIDENCE_ASSOCIATION_PATCH_REVALIDATION_REQUIRED/,
+  );
+
+  const result = await recordClaimEvidenceDecision(pool, {
+    ...crossPatchCommand,
+    associations: crossPatchCommand.associations.map((association) => ({
+      ...association,
+      crossPatchRevalidated: true,
+      revalidationReason:
+        'The old observation was revalidated against patch 26.16.',
+    })),
+  });
+  assert.equal(result.decision, 'supported');
+
+  const graph = await pool.query<{
+    cross_patch_revalidated: boolean;
+    decision_patch_id: string;
+    evidence_patch_id: string;
+  }>(
+    `select association.cross_patch_revalidated,
+            association.decision_patch_id,
+            association.evidence_patch_id
+       from evidence_associations association
+      where association.evidence_association_id = $1`,
+    [CROSS_PATCH_IDS.associationId],
+  );
+  assert.equal(graph.rows[0]?.cross_patch_revalidated, true);
+  assert.notEqual(
+    graph.rows[0]?.decision_patch_id,
+    graph.rows[0]?.evidence_patch_id,
+  );
+  assert.equal(await tableCount(pool, 'evidence_records'), 1);
+  assert.equal(await tableCount(pool, 'claim_evidence_decisions'), 2);
+  assert.equal(await tableCount(pool, 'current_claim_evidence_decisions'), 2);
   await pool.end();
 });
