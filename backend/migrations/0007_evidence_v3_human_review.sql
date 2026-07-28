@@ -925,6 +925,7 @@ declare
   association_tokens text[];
   expected_hash text;
   ordinal_mismatch boolean;
+  actual_claim_statement_hash text;
 begin
   snapshot_id := case
     when tg_table_name = 'evidence_input_snapshots'
@@ -938,6 +939,22 @@ begin
    where evidence_input_snapshot_id = snapshot_id;
   if not found then
     raise exception 'evidence input snapshot missing'
+      using errcode = '23514';
+  end if;
+
+  select claim.statement_hash
+    into actual_claim_statement_hash
+    from candidate_claims claim
+   where claim.claim_id = snapshot.claim_id
+     and claim.candidate_id = snapshot.candidate_id
+     and claim.candidate_revision_id = snapshot.candidate_revision_id
+     and claim.patch_id = snapshot.patch_id
+     and claim.catalog_revision_id = snapshot.catalog_revision_id;
+
+  if not found
+     or actual_claim_statement_hash is distinct from
+        snapshot.claim_statement_hash then
+    raise exception 'evidence snapshot claim statement hash mismatch'
       using errcode = '23514';
   end if;
 
