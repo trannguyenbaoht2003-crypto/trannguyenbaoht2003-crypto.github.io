@@ -561,8 +561,15 @@ export async function recordClaimEvidenceDecision(
       [command.claimId],
     );
     const current = currentResult.rows[0];
+    const resolutionOrder = [...command.associations].sort((left, right) => (
+      compareCanonical(
+        left.normalizedObservationId,
+        right.normalizedObservationId,
+      )
+      || compareCanonical(left.associationId, right.associationId)
+    ));
     const resolved: ResolvedAssociation[] = [];
-    for (const association of command.associations) {
+    for (const association of resolutionOrder) {
       resolved.push(await resolveAssociation(
         client,
         command,
