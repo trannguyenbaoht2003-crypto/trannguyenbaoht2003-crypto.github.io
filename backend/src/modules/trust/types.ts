@@ -71,3 +71,29 @@ export interface RegisterTrustPolicyRevisionResult {
   policyRevisionId: string;
   replayed: boolean;
 }
+
+export interface DefineCandidateClaimSetCommand {
+  actorId: string;
+  candidateId: string;
+  candidateRevisionId: string;
+  claims: CandidateClaimInput[];
+  correlationId: string;
+  idempotencyKey: string;
+}
+
+export interface DefineCandidateClaimSetResult {
+  candidateId: string;
+  candidateRevisionId: string;
+  claimIds: string[];
+  claimSetHash: string;
+  replayed: boolean;
+}
+
+export interface CandidateRevisionAuthority {
+  candidateId: string;
+  candidateRevisionId: string;
+  patchId: string;
+  catalogRevisionId: string;
+  canonicalPayload: unknown;
+  normalizedSignature: string;
+}
