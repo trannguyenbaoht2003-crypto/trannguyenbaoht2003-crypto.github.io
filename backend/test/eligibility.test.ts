@@ -150,8 +150,30 @@ test('Eligibility blocked Moderation takes precedence over missing Review', asyn
 test('Eligibility required contradiction takes precedence over missing Moderation', async () => {
   const pool = await resetDatabase();
   await seedActivatedGateContext(pool);
+  const contradictoryRawObservationId =
+    '76000000-0000-4000-8000-000000000030';
+  const contradictoryNormalizedObservationId =
+    '76000000-0000-4000-8000-000000000031';
+  await seedRawObservation(pool, contradictoryRawObservationId);
+  await registerNormalizedObservation(pool, registrationCommand({
+    candidateId: CANDIDATE_IDS.candidateId,
+    candidateRevisionId: CANDIDATE_IDS.candidateRevisionId,
+    normalizedObservationId:
+      contradictoryNormalizedObservationId,
+    provenanceId: '76000000-0000-4000-8000-000000000032',
+    rawObservationId: contradictoryRawObservationId,
+    snapshot: validNormalizationSnapshot('editorial'),
+  }));
   await recordClaimEvidenceDecision(pool, evidenceDecisionCommand({
-    associations: [],
+    associations: [{
+      associationId: TRUST_IDS.alternateAssociationId,
+      crossPatchRevalidated: false,
+      evidenceId: TRUST_IDS.alternateEvidenceId,
+      normalizedObservationId:
+        contradictoryNormalizedObservationId,
+      revalidationReason: null,
+      stance: 'contradicts',
+    }],
     correlationId: 'eligibility-required-contradiction',
     decision: 'contradicted',
     decisionId: TRUST_IDS.secondEvidenceDecisionId,
