@@ -5,7 +5,16 @@ import { resetDatabase } from './helpers/database.js';
 
 const GATE_POLICY_TABLES = [
   'active_eligibility_policy_revision',
+  'candidate_eligibility_evaluation_reasons',
+  'candidate_eligibility_evaluations',
+  'current_candidate_eligibility_evaluations',
+  'eligibility_input_snapshot_required_claims',
+  'eligibility_input_snapshots',
   'eligibility_policy_revisions',
+  'eligibility_recalculation_effects',
+  'moderation_decisions',
+  'moderation_input_snapshot_provenance',
+  'moderation_input_snapshots',
   'moderation_policy_revisions',
 ] as const;
 

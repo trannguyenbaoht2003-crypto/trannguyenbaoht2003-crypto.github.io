@@ -84,3 +84,33 @@ export interface ActivateEligibilityPolicyRevisionResult {
   previousEligibilityPolicyRevisionId: string | null;
   replayed: boolean;
 }
+
+export interface EvaluateCandidateEligibilityCommand {
+  actorId: string;
+  candidateId: string;
+  candidateRevisionId: string;
+  correlationId: string;
+  evaluatedAt: string;
+  evaluationId: string;
+  idempotencyKey: string;
+  inputSnapshotId: string;
+}
+
+export interface EvaluateCandidateEligibilityResult {
+  candidateRevisionId: string;
+  eligibilityPolicyRevisionId: string;
+  evaluationId: string;
+  inputHash: string;
+  outcome: EligibilityOutcome;
+  reasons: EligibilityReasonCode[];
+  replayed: boolean;
+}
+
+export interface CandidateEligibilityStatus {
+  activeEligibilityPolicyRevisionId: string | null;
+  candidateRevisionId: string;
+  currentEvaluationId: string | null;
+  outcome: EligibilityOutcome;
+  reasons: EligibilityReasonCode[];
+  stale: boolean;
+}
