@@ -97,3 +97,37 @@ export interface CandidateRevisionAuthority {
   canonicalPayload: unknown;
   normalizedSignature: string;
 }
+
+export interface EvidenceAssociationInput {
+  associationId: string;
+  evidenceId: string;
+  normalizedObservationId: string;
+  stance: EvidenceStance;
+  crossPatchRevalidated: boolean;
+  revalidationReason: string | null;
+}
+
+export interface RecordClaimEvidenceDecisionCommand {
+  actorId: string;
+  candidateId: string;
+  candidateRevisionId: string;
+  claimId: string;
+  correlationId: string;
+  decision: EvidenceDecision;
+  decisionId: string;
+  evaluatedAt: string;
+  evidenceInputSnapshotId: string;
+  evidencePolicyRevisionId: string;
+  idempotencyKey: string;
+  reason: string;
+  associations: EvidenceAssociationInput[];
+}
+
+export interface RecordClaimEvidenceDecisionResult {
+  claimId: string;
+  decisionId: string;
+  decision: EvidenceDecision;
+  evidenceInputSnapshotId: string;
+  inputHash: string;
+  replayed: boolean;
+}
