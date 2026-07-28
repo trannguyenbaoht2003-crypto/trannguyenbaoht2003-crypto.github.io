@@ -381,7 +381,7 @@ create table evidence_input_snapshot_associations (
 create table claim_evidence_decisions (
   claim_evidence_decision_id uuid primary key,
   claim_id uuid not null,
-  evidence_input_snapshot_id uuid not null,
+  evidence_input_snapshot_id uuid not null unique,
   candidate_id uuid not null,
   candidate_revision_id uuid not null,
   patch_id uuid not null,
