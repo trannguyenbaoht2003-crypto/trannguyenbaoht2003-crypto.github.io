@@ -15,6 +15,7 @@ function testDatabaseUrl(): string {
 
 const expectedTables = [
   'active_catalog_revisions',
+  'active_eligibility_policy_revision',
   'active_source_policies',
   'audit_events',
   'candidate_claim_set_seals',
@@ -30,6 +31,7 @@ const expectedTables = [
   'compatibility_rules',
   'current_claim_evidence_decisions',
   'current_review_quorum_evaluations',
+  'eligibility_policy_revisions',
   'evidence_associations',
   'evidence_input_snapshot_associations',
   'evidence_input_snapshots',
@@ -39,6 +41,7 @@ const expectedTables = [
   'game_entity_revisions',
   'human_reviews',
   'idempotency_records',
+  'moderation_policy_revisions',
   'normalization_effects',
   'normalized_observations',
   'outbox_events',
