@@ -38,3 +38,36 @@ export interface NormalizedClaimSet {
   claims: NormalizedCandidateClaim[];
   claimSetHash: string;
 }
+
+export type RegisterTrustPolicyRevisionCommand =
+  | {
+      policyKind: 'evidence';
+      policyRevisionId: string;
+      policyKey: string;
+      revision: number;
+      schemaVersion: 1;
+      actorId: string;
+      reason: string;
+      correlationId: string;
+      idempotencyKey: string;
+    }
+  | {
+      policyKind: 'human_review';
+      policyRevisionId: string;
+      policyKey: string;
+      revision: number;
+      minimumConfirmedReviews: number;
+      requireDistinctReviewers: true;
+      requiredPermission: 'reviewer';
+      appliesToAiProvenance: boolean;
+      actorId: string;
+      reason: string;
+      correlationId: string;
+      idempotencyKey: string;
+    };
+
+export interface RegisterTrustPolicyRevisionResult {
+  policyKind: 'evidence' | 'human_review';
+  policyRevisionId: string;
+  replayed: boolean;
+}
