@@ -1,4 +1,4 @@
-name: Sprint 3A deterministic candidate registry gate
+name: Sprint 3B evidence and human review persistence gate
 
 on:
   workflow_dispatch:
@@ -16,12 +16,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: sprint-3a-deterministic-candidate-registry-${{ github.ref }}
+  group: sprint-3b-evidence-human-review-persistence-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   verify:
-    name: verify deterministic candidate registry
+    name: verify evidence and human review persistence
     runs-on: ubuntu-latest
     timeout-minutes: 40
     services:
@@ -111,7 +111,19 @@ jobs:
             "Scenario S21",
             "reference_only cannot supply a stored aggregate snapshot",
             "Candidate outbox events are not dispatched in Sprint 3A",
-            "No Evidence",
+            "Claim-level Evidence",
+            "Candidate claim-set seal",
+            "Evidence input snapshot",
+            "Evidence decision history",
+            "Cross-patch revalidation",
+            "Human Review input snapshot",
+            "completed + confirmed",
+            "Review quorum",
+            "Candidate → CandidateRevision → Claim",
+            "AI provenance is not Evidence",
+            "Trust-layer outbox events are not dispatched in Sprint 3B",
+            "No Moderation",
+            "No Eligibility",
             "No Publication",
             "No merge",
           ]) {
@@ -165,7 +177,7 @@ jobs:
         run: |
           set -euo pipefail
           workflow=".github/workflows/backend-production-foundation.yml"
-          executable="$RUNNER_TEMP/sprint-3a-deterministic-candidate-registry-before-guard.yml"
+          executable="$RUNNER_TEMP/sprint-3b-evidence-human-review-persistence-before-guard.yml"
           sed '/- name: Deployment guard/,$d' "$workflow" > "$executable"
           ! grep -Eq '(contents|packages|pages|id-token):[[:space:]]*write' "$workflow"
           ! grep -Eq 'git push|wrangler[[:space:]]+deploy|npm run deploy|actions/deploy-pages' "$executable"
