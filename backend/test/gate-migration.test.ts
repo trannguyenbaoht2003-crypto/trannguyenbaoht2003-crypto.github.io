@@ -129,7 +129,7 @@ test('PostgreSQL rejects Eligibility when a required Claim member is omitted', a
        moderation_outcome, moderation_current,
        review_quorum_evaluation_id, review_quorum_satisfied,
        review_current, required_claim_count, required_claim_set_hash,
-      input_hash, created_by)
+       input_hash, created_by)
      select $1, candidate_id, candidate_revision_id, patch_id,
             catalog_revision_id, candidate_normalized_signature,
             candidate_claim_set_seal_id, claim_set_hash,
