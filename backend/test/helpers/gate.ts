@@ -14,6 +14,9 @@ import type {
   RegisterEligibilityPolicyRevisionCommand,
 } from '../../src/modules/eligibility/register-eligibility-policy-revision.js';
 import {
+  registerEligibilityPolicyRevision,
+} from '../../src/modules/eligibility/register-eligibility-policy-revision.js';
+import {
   activateEligibilityPolicyRevision,
 } from '../../src/modules/eligibility/activate-eligibility-policy-revision.js';
 import {
