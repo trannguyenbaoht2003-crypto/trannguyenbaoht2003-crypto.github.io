@@ -666,7 +666,7 @@ $$;
 create or replace function enforce_eligibility_input_snapshot_seal()
 returns trigger
 language plpgsql
-as $
+as $$
 declare
   snapshot_id uuid;
   snapshot eligibility_input_snapshots%rowtype;
@@ -933,12 +933,12 @@ begin
   end if;
   return new;
 end;
-$;
+$$;
 
 create or replace function enforce_eligibility_evaluation_result()
 returns trigger
 language plpgsql
-as $
+as $$
 declare
   evaluation_id uuid;
   evaluation candidate_eligibility_evaluations%rowtype;
@@ -1056,7 +1056,7 @@ begin
   end if;
   return new;
 end;
-$;
+$$;
 
 create or replace function enforce_current_candidate_moderation_graph()
 returns trigger
@@ -1187,6 +1187,7 @@ create constraint trigger eligibility_evaluation_result_from_reason
 after insert on candidate_eligibility_evaluation_reasons
 deferrable initially deferred
 for each row execute function enforce_eligibility_evaluation_result();
+
 create trigger current_candidate_moderation_graph_guard
 before insert or update or delete
 on current_candidate_moderation_decisions
