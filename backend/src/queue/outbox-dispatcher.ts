@@ -82,7 +82,7 @@ async function claimEvents(
                  event.aggregate_id,
                  event.event_type,
                  event.payload,
-                 event.correlation_id ,
+                 event.correlation_id`,
       [eventTypes, batchSize, leaseToken, leaseMs],
     );
     return result.rows;
