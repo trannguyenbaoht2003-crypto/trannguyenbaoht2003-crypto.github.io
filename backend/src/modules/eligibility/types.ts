@@ -49,3 +49,37 @@ export interface EligibilityComputation {
   outcome: EligibilityOutcome;
   reasons: EligibilityReasonCode[];
 }
+
+export interface RegisterEligibilityPolicyRevisionCommand {
+  actorId: string;
+  correlationId: string;
+  eligibilityPolicyRevisionId: string;
+  evidencePolicyRevisionId: string;
+  idempotencyKey: string;
+  moderationPolicyRevisionId: string;
+  policyKey: string;
+  reason: string;
+  reviewPolicyRevisionId: string;
+  revision: number;
+  schemaVersion: 1;
+}
+
+export interface RegisterEligibilityPolicyRevisionResult {
+  eligibilityPolicyRevisionId: string;
+  replayed: boolean;
+}
+
+export interface ActivateEligibilityPolicyRevisionCommand {
+  actorId: string;
+  correlationId: string;
+  eligibilityPolicyRevisionId: string;
+  expectedCurrentEligibilityPolicyRevisionId: string | null;
+  idempotencyKey: string;
+  reason: string;
+}
+
+export interface ActivateEligibilityPolicyRevisionResult {
+  currentEligibilityPolicyRevisionId: string;
+  previousEligibilityPolicyRevisionId: string | null;
+  replayed: boolean;
+}
