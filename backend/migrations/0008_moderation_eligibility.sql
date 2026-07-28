@@ -63,10 +63,420 @@ create table active_eligibility_policy_revision (
   updated_at timestamptz not null default clock_timestamp()
 );
 
+alter table candidate_provenance
+  add constraint candidate_provenance_moderation_identity_unique
+  unique (
+    candidate_provenance_id,
+    candidate_revision_id,
+    origin
+  );
+
+create table moderation_input_snapshots (
+  moderation_input_snapshot_id uuid primary key,
+  candidate_id uuid not null,
+  candidate_revision_id uuid not null,
+  patch_id uuid not null,
+  catalog_revision_id uuid not null,
+  candidate_normalized_signature text not null
+    check (candidate_normalized_signature ~ '^[a-f0-9]{64}$'),
+  candidate_claim_set_seal_id uuid not null,
+  claim_set_hash text not null
+    check (claim_set_hash ~ '^[a-f0-9]{64}$'),
+  claim_count integer not null check (claim_count > 0),
+  provenance_count integer not null check (provenance_count > 0),
+  provenance_set_hash text not null
+    check (provenance_set_hash ~ '^[a-f0-9]{64}$'),
+  moderation_policy_revision_id uuid not null
+    references moderation_policy_revisions(
+      moderation_policy_revision_id
+    ),
+  input_hash text not null
+    check (input_hash ~ '^[a-f0-9]{64}$'),
+  created_by text not null
+    check (octet_length(created_by) between 1 and 256),
+  created_at timestamptz not null default clock_timestamp(),
+  unique (
+    candidate_revision_id,
+    moderation_policy_revision_id,
+    input_hash
+  ),
+  unique (
+    moderation_input_snapshot_id,
+    candidate_id,
+    candidate_revision_id,
+    patch_id,
+    catalog_revision_id,
+    moderation_policy_revision_id,
+    input_hash
+  ),
+  foreign key (
+    candidate_revision_id,
+    candidate_id,
+    patch_id,
+    catalog_revision_id
+  ) references candidate_revisions (
+    candidate_revision_id,
+    candidate_id,
+    patch_id,
+    catalog_revision_id
+  ),
+  foreign key (
+    candidate_claim_set_seal_id,
+    candidate_id,
+    candidate_revision_id,
+    patch_id,
+    catalog_revision_id,
+    claim_set_hash
+  ) references candidate_claim_set_seals (
+    candidate_claim_set_seal_id,
+    candidate_id,
+    candidate_revision_id,
+    patch_id,
+    catalog_revision_id,
+    claim_set_hash
+  )
+);
+
+create table moderation_input_snapshot_provenance (
+  moderation_input_snapshot_id uuid not null
+    references moderation_input_snapshots(
+      moderation_input_snapshot_id
+    ),
+  candidate_provenance_id uuid not null,
+  candidate_revision_id uuid not null,
+  origin text not null
+    check (
+      origin in (
+        'collector_detected',
+        'community_submitted',
+        'editorial',
+        'ai_generated'
+      )
+    ),
+  ordinal integer not null check (ordinal > 0),
+  created_at timestamptz not null default clock_timestamp(),
+  primary key (
+    moderation_input_snapshot_id,
+    candidate_provenance_id
+  ),
+  unique (moderation_input_snapshot_id, ordinal),
+  foreign key (
+    candidate_provenance_id,
+    candidate_revision_id,
+    origin
+  ) references candidate_provenance (
+    candidate_provenance_id,
+    candidate_revision_id,
+    origin
+  )
+);
+
+create table moderation_decisions (
+  moderation_decision_id uuid primary key,
+  decision_sequence bigint generated always as identity unique,
+  candidate_id uuid not null,
+  candidate_revision_id uuid not null,
+  patch_id uuid not null,
+  catalog_revision_id uuid not null,
+  moderation_input_snapshot_id uuid not null,
+  input_hash text not null
+    check (input_hash ~ '^[a-f0-9]{64}$'),
+  moderation_policy_revision_id uuid not null,
+  outcome text not null
+    check (outcome in ('clear', 'needs_review', 'blocked')),
+  evaluator_actor_id text not null
+    check (octet_length(evaluator_actor_id) between 1 and 256),
+  reason text not null
+    check (octet_length(reason) between 1 and 1024),
+  correlation_id text not null
+    check (octet_length(correlation_id) between 1 and 256),
+  evaluated_at timestamptz not null,
+  created_at timestamptz not null default clock_timestamp(),
+  unique (
+    moderation_decision_id,
+    candidate_id,
+    candidate_revision_id,
+    moderation_policy_revision_id,
+    input_hash
+  ),
+  foreign key (
+    moderation_input_snapshot_id,
+    candidate_id,
+    candidate_revision_id,
+    patch_id,
+    catalog_revision_id,
+    moderation_policy_revision_id,
+    input_hash
+  ) references moderation_input_snapshots (
+    moderation_input_snapshot_id,
+    candidate_id,
+    candidate_revision_id,
+    patch_id,
+    catalog_revision_id,
+    moderation_policy_revision_id,
+    input_hash
+  )
+);
+
+create table current_candidate_moderation_decisions (
+  candidate_revision_id uuid not null,
+  moderation_policy_revision_id uuid not null,
+  candidate_id uuid not null,
+  input_hash text not null
+    check (input_hash ~ '^[a-f0-9]{64}$'),
+  moderation_decision_id uuid not null unique,
+  updated_at timestamptz not null default clock_timestamp(),
+  primary key (
+    candidate_revision_id,
+    moderation_policy_revision_id
+  ),
+  foreign key (
+    moderation_decision_id,
+    candidate_id,
+    candidate_revision_id,
+    moderation_policy_revision_id,
+    input_hash
+  ) references moderation_decisions (
+    moderation_decision_id,
+    candidate_id,
+    candidate_revision_id,
+    moderation_policy_revision_id,
+    input_hash
+  )
+);
+
+create or replace function enforce_moderation_input_snapshot_seal()
+returns trigger
+language plpgsql
+as $$
+declare
+  snapshot_id uuid;
+  snapshot moderation_input_snapshots%rowtype;
+  revision candidate_revisions%rowtype;
+  seal candidate_claim_set_seals%rowtype;
+  actual_provenance_count integer;
+  member_count integer;
+  provenance_tokens text[];
+  expected_provenance_hash text;
+  expected_input_hash text;
+begin
+  snapshot_id := case
+    when tg_table_name = 'moderation_input_snapshots'
+      then new.moderation_input_snapshot_id
+    else new.moderation_input_snapshot_id
+  end;
+
+  select *
+    into snapshot
+    from moderation_input_snapshots
+   where moderation_input_snapshot_id = snapshot_id;
+  if not found then
+    raise exception 'moderation input snapshot missing'
+      using errcode = '23514';
+  end if;
+
+  select *
+    into revision
+    from candidate_revisions
+   where candidate_revision_id = snapshot.candidate_revision_id;
+  select *
+    into seal
+    from candidate_claim_set_seals
+   where candidate_claim_set_seal_id =
+         snapshot.candidate_claim_set_seal_id;
+  if not found
+     or revision.candidate_id <> snapshot.candidate_id
+     or revision.patch_id <> snapshot.patch_id
+     or revision.catalog_revision_id <> snapshot.catalog_revision_id
+     or revision.normalized_signature <>
+        snapshot.candidate_normalized_signature
+     or seal.candidate_id <> snapshot.candidate_id
+     or seal.candidate_revision_id <> snapshot.candidate_revision_id
+     or seal.patch_id <> snapshot.patch_id
+     or seal.catalog_revision_id <> snapshot.catalog_revision_id
+     or seal.claim_set_hash <> snapshot.claim_set_hash
+     or seal.claim_count <> snapshot.claim_count then
+    raise exception 'moderation input snapshot authority mismatch'
+      using errcode = '23514';
+  end if;
+
+  select count(*)::integer
+    into actual_provenance_count
+    from candidate_provenance
+   where candidate_revision_id = snapshot.candidate_revision_id;
+  select count(*)::integer
+    into member_count
+    from moderation_input_snapshot_provenance
+   where moderation_input_snapshot_id = snapshot_id;
+
+  if actual_provenance_count = 0
+     or member_count <> actual_provenance_count
+     or snapshot.provenance_count <> actual_provenance_count then
+    raise exception 'moderation input snapshot provenance is not current'
+      using errcode = '23514';
+  end if;
+
+  select array_agg(
+           entry.token
+           order by entry.candidate_provenance_id, entry.part
+         )
+    into provenance_tokens
+    from (
+      select member.candidate_provenance_id,
+             part.part,
+             part.token
+        from moderation_input_snapshot_provenance member
+        cross join lateral (
+          values
+            (1, member.candidate_provenance_id::text),
+            (2, member.origin)
+        ) as part(part, token)
+       where member.moderation_input_snapshot_id = snapshot_id
+    ) as entry;
+
+  expected_provenance_hash := sha256_text_tuple_v1(
+    array[
+      'TrustTupleV1',
+      'ModerationProvenanceSetV1',
+      snapshot.candidate_revision_id::text,
+      actual_provenance_count::text
+    ] || coalesce(provenance_tokens, array[]::text[])
+  );
+  expected_input_hash := sha256_text_tuple_v1(
+    array[
+      'TrustTupleV1',
+      'ModerationInputSnapshotV1',
+      snapshot.candidate_id::text,
+      snapshot.candidate_revision_id::text,
+      snapshot.patch_id::text,
+      snapshot.catalog_revision_id::text,
+      snapshot.candidate_normalized_signature,
+      snapshot.candidate_claim_set_seal_id::text,
+      snapshot.claim_set_hash,
+      snapshot.claim_count::text,
+      snapshot.moderation_policy_revision_id::text,
+      actual_provenance_count::text
+    ] || coalesce(provenance_tokens, array[]::text[])
+  );
+
+  if snapshot.provenance_set_hash <> expected_provenance_hash
+     or snapshot.input_hash <> expected_input_hash then
+    raise exception 'moderation input snapshot seal mismatch'
+      using errcode = '23514';
+  end if;
+  return new;
+end;
+$$;
+
+create or replace function enforce_moderation_decision_graph()
+returns trigger
+language plpgsql
+as $$
+declare
+  snapshot moderation_input_snapshots%rowtype;
+begin
+  select *
+    into snapshot
+    from moderation_input_snapshots
+   where moderation_input_snapshot_id =
+         new.moderation_input_snapshot_id;
+  if not found
+     or snapshot.candidate_id <> new.candidate_id
+     or snapshot.candidate_revision_id <> new.candidate_revision_id
+     or snapshot.patch_id <> new.patch_id
+     or snapshot.catalog_revision_id <> new.catalog_revision_id
+     or snapshot.moderation_policy_revision_id <>
+        new.moderation_policy_revision_id
+     or snapshot.input_hash <> new.input_hash then
+    raise exception 'moderation decision graph mismatch'
+      using errcode = '23514';
+  end if;
+  return new;
+end;
+$$;
+
+create or replace function enforce_current_candidate_moderation_graph()
+returns trigger
+language plpgsql
+as $$
+declare
+  next_decision moderation_decisions%rowtype;
+  previous_decision moderation_decisions%rowtype;
+begin
+  if tg_op = 'DELETE' then
+    raise exception 'current moderation decision cannot be deleted'
+      using errcode = '23514';
+  end if;
+
+  select *
+    into next_decision
+    from moderation_decisions
+   where moderation_decision_id = new.moderation_decision_id;
+  if not found
+     or next_decision.candidate_id <> new.candidate_id
+     or next_decision.candidate_revision_id <>
+        new.candidate_revision_id
+     or next_decision.moderation_policy_revision_id <>
+        new.moderation_policy_revision_id
+     or next_decision.input_hash <> new.input_hash then
+    raise exception 'current moderation decision graph mismatch'
+      using errcode = '23514';
+  end if;
+
+  if tg_op = 'UPDATE'
+     and old.moderation_decision_id <>
+         new.moderation_decision_id then
+    select *
+      into previous_decision
+      from moderation_decisions
+     where moderation_decision_id = old.moderation_decision_id;
+    if next_decision.evaluated_at <
+       previous_decision.evaluated_at
+       or next_decision.decision_sequence <=
+          previous_decision.decision_sequence then
+      raise exception 'current moderation decision cannot move backward'
+        using errcode = '23514';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+create constraint trigger moderation_input_snapshot_seal_from_header
+after insert on moderation_input_snapshots
+deferrable initially deferred
+for each row execute function enforce_moderation_input_snapshot_seal();
+
+create constraint trigger moderation_input_snapshot_seal_from_member
+after insert on moderation_input_snapshot_provenance
+deferrable initially deferred
+for each row execute function enforce_moderation_input_snapshot_seal();
+
+create trigger moderation_decision_graph_guard
+before insert on moderation_decisions
+for each row execute function enforce_moderation_decision_graph();
+
+create trigger current_candidate_moderation_graph_guard
+before insert or update or delete
+on current_candidate_moderation_decisions
+for each row execute function enforce_current_candidate_moderation_graph();
+
 create trigger moderation_policy_revisions_immutable
 before update or delete on moderation_policy_revisions
 for each row execute function reject_immutable_change();
 
 create trigger eligibility_policy_revisions_immutable
 before update or delete on eligibility_policy_revisions
+for each row execute function reject_immutable_change();
+
+create trigger moderation_input_snapshots_immutable
+before update or delete on moderation_input_snapshots
+for each row execute function reject_immutable_change();
+
+create trigger moderation_input_snapshot_provenance_immutable
+before update or delete on moderation_input_snapshot_provenance
+for each row execute function reject_immutable_change();
+
+create trigger moderation_decisions_immutable
+before update or delete on moderation_decisions
 for each row execute function reject_immutable_change();
