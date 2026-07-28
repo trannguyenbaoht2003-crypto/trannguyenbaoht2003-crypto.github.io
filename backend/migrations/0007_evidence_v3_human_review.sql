@@ -380,6 +380,7 @@ create table evidence_input_snapshot_associations (
 
 create table claim_evidence_decisions (
   claim_evidence_decision_id uuid primary key,
+  decision_sequence bigint generated always as identity unique,
   claim_id uuid not null,
   evidence_input_snapshot_id uuid not null unique,
   candidate_id uuid not null,
@@ -628,6 +629,7 @@ create table human_reviews (
 
 create table review_quorum_evaluations (
   review_quorum_evaluation_id uuid primary key,
+  evaluation_sequence bigint generated always as identity unique,
   candidate_id uuid not null,
   candidate_revision_id uuid not null,
   review_input_snapshot_id uuid not null,
@@ -1086,6 +1088,8 @@ as $$
 declare
   old_evaluated_at timestamptz;
   new_evaluated_at timestamptz;
+  old_sequence bigint;
+  new_sequence bigint;
 begin
   if tg_op = 'DELETE' then
     raise exception 'current claim evidence decision pointer is immutable'
@@ -1105,17 +1109,22 @@ begin
   end if;
 
   if tg_op = 'UPDATE' then
-    select evaluated_at
-      into old_evaluated_at
+    select evaluated_at, decision_sequence
+      into old_evaluated_at, old_sequence
       from claim_evidence_decisions
      where claim_evidence_decision_id =
            old.claim_evidence_decision_id;
-    select evaluated_at
-      into new_evaluated_at
+    select evaluated_at, decision_sequence
+      into new_evaluated_at, new_sequence
       from claim_evidence_decisions
      where claim_evidence_decision_id =
            new.claim_evidence_decision_id;
-    if new_evaluated_at < old_evaluated_at then
+    if new.claim_evidence_decision_id <>
+       old.claim_evidence_decision_id
+       and (
+         new_evaluated_at < old_evaluated_at
+         or new_sequence <= old_sequence
+       ) then
       raise exception 'current claim evidence decision cannot move backward'
         using errcode = '23514';
     end if;
@@ -1577,6 +1586,8 @@ as $$
 declare
   old_evaluated_at timestamptz;
   new_evaluated_at timestamptz;
+  old_sequence bigint;
+  new_sequence bigint;
 begin
   if tg_op = 'DELETE' then
     raise exception 'current review quorum pointer is immutable'
@@ -1593,17 +1604,22 @@ begin
       using errcode = '55000';
   end if;
   if tg_op = 'UPDATE' then
-    select evaluated_at
-      into old_evaluated_at
+    select evaluated_at, evaluation_sequence
+      into old_evaluated_at, old_sequence
       from review_quorum_evaluations
      where review_quorum_evaluation_id =
            old.review_quorum_evaluation_id;
-    select evaluated_at
-      into new_evaluated_at
+    select evaluated_at, evaluation_sequence
+      into new_evaluated_at, new_sequence
       from review_quorum_evaluations
      where review_quorum_evaluation_id =
            new.review_quorum_evaluation_id;
-    if new_evaluated_at < old_evaluated_at then
+    if new.review_quorum_evaluation_id <>
+       old.review_quorum_evaluation_id
+       and (
+         new_evaluated_at < old_evaluated_at
+         or new_sequence <= old_sequence
+       ) then
       raise exception 'current review quorum cannot move backward'
         using errcode = '23514';
     end if;
