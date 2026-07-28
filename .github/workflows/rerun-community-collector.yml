@@ -56,13 +56,15 @@ jobs:
         run: |
           set -euo pipefail
           workflow=".github/workflows/rerun-community-collector.yml"
+          executable="$RUNNER_TEMP/deploy-workflow-before-guard.yml"
+          sed '/- name: Confirm production deployment is disabled/,$d' "$workflow" > "$executable"
 
           if grep -Eq 'contents:[[:space:]]*write|pages:[[:space:]]*write|id-token:[[:space:]]*write' "$workflow"; then
             echo "Write-capable deployment permission detected." >&2
             exit 1
           fi
 
-          if grep -Eq 'git push|actions/deploy-pages|peaceiris/actions-gh-pages|cloudflare/wrangler-action|wrangler deploy' "$workflow"; then
+          if grep -Eq 'git push|actions/deploy-pages|peaceiris/actions-gh-pages|cloudflare/wrangler-action|wrangler[[:space:]]+deploy' "$executable"; then
             echo "Production deployment command detected." >&2
             exit 1
           fi
