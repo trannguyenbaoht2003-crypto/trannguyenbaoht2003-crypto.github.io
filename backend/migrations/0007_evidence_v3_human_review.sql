@@ -1220,6 +1220,7 @@ declare
   missing_provenance boolean;
   ordinal_mismatch boolean;
   revision_signature text;
+  policy_allows_ai boolean;
 begin
   snapshot_id := case
     when tg_table_name = 'review_input_snapshots'
@@ -1244,6 +1245,23 @@ begin
   if revision_signature is distinct from
      snapshot.candidate_normalized_signature then
     raise exception 'review snapshot candidate signature mismatch'
+      using errcode = '23514';
+  end if;
+
+  select applies_to_ai_provenance
+    into policy_allows_ai
+    from review_policy_revisions
+   where review_policy_revision_id =
+         snapshot.review_policy_revision_id;
+
+  if policy_allows_ai is distinct from true
+     and exists (
+       select 1
+         from review_input_snapshot_provenance member
+        where member.review_input_snapshot_id = snapshot_id
+          and member.origin = 'ai_generated'
+     ) then
+    raise exception 'review policy does not apply to AI provenance'
       using errcode = '23514';
   end if;
 
