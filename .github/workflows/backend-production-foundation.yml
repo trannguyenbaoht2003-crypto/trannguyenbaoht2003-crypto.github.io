@@ -1,4 +1,4 @@
-name: Sprint 3B evidence and human review persistence gate
+name: Sprint 4A moderation and eligibility gate
 
 on:
   workflow_dispatch:
@@ -16,12 +16,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: sprint-3b-evidence-human-review-persistence-${{ github.ref }}
+  group: sprint-4a-moderation-eligibility-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   verify:
-    name: verify evidence and human review persistence
+    name: verify moderation and eligibility
     runs-on: ubuntu-latest
     timeout-minutes: 40
     services:
@@ -110,7 +110,6 @@ jobs:
             "Scenario S12",
             "Scenario S21",
             "reference_only cannot supply a stored aggregate snapshot",
-            "Candidate outbox events are not dispatched in Sprint 3A",
             "Claim-level Evidence",
             "Candidate claim-set seal",
             "Evidence input snapshot",
@@ -121,10 +120,16 @@ jobs:
             "Review quorum",
             "Candidate → CandidateRevision → Claim",
             "AI provenance is not Evidence",
-            "Trust-layer outbox events are not dispatched in Sprint 3B",
-            "No Moderation",
-            "No Eligibility",
+            "Moderation decision history",
+            "No default clear",
+            "Eligibility input snapshot",
+            "Only required Claims determine Eligibility",
+            "Stale Eligibility reads needs_review",
+            "Eligibility re-evaluation queue",
+            "PostgreSQL remains Eligibility authority",
             "No Publication",
+            "No UI",
+            "No auth",
             "No merge",
           ]) {
             if (!runbook.includes(contract)) {
@@ -177,7 +182,7 @@ jobs:
         run: |
           set -euo pipefail
           workflow=".github/workflows/backend-production-foundation.yml"
-          executable="$RUNNER_TEMP/sprint-3b-evidence-human-review-persistence-before-guard.yml"
+          executable="$RUNNER_TEMP/sprint-4a-moderation-eligibility-before-guard.yml"
           sed '/- name: Deployment guard/,$d' "$workflow" > "$executable"
           ! grep -Eq '(contents|packages|pages|id-token):[[:space:]]*write' "$workflow"
           ! grep -Eq 'git push|wrangler[[:space:]]+deploy|npm run deploy|actions/deploy-pages' "$executable"
