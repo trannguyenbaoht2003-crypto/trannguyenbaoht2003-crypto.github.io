@@ -145,12 +145,15 @@ test('PostgreSQL rejects Eligibility when a required Claim member is omitted', a
     [randomUUID(), GATE_IDS.eligibilityInputSnapshotId],
   );
 
-  await assert.rejects(
-    client.query('commit'),
-    /eligibility input snapshot required Claim membership mismatch/,
-  );
-  client.release();
-  await pool.end();
+  try {
+    await assert.rejects(
+      client.query('commit'),
+      /eligibility input snapshot required Claim membership mismatch/,
+    );
+  } finally {
+    client.release();
+    await pool.end();
+  }
 });
 
 test('PostgreSQL rejects eligible with an unsatisfied Review quorum and forged all_requirements_satisfied reason', async () => {
@@ -192,10 +195,13 @@ test('PostgreSQL rejects eligible with an unsatisfied Review quorum and forged a
     [evaluationId],
   );
 
-  await assert.rejects(
-    client.query('commit'),
-    /eligibility evaluation result mismatch/,
-  );
-  client.release();
-  await pool.end();
+  try {
+    await assert.rejects(
+      client.query('commit'),
+      /eligibility evaluation result mismatch/,
+    );
+  } finally {
+    client.release();
+    await pool.end();
+  }
 });
