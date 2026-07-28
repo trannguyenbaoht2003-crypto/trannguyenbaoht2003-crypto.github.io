@@ -143,6 +143,15 @@ evaluations, and the current quorum pointer. It cannot mutate Evidence.
 
 Migration `0007_evidence_v3_human_review.sql` adds the following records.
 
+All Sprint 3B cross-layer hashes use one `TrustTupleV1` grammar. Each token is
+encoded as its UTF-8 byte length, `:`, then the exact token; tokens are joined
+with `|` and the result is SHA-256 hashed. Null uses the reserved token
+`@null`; collection headers include the exact item count before ordered
+members. Claim statements are hashed as their exact UTF-8 bytes, and only
+their hex hash enters a tuple. TypeScript and PostgreSQL implement the same
+grammar, so deferred database guards can recompute every header hash without
+depending on JSON whitespace, JavaScript UTF-16 length, or locale collation.
+
 ### 6.1 Policy revisions
 
 `evidence_policy_revisions`
@@ -292,7 +301,7 @@ These are structural minimums, not a confidence formula.
 - Snapshot ID;
 - Candidate and CandidateRevision;
 - Patch and CatalogRevision;
-- Candidate canonical-payload hash;
+- Candidate normalized signature, which seals the canonical selection payload;
 - Claim-set seal and hash;
 - exact provenance and Claim counts;
 - exact provenance-set hash;
@@ -566,7 +575,7 @@ unchanged.
 
 ## 15. Self-review
 
-- **No placeholders:** no TBD/TODO or unresolved implementation choice remains.
+- **Complete design:** no unresolved marker or implementation choice remains.
 - **Vocabulary:** Claim, Evidence, Evidence decision, Human Review, quorum, and
   Publication authority remain separate.
 - **Patch semantics:** Claim and decision inherit an exact
