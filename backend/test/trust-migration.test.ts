@@ -547,6 +547,106 @@ test('Evidence pointer graph rejects another Claim and backward movement', async
   await pool.end();
 });
 
+test('Evidence pointer rejects rollback between equal-time decisions', async () => {
+  const pool = await resetDatabase();
+  await seedTrustClaimSet(pool);
+  await recordClaimEvidenceDecision(pool, evidenceDecisionCommand());
+  await recordClaimEvidenceDecision(pool, evidenceDecisionCommand({
+    associations: [],
+    correlationId: 'equal-time-evidence-later',
+    decision: 'insufficient',
+    decisionId: TRUST_IDS.reevaluationDecisionId,
+    evaluatedAt: '2026-07-28T02:00:00.000Z',
+    evidenceInputSnapshotId: TRUST_IDS.reevaluationInputSnapshotId,
+    idempotencyKey: 'equal-time-evidence-later',
+    reason: 'A later immutable evaluation shares the same domain time.',
+  }));
+
+  try {
+    await assert.rejects(
+      pool.query(
+        `update current_claim_evidence_decisions
+            set claim_evidence_decision_id = $2,
+                updated_at = clock_timestamp()
+          where claim_id = $1`,
+        [TRUST_IDS.requiredClaimId, TRUST_IDS.evidenceDecisionId],
+      ),
+      /cannot move backward/,
+    );
+  } finally {
+    await pool.end();
+  }
+});
+
+test('Review pointer rejects rollback between equal-time evaluations', async () => {
+  const pool = await resetDatabase();
+  await seedTrustReviewContext(pool);
+  await completeHumanReview(pool, humanReviewCommand());
+  const laterEvaluationId = '75000000-0000-4000-8000-000000000008';
+
+  await withTransaction(pool, async (client) => {
+    await client.query(
+      `insert into review_quorum_evaluations
+        (review_quorum_evaluation_id, candidate_id,
+         candidate_revision_id, review_input_snapshot_id,
+         input_hash, review_policy_revision_id,
+         required_confirmed_count, counted_review_count,
+         quorum_satisfied, evaluated_at)
+       select $1, candidate_id, candidate_revision_id,
+              review_input_snapshot_id, input_hash,
+              review_policy_revision_id, required_confirmed_count,
+              counted_review_count, quorum_satisfied, evaluated_at
+         from review_quorum_evaluations
+        where review_quorum_evaluation_id = $2`,
+      [laterEvaluationId, TRUST_IDS.reviewQuorumEvaluationId],
+    );
+    await client.query(
+      `insert into review_quorum_evaluation_reviews
+        (review_quorum_evaluation_id, human_review_id,
+         candidate_id, candidate_revision_id,
+         review_policy_revision_id, input_hash,
+         reviewer_actor_id, ordinal)
+       select $1, human_review_id, candidate_id,
+              candidate_revision_id, review_policy_revision_id,
+              input_hash, reviewer_actor_id, ordinal
+         from review_quorum_evaluation_reviews
+        where review_quorum_evaluation_id = $2`,
+      [laterEvaluationId, TRUST_IDS.reviewQuorumEvaluationId],
+    );
+    await client.query(
+      `update current_review_quorum_evaluations
+          set review_quorum_evaluation_id = $2,
+              updated_at = clock_timestamp()
+        where candidate_revision_id = (
+          select candidate_revision_id
+            from review_quorum_evaluations
+           where review_quorum_evaluation_id = $1
+        )
+          and review_policy_revision_id = $3`,
+      [
+        TRUST_IDS.reviewQuorumEvaluationId,
+        laterEvaluationId,
+        TRUST_IDS.reviewPolicyId,
+      ],
+    );
+  });
+
+  try {
+    await assert.rejects(
+      pool.query(
+        `update current_review_quorum_evaluations
+            set review_quorum_evaluation_id = $2,
+                updated_at = clock_timestamp()
+          where review_quorum_evaluation_id = $1`,
+        [laterEvaluationId, TRUST_IDS.reviewQuorumEvaluationId],
+      ),
+      /cannot move backward/,
+    );
+  } finally {
+    await pool.end();
+  }
+});
+
 test('deferred Review snapshot and quorum headers reject forged membership', async () => {
   const pool = await resetDatabase();
   await seedTrustReviewContext(pool);
