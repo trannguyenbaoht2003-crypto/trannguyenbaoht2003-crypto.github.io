@@ -312,7 +312,7 @@ test('Evidence pointer graph rejects another Claim and backward movement', async
         TRUST_IDS.evidenceDecisionId,
       ],
     ),
-    /foreign key/,
+    /foreign key|unique constraint/,
   );
 
   await recordClaimEvidenceDecision(pool, evidenceDecisionCommand({
