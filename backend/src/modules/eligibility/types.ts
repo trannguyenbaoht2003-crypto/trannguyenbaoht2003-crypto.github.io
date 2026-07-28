@@ -1,6 +1,7 @@
 import type { EvidenceDecision } from '../trust/types.js';
+import type { ModerationOutcome } from '../moderation/types.js';
 
-export type ModerationOutcome = 'clear' | 'needs_review' | 'blocked';
+export type { ModerationOutcome } from '../moderation/types.js';
 
 export type EligibilityOutcome =
   | 'eligible'
