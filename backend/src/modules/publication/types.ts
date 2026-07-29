@@ -26,3 +26,36 @@ export interface BuiltPublicationPayload {
   payload: PublicationPayloadV1;
   payloadHash: string;
 }
+
+
+export interface PublicationAuthorizationContext {
+  actorId: string;
+  permissions: readonly 'publisher'[];
+}
+
+export interface PublishCandidateRevisionCommand {
+  publicationId: string;
+  publicationVersionId: string;
+  activationId: string;
+  candidateRevisionId: string;
+  expectedActiveEligibilityPolicyRevisionId: string;
+  expectedEligibilityEvaluationId: string;
+  expectedModerationDecisionId: string;
+  expectedActivePublicationVersionId: string | null;
+  authorization: PublicationAuthorizationContext;
+  auditId: string;
+  outboxEventId: string;
+  correlationId: string;
+  idempotencyKey: string;
+  occurredAt: string;
+}
+
+export interface PublishCandidateRevisionResult {
+  publicationId: string;
+  publicationVersionId: string;
+  candidateId: string;
+  candidateRevisionId: string;
+  versionNumber: number;
+  activePublicationVersionId: string;
+  replayed: boolean;
+}
