@@ -101,6 +101,8 @@ create table publication_version_input_required_claims (
   candidate_id uuid not null,
   candidate_revision_id uuid not null,
   claim_id uuid not null,
+  importance text not null default 'required'
+    check (importance = 'required'),
   claim_evidence_decision_id uuid not null,
   evidence_decision text not null
     check (
