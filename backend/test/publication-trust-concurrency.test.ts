@@ -142,15 +142,16 @@ function reevaluateEvidenceCommand(): RecordClaimEvidenceDecisionCommand {
         evidenceId: TRUST_IDS.evidenceId,
         normalizedObservationId: CANDIDATE_IDS.normalizedObservationId,
         revalidationReason: null,
-        stance: 'supports',
+        stance: 'contradicts',
       },
     ],
     correlationId: 'publication-race-evidence',
+    decision: 'contradicted',
     decisionId: TRUST_RACE_IDS.evidenceDecisionId,
     evaluatedAt: '2026-07-30T05:00:00.000Z',
     evidenceInputSnapshotId: TRUST_RACE_IDS.evidenceInputSnapshotId,
     idempotencyKey: 'publication-race-evidence',
-    reason: 'Evidence reevaluation serialized behind Publication.',
+    reason: 'Contradicting Evidence reevaluation serialized behind Publication.',
   });
 }
 
