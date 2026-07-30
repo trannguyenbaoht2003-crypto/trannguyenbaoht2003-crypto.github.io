@@ -59,3 +59,23 @@ export interface PublishCandidateRevisionResult {
   activePublicationVersionId: string;
   replayed: boolean;
 }
+
+export interface RollbackPublicationCommand {
+  publicationId: string;
+  targetPublicationVersionId: string;
+  activationId: string;
+  expectedActivePublicationVersionId: string;
+  authorization: PublicationAuthorizationContext;
+  auditId: string;
+  outboxEventId: string;
+  correlationId: string;
+  idempotencyKey: string;
+  occurredAt: string;
+}
+
+export interface RollbackPublicationResult {
+  publicationId: string;
+  previousActivePublicationVersionId: string;
+  activePublicationVersionId: string;
+  replayed: boolean;
+}
