@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import { createPool } from '../src/database/pool.js';
@@ -75,6 +76,52 @@ const expectedTables = [
   'sources',
   'worker_job_attempts',
 ];
+
+const sprint4bRunbookContracts = [
+  'PublicationVersion immutable',
+  'Publisher permission required',
+  'Fresh Eligibility rechecked at commit',
+  'Publication activation history',
+  'Item-level rollback',
+  'Public read independent from workers',
+  'PostgreSQL remains Publication authority',
+  'No automatic publication',
+  'No HTTP mutation route',
+  'No UI',
+  'No merge',
+  'No deploy',
+] as const;
+
+test('Sprint 4B workflow requires the Publication operations runbook contract', async () => {
+  const runbook = await readFile(new URL('../README.md', import.meta.url), 'utf8');
+  const workflow = await readFile(
+    new URL('../../.github/workflows/backend-production-foundation.yml', import.meta.url),
+    'utf8',
+  );
+
+  for (const contract of sprint4bRunbookContracts) {
+    assert.ok(
+      runbook.includes(contract),
+      `backend runbook is missing Sprint 4B contract: ${contract}`,
+    );
+    assert.ok(
+      workflow.includes(`"${contract}"`),
+      `workflow is missing Sprint 4B contract assertion: ${contract}`,
+    );
+  }
+
+  assert.match(workflow, /^name: Sprint 4B publication authority gate$/m);
+  assert.match(
+    workflow,
+    /group: sprint-4b-publication-authority-\$\{\{ github\.ref \}\}/,
+  );
+  assert.match(workflow, /^    name: verify publication authority$/m);
+  assert.match(workflow, /^permissions:\n  contents: read$/m);
+  assert.doesNotMatch(
+    workflow,
+    /(contents|packages|pages|id-token):[ \t]*write/,
+  );
+});
 
 test('migration creates the production foundation tables from an empty schema', async () => {
   const pool = createPool(testDatabaseUrl());
