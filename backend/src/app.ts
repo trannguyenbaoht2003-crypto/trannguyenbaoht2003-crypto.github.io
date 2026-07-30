@@ -24,7 +24,7 @@ const loggerOptions = {
 
 export interface BuildAppOptions {
   resources: ResourceHealth;
-  publications?: PublicPublicationReader;
+  publications: PublicPublicationReader;
   logger?: boolean;
 }
 
@@ -48,9 +48,7 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     return { status: 'ready' };
   });
 
-  if (options.publications) {
-    registerPublicPublicationRoutes(app, options.publications);
-  }
+  registerPublicPublicationRoutes(app, options.publications);
 
   return app;
 }
