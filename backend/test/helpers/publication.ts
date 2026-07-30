@@ -13,6 +13,15 @@ import type {
 import {
   recordCandidateModerationDecision,
 } from '../../src/modules/moderation/record-candidate-moderation-decision.js';
+import {
+  completeHumanReview,
+} from '../../src/modules/trust/complete-human-review.js';
+import {
+  defineCandidateClaimSet,
+} from '../../src/modules/trust/define-candidate-claim-set.js';
+import {
+  recordClaimEvidenceDecision,
+} from '../../src/modules/trust/record-claim-evidence-decision.js';
 import { CANDIDATE_IDS } from './candidate.js';
 import {
   GATE_IDS,
@@ -20,6 +29,14 @@ import {
   seedActivatedGateContext,
   seedSatisfiedReviewQuorum,
 } from './gate.js';
+import {
+  TRUST_IDS,
+  claimSetCommand,
+  evidenceDecisionCommand,
+  humanReviewCommand,
+  requiredClaim,
+  seedSecondTrustCandidate,
+} from './trust.js';
 
 export const PUBLICATION_IDS = {
   publicationId: '77000000-0000-4000-8000-000000000001',
@@ -27,6 +44,36 @@ export const PUBLICATION_IDS = {
   activationId: '77000000-0000-4000-8000-000000000003',
   auditId: '77000000-0000-4000-8000-000000000004',
   outboxEventId: '77000000-0000-4000-8000-000000000005',
+} as const;
+
+export const SECOND_PUBLICATION_CONTEXT_IDS = {
+  requiredClaimId: '78000000-0000-4000-8000-000000000001',
+  evidenceId: '78000000-0000-4000-8000-000000000002',
+  evidenceAssociationId: '78000000-0000-4000-8000-000000000003',
+  evidenceInputSnapshotId: '78000000-0000-4000-8000-000000000004',
+  evidenceDecisionId: '78000000-0000-4000-8000-000000000005',
+  firstReviewInputSnapshotId:
+    '78000000-0000-4000-8000-000000000006',
+  firstHumanReviewId: '78000000-0000-4000-8000-000000000007',
+  firstReviewQuorumEvaluationId:
+    '78000000-0000-4000-8000-000000000008',
+  secondReviewInputSnapshotId:
+    '78000000-0000-4000-8000-000000000009',
+  secondHumanReviewId: '78000000-0000-4000-8000-000000000010',
+  secondReviewQuorumEvaluationId:
+    '78000000-0000-4000-8000-000000000011',
+  moderationInputSnapshotId:
+    '78000000-0000-4000-8000-000000000012',
+  moderationDecisionId: '78000000-0000-4000-8000-000000000013',
+  eligibilityInputSnapshotId:
+    '78000000-0000-4000-8000-000000000014',
+  eligibilityEvaluationId:
+    '78000000-0000-4000-8000-000000000015',
+  publicationId: '78000000-0000-4000-8000-000000000016',
+  publicationVersionId: '78000000-0000-4000-8000-000000000017',
+  activationId: '78000000-0000-4000-8000-000000000018',
+  auditId: '78000000-0000-4000-8000-000000000019',
+  outboxEventId: '78000000-0000-4000-8000-000000000020',
 } as const;
 
 export async function seedEligiblePublicationContext(
@@ -48,6 +95,108 @@ export async function seedEligiblePublicationContext(
     idempotencyKey: 'publication-eligibility-v1',
     inputSnapshotId: GATE_IDS.eligibilityInputSnapshotId,
   });
+}
+
+export async function seedSecondEligiblePublicationContext(
+  pool: Pool,
+): Promise<void> {
+  await seedSecondTrustCandidate(pool);
+  await defineCandidateClaimSet(pool, claimSetCommand({
+    candidateId: TRUST_IDS.secondCandidateId,
+    candidateRevisionId: TRUST_IDS.secondCandidateRevisionId,
+    claims: [
+      requiredClaim({
+        claimId: SECOND_PUBLICATION_CONTEXT_IDS.requiredClaimId,
+        claimKey: 'second-publication-build',
+        statement: 'The second publication build is effective.',
+      }),
+    ],
+    correlationId: 'second-publication-claim-set',
+    idempotencyKey: 'second-publication-claim-set',
+  }));
+  await recordClaimEvidenceDecision(pool, evidenceDecisionCommand({
+    actorId: 'second-publication-evidence-evaluator',
+    associations: [
+      {
+        associationId:
+          SECOND_PUBLICATION_CONTEXT_IDS.evidenceAssociationId,
+        crossPatchRevalidated: false,
+        evidenceId: SECOND_PUBLICATION_CONTEXT_IDS.evidenceId,
+        normalizedObservationId: TRUST_IDS.secondNormalizedObservationId,
+        revalidationReason: null,
+        stance: 'supports',
+      },
+    ],
+    candidateId: TRUST_IDS.secondCandidateId,
+    candidateRevisionId: TRUST_IDS.secondCandidateRevisionId,
+    claimId: SECOND_PUBLICATION_CONTEXT_IDS.requiredClaimId,
+    correlationId: 'second-publication-evidence',
+    decisionId: SECOND_PUBLICATION_CONTEXT_IDS.evidenceDecisionId,
+    evidenceInputSnapshotId:
+      SECOND_PUBLICATION_CONTEXT_IDS.evidenceInputSnapshotId,
+    idempotencyKey: 'second-publication-evidence',
+    reason: 'Second CandidateRevision Evidence is supported.',
+  }));
+  await completeHumanReview(pool, humanReviewCommand({
+    actorId: 'second-publication-reviewer-a',
+    candidateId: TRUST_IDS.secondCandidateId,
+    candidateRevisionId: TRUST_IDS.secondCandidateRevisionId,
+    completedAt: '2026-07-29T01:05:00.000Z',
+    correlationId: 'second-publication-review-a',
+    humanReviewId:
+      SECOND_PUBLICATION_CONTEXT_IDS.firstHumanReviewId,
+    idempotencyKey: 'second-publication-review-a',
+    reason: 'First reviewer confirmed the second CandidateRevision.',
+    reviewInputSnapshotId:
+      SECOND_PUBLICATION_CONTEXT_IDS.firstReviewInputSnapshotId,
+    reviewQuorumEvaluationId:
+      SECOND_PUBLICATION_CONTEXT_IDS.firstReviewQuorumEvaluationId,
+  }));
+  await completeHumanReview(pool, humanReviewCommand({
+    actorId: 'second-publication-reviewer-b',
+    candidateId: TRUST_IDS.secondCandidateId,
+    candidateRevisionId: TRUST_IDS.secondCandidateRevisionId,
+    completedAt: '2026-07-29T01:06:00.000Z',
+    correlationId: 'second-publication-review-b',
+    humanReviewId:
+      SECOND_PUBLICATION_CONTEXT_IDS.secondHumanReviewId,
+    idempotencyKey: 'second-publication-review-b',
+    reason: 'Second reviewer confirmed the second CandidateRevision.',
+    reviewInputSnapshotId:
+      SECOND_PUBLICATION_CONTEXT_IDS.secondReviewInputSnapshotId,
+    reviewQuorumEvaluationId:
+      SECOND_PUBLICATION_CONTEXT_IDS.secondReviewQuorumEvaluationId,
+  }));
+  await recordCandidateModerationDecision(
+    pool,
+    moderationDecisionCommand({
+      actorId: 'second-publication-moderator',
+      candidateId: TRUST_IDS.secondCandidateId,
+      candidateRevisionId: TRUST_IDS.secondCandidateRevisionId,
+      correlationId: 'second-publication-moderation',
+      decisionId: SECOND_PUBLICATION_CONTEXT_IDS.moderationDecisionId,
+      evaluatedAt: '2026-07-29T01:10:00.000Z',
+      idempotencyKey: 'second-publication-moderation',
+      inputSnapshotId:
+        SECOND_PUBLICATION_CONTEXT_IDS.moderationInputSnapshotId,
+      reason: 'Second CandidateRevision passed Moderation.',
+    }),
+  );
+  const evaluation = await evaluateCandidateEligibility(pool, {
+    actorId: 'second-publication-eligibility-evaluator',
+    candidateId: TRUST_IDS.secondCandidateId,
+    candidateRevisionId: TRUST_IDS.secondCandidateRevisionId,
+    correlationId: 'second-publication-eligibility',
+    evaluatedAt: '2026-07-29T01:20:00.000Z',
+    evaluationId:
+      SECOND_PUBLICATION_CONTEXT_IDS.eligibilityEvaluationId,
+    idempotencyKey: 'second-publication-eligibility',
+    inputSnapshotId:
+      SECOND_PUBLICATION_CONTEXT_IDS.eligibilityInputSnapshotId,
+  });
+  if (evaluation.outcome !== 'eligible') {
+    throw new Error('second publication fixture is not eligible');
+  }
 }
 
 interface DirectPublicationAuthorityRow {
