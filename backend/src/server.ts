@@ -3,6 +3,9 @@ import { Pool } from 'pg';
 
 import { buildApp } from './app.js';
 import { parseConfig } from './config.js';
+import {
+  createPublicPublicationReader,
+} from './modules/publication/public-publication-reader.js';
 import { createResourceHealth } from './resources.js';
 
 async function main(): Promise<void> {
@@ -15,6 +18,7 @@ async function main(): Promise<void> {
   await redis.connect();
 
   const app = buildApp({
+    publications: createPublicPublicationReader(pool),
     resources: createResourceHealth(pool, redis),
   });
 
