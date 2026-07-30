@@ -92,30 +92,45 @@ const sprint4bRunbookContracts = [
   'No deploy',
 ] as const;
 
-test('Sprint 4B workflow requires the Publication operations runbook contract', async () => {
+const sprint5aRunbookContracts = [
+  'GET /api/v1/publications',
+  'GET /api/v1/publications/:publicationId',
+  'Read-only Publication HTTP boundary',
+  'Public API reads PostgreSQL only',
+  'No Publication mutation route',
+  'No frontend integration',
+  'No auth provider',
+  'No merge',
+  'No deploy',
+] as const;
+
+test('Sprint 5A workflow requires the public read API operations contract', async () => {
   const runbook = await readFile(new URL('../README.md', import.meta.url), 'utf8');
   const workflow = await readFile(
     new URL('../../.github/workflows/backend-production-foundation.yml', import.meta.url),
     'utf8',
   );
 
-  for (const contract of sprint4bRunbookContracts) {
+  for (const contract of [
+    ...sprint4bRunbookContracts,
+    ...sprint5aRunbookContracts,
+  ]) {
     assert.ok(
       runbook.includes(contract),
-      `backend runbook is missing Sprint 4B contract: ${contract}`,
+      `backend runbook is missing Sprint 5A contract: ${contract}`,
     );
     assert.ok(
       workflow.includes(`"${contract}"`),
-      `workflow is missing Sprint 4B contract assertion: ${contract}`,
+      `workflow is missing Sprint 5A contract assertion: ${contract}`,
     );
   }
 
-  assert.match(workflow, /^name: Sprint 4B publication authority gate$/m);
+  assert.match(workflow, /^name: Sprint 5A public read API gate$/m);
   assert.match(
     workflow,
-    /group: sprint-4b-publication-authority-\$\{\{ github\.ref \}\}/,
+    /group: sprint-5a-public-read-api-\$\{\{ github\.ref \}\}/,
   );
-  assert.match(workflow, /^    name: verify publication authority$/m);
+  assert.match(workflow, /^    name: verify public read API$/m);
   assert.match(workflow, /^permissions:\n  contents: read$/m);
   assert.doesNotMatch(
     workflow,
