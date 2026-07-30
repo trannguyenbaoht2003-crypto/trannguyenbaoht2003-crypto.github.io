@@ -27,6 +27,9 @@ const HARDENING_IDS = {
   pointerlessRollbackActivationId: '7a000000-0000-4000-8000-000000000008',
   pointerlessRollbackAuditId: '7a000000-0000-4000-8000-000000000009',
   pointerlessRollbackOutboxEventId: '7a000000-0000-4000-8000-000000000010',
+  noopRollbackActivationId: '7a000000-0000-4000-8000-000000000011',
+  noopRollbackAuditId: '7a000000-0000-4000-8000-000000000012',
+  noopRollbackOutboxEventId: '7a000000-0000-4000-8000-000000000013',
 } as const;
 
 function firstPublishCommand(
@@ -221,6 +224,64 @@ test('PostgreSQL rejects activation history without a matching active pointer', 
       transactionOpen = false;
     });
     await assert.rejects(commit, /active publication pointer mismatch/);
+  } finally {
+    await closeClient(client, transactionOpen);
+    await pool.end();
+  }
+});
+
+test('PostgreSQL rejects no-op rollback activation targeting the active version', async () => {
+  const pool = await resetDatabase();
+  await seedTwoVersions(pool);
+  const client = await pool.connect();
+  let transactionOpen = false;
+
+  try {
+    await client.query('begin');
+    transactionOpen = true;
+    await insertActivationEnvelope(client, {
+      activationId: HARDENING_IDS.noopRollbackActivationId,
+      auditId: HARDENING_IDS.noopRollbackAuditId,
+      outboxEventId: HARDENING_IDS.noopRollbackOutboxEventId,
+      eventType: 'PublicationRolledBack',
+      action: 'publication.version_rolled_back',
+    });
+    const activation = await client.query<{ activation_sequence: string }>(
+      `insert into publication_activation_history
+         (activation_id, publication_id, activation_kind,
+          from_publication_version_id, to_publication_version_id,
+          actor_id, audit_event_id, outbox_event_id, correlation_id,
+          activated_at)
+       values ($1, $2, 'rolled_back', $3, $3,
+               'direct-sql-hardening', $4, $5, $6,
+               '2026-07-30T01:40:00.000Z')
+       returning activation_sequence::text`,
+      [
+        HARDENING_IDS.noopRollbackActivationId,
+        PUBLICATION_IDS.publicationId,
+        HARDENING_IDS.secondVersionId,
+        HARDENING_IDS.noopRollbackAuditId,
+        HARDENING_IDS.noopRollbackOutboxEventId,
+        HARDENING_IDS.noopRollbackActivationId,
+      ],
+    );
+    await client.query(
+      `update active_publication_versions
+          set activation_id = $2,
+              activation_sequence = $3::bigint,
+              updated_at = clock_timestamp()
+        where publication_id = $1`,
+      [
+        PUBLICATION_IDS.publicationId,
+        HARDENING_IDS.noopRollbackActivationId,
+        activation.rows[0]!.activation_sequence,
+      ],
+    );
+
+    const commit = client.query('commit').finally(() => {
+      transactionOpen = false;
+    });
+    await assert.rejects(commit, /publication activation transition mismatch/);
   } finally {
     await closeClient(client, transactionOpen);
     await pool.end();
