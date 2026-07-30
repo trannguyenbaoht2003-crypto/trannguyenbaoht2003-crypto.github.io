@@ -17,9 +17,6 @@ import {
   completeHumanReview,
 } from '../../src/modules/trust/complete-human-review.js';
 import {
-  defineCandidateClaimSet,
-} from '../../src/modules/trust/define-candidate-claim-set.js';
-import {
   recordClaimEvidenceDecision,
 } from '../../src/modules/trust/record-claim-evidence-decision.js';
 import { CANDIDATE_IDS } from './candidate.js';
@@ -30,12 +27,10 @@ import {
   seedSatisfiedReviewQuorum,
 } from './gate.js';
 import {
-  TRUST_IDS,
-  claimSetCommand,
+  CROSS_PATCH_IDS,
   evidenceDecisionCommand,
   humanReviewCommand,
-  requiredClaim,
-  seedSecondTrustCandidate,
+  seedCrossPatchClaimSet,
 } from './trust.js';
 
 export const PUBLICATION_IDS = {
@@ -100,38 +95,25 @@ export async function seedEligiblePublicationContext(
 export async function seedSecondEligiblePublicationContext(
   pool: Pool,
 ): Promise<void> {
-  await seedSecondTrustCandidate(pool);
-  await defineCandidateClaimSet(pool, claimSetCommand({
-    candidateId: TRUST_IDS.secondCandidateId,
-    candidateRevisionId: TRUST_IDS.secondCandidateRevisionId,
-    claims: [
-      requiredClaim({
-        claimId: SECOND_PUBLICATION_CONTEXT_IDS.requiredClaimId,
-        claimKey: 'second-publication-build',
-        statement: 'The second publication build is effective.',
-      }),
-    ],
-    correlationId: 'second-publication-claim-set',
-    idempotencyKey: 'second-publication-claim-set',
-  }));
+  await seedCrossPatchClaimSet(pool);
   await recordClaimEvidenceDecision(pool, evidenceDecisionCommand({
     actorId: 'second-publication-evidence-evaluator',
     associations: [
       {
-        associationId:
-          SECOND_PUBLICATION_CONTEXT_IDS.evidenceAssociationId,
+        associationId: CROSS_PATCH_IDS.associationId,
         crossPatchRevalidated: false,
         evidenceId: SECOND_PUBLICATION_CONTEXT_IDS.evidenceId,
-        normalizedObservationId: TRUST_IDS.secondNormalizedObservationId,
+        normalizedObservationId: CROSS_PATCH_IDS.normalizedObservationId,
         revalidationReason: null,
         stance: 'supports',
       },
     ],
-    candidateId: TRUST_IDS.secondCandidateId,
-    candidateRevisionId: TRUST_IDS.secondCandidateRevisionId,
-    claimId: SECOND_PUBLICATION_CONTEXT_IDS.requiredClaimId,
+    candidateId: CROSS_PATCH_IDS.candidateId,
+    candidateRevisionId: CROSS_PATCH_IDS.candidateRevisionId,
+    claimId: CROSS_PATCH_IDS.claimId,
     correlationId: 'second-publication-evidence',
     decisionId: SECOND_PUBLICATION_CONTEXT_IDS.evidenceDecisionId,
+    evaluatedAt: '2026-07-29T00:30:00.000Z',
     evidenceInputSnapshotId:
       SECOND_PUBLICATION_CONTEXT_IDS.evidenceInputSnapshotId,
     idempotencyKey: 'second-publication-evidence',
@@ -139,8 +121,8 @@ export async function seedSecondEligiblePublicationContext(
   }));
   await completeHumanReview(pool, humanReviewCommand({
     actorId: 'second-publication-reviewer-a',
-    candidateId: TRUST_IDS.secondCandidateId,
-    candidateRevisionId: TRUST_IDS.secondCandidateRevisionId,
+    candidateId: CROSS_PATCH_IDS.candidateId,
+    candidateRevisionId: CROSS_PATCH_IDS.candidateRevisionId,
     completedAt: '2026-07-29T01:05:00.000Z',
     correlationId: 'second-publication-review-a',
     humanReviewId:
@@ -154,8 +136,8 @@ export async function seedSecondEligiblePublicationContext(
   }));
   await completeHumanReview(pool, humanReviewCommand({
     actorId: 'second-publication-reviewer-b',
-    candidateId: TRUST_IDS.secondCandidateId,
-    candidateRevisionId: TRUST_IDS.secondCandidateRevisionId,
+    candidateId: CROSS_PATCH_IDS.candidateId,
+    candidateRevisionId: CROSS_PATCH_IDS.candidateRevisionId,
     completedAt: '2026-07-29T01:06:00.000Z',
     correlationId: 'second-publication-review-b',
     humanReviewId:
@@ -171,8 +153,8 @@ export async function seedSecondEligiblePublicationContext(
     pool,
     moderationDecisionCommand({
       actorId: 'second-publication-moderator',
-      candidateId: TRUST_IDS.secondCandidateId,
-      candidateRevisionId: TRUST_IDS.secondCandidateRevisionId,
+      candidateId: CROSS_PATCH_IDS.candidateId,
+      candidateRevisionId: CROSS_PATCH_IDS.candidateRevisionId,
       correlationId: 'second-publication-moderation',
       decisionId: SECOND_PUBLICATION_CONTEXT_IDS.moderationDecisionId,
       evaluatedAt: '2026-07-29T01:10:00.000Z',
@@ -184,8 +166,8 @@ export async function seedSecondEligiblePublicationContext(
   );
   const evaluation = await evaluateCandidateEligibility(pool, {
     actorId: 'second-publication-eligibility-evaluator',
-    candidateId: TRUST_IDS.secondCandidateId,
-    candidateRevisionId: TRUST_IDS.secondCandidateRevisionId,
+    candidateId: CROSS_PATCH_IDS.candidateId,
+    candidateRevisionId: CROSS_PATCH_IDS.candidateRevisionId,
     correlationId: 'second-publication-eligibility',
     evaluatedAt: '2026-07-29T01:20:00.000Z',
     evaluationId:

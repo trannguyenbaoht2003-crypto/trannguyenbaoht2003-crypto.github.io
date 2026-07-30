@@ -19,7 +19,7 @@ import {
   seedEligiblePublicationContext,
   seedSecondEligiblePublicationContext,
 } from './helpers/publication.js';
-import { TRUST_IDS } from './helpers/trust.js';
+import { CROSS_PATCH_IDS } from './helpers/trust.js';
 
 const ROLLBACK_IDS = {
   secondVersionId: '79000000-0000-4000-8000-000000000001',
@@ -80,7 +80,7 @@ function secondItemPublishCommand(): PublishCandidateRevisionCommand {
     publicationVersionId:
       SECOND_PUBLICATION_CONTEXT_IDS.publicationVersionId,
     activationId: SECOND_PUBLICATION_CONTEXT_IDS.activationId,
-    candidateRevisionId: TRUST_IDS.secondCandidateRevisionId,
+    candidateRevisionId: CROSS_PATCH_IDS.candidateRevisionId,
     expectedActiveEligibilityPolicyRevisionId:
       GATE_IDS.eligibilityPolicyId,
     expectedEligibilityEvaluationId:
