@@ -5,12 +5,18 @@ import {
   publishCandidateRevision,
 } from '../src/modules/publication/publish-candidate-revision.js';
 import {
+  readActivePublicationById,
+  readActivePublications,
+} from '../src/modules/publication/read-active-publications.js';
+import {
   rollbackPublication,
 } from '../src/modules/publication/rollback-publication.js';
 import type {
+  ActivePublicationRead,
   PublishCandidateRevisionCommand,
   RollbackPublicationCommand,
 } from '../src/modules/publication/types.js';
+import { CANDIDATE_IDS } from './helpers/candidate.js';
 import { tableCount, resetDatabase } from './helpers/database.js';
 import { GATE_IDS } from './helpers/gate.js';
 import {
@@ -128,6 +134,141 @@ async function seedTwoVersions(
   await publishCandidateRevision(pool, firstPublishCommand());
   await publishCandidateRevision(pool, secondPublishCommand());
 }
+
+function firstPublicationRead(
+  publicationVersionId: string,
+  versionNumber: number,
+  publishedAt: string,
+): ActivePublicationRead {
+  return {
+    publicationId: PUBLICATION_IDS.publicationId,
+    candidateId: CANDIDATE_IDS.candidateId,
+    candidateRevisionId: CANDIDATE_IDS.candidateRevisionId,
+    publicationVersionId,
+    versionNumber,
+    publishedAt,
+    payload: {
+      schemaVersion: 1,
+      mode: 'aram_mayhem',
+      patchKey: '26.15',
+      catalogRevisionId: '40000000-0000-4000-8000-000000000005',
+      championExternalId: 'samira',
+      augmentExternalIds: ['1194'],
+      itemExternalIds: ['3006', '6672'],
+    },
+  };
+}
+
+test('public read hides eligible but unpublished Candidates', async () => {
+  const pool = await resetDatabase();
+  await seedEligiblePublicationContext(pool);
+
+  assert.deepEqual(await readActivePublications(pool), []);
+  assert.equal(
+    await readActivePublicationById(
+      pool,
+      PUBLICATION_IDS.publicationId,
+    ),
+    null,
+  );
+  await pool.end();
+});
+
+test('public read returns only the active immutable PublicationVersion', async () => {
+  const pool = await resetDatabase();
+  await seedTwoVersions(pool);
+  const expected = firstPublicationRead(
+    ROLLBACK_IDS.secondVersionId,
+    2,
+    '2026-07-29T02:10:00.000Z',
+  );
+
+  assert.deepEqual(await readActivePublications(pool), [expected]);
+  assert.deepEqual(
+    await readActivePublicationById(
+      pool,
+      PUBLICATION_IDS.publicationId,
+    ),
+    expected,
+  );
+  await pool.end();
+});
+
+test('public read follows rollback without exposing the inactive version', async () => {
+  const pool = await resetDatabase();
+  await seedTwoVersions(pool);
+  await rollbackPublication(pool, rollbackCommand());
+  const expected = firstPublicationRead(
+    PUBLICATION_IDS.publicationVersionId,
+    1,
+    '2026-07-29T02:00:00.000Z',
+  );
+
+  assert.deepEqual(await readActivePublications(pool), [expected]);
+  assert.deepEqual(
+    await readActivePublicationById(
+      pool,
+      PUBLICATION_IDS.publicationId,
+    ),
+    expected,
+  );
+  await pool.end();
+});
+
+test('public read orders active Publications deterministically', async () => {
+  const pool = await resetDatabase();
+  await seedEligiblePublicationContext(pool);
+  await seedSecondEligiblePublicationContext(pool);
+  await publishCandidateRevision(pool, firstPublishCommand());
+  await publishCandidateRevision(pool, secondItemPublishCommand());
+
+  const reads = await readActivePublications(pool);
+
+  assert.deepEqual(
+    reads.map((read: ActivePublicationRead) => read.publicationId),
+    [
+      PUBLICATION_IDS.publicationId,
+      SECOND_PUBLICATION_CONTEXT_IDS.publicationId,
+    ],
+  );
+  await pool.end();
+});
+
+test('public read does not require Redis, workers, or projection effects', async () => {
+  const pool = await resetDatabase();
+  await seedEligiblePublicationContext(pool);
+  await publishCandidateRevision(pool, firstPublishCommand());
+  assert.equal(await tableCount(pool, 'publication_projection_effects'), 0);
+  const testRedisUrl = process.env.TEST_REDIS_URL;
+  const redisUrl = process.env.REDIS_URL;
+  process.env.TEST_REDIS_URL = 'redis://127.0.0.1:1';
+  process.env.REDIS_URL = 'redis://127.0.0.1:1';
+
+  try {
+    assert.deepEqual(
+      await readActivePublications(pool),
+      [
+        firstPublicationRead(
+          PUBLICATION_IDS.publicationVersionId,
+          1,
+          '2026-07-29T02:00:00.000Z',
+        ),
+      ],
+    );
+  } finally {
+    if (testRedisUrl === undefined) {
+      delete process.env.TEST_REDIS_URL;
+    } else {
+      process.env.TEST_REDIS_URL = testRedisUrl;
+    }
+    if (redisUrl === undefined) {
+      delete process.env.REDIS_URL;
+    } else {
+      process.env.REDIS_URL = redisUrl;
+    }
+    await pool.end();
+  }
+});
 
 test('Publication rollback requires explicit publisher permission without effects', async () => {
   const pool = await resetDatabase();
