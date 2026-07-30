@@ -9,6 +9,7 @@ import { createQueueConnection } from '../src/queue/connection.js';
 import {
   ELIGIBILITY_QUEUE_NAME,
   NORMALIZATION_QUEUE_NAME,
+  PUBLICATION_QUEUE_NAME,
 } from '../src/queue/names.js';
 import {
   dispatchOutbox,
@@ -149,12 +150,16 @@ test('queue failure keeps the immutable payload and schedules a database-backed 
   assert.deepEqual(delivery.rows[0]?.payload, payload);
 });
 
-test('dispatch routes normalization and trust events to separate queues', async () => {
+test('publication queue routes raw, trust, and Publication events without claiming unsupported events', async () => {
   pool = await resetDatabase();
   const rawEventId = randomUUID();
   const rawAggregateId = randomUUID();
   const gateEventId = randomUUID();
   const candidateRevisionId = randomUUID();
+  const publicationEventId = randomUUID();
+  const publicationId = randomUUID();
+  const unsupportedEventId = randomUUID();
+  const unsupportedAggregateId = randomUUID();
   await pool.query(
     `insert into outbox_events
       (outbox_event_id, aggregate_type, aggregate_id, event_type,
@@ -163,7 +168,11 @@ test('dispatch routes normalization and trust events to separate queues', async 
        ($1, 'raw_observation', $2, 'RawObservationIngested',
         $3::jsonb, $4),
        ($5, 'candidate_revision', $6, 'ModerationDecisionRecorded',
-        $7::jsonb, $8)`,
+        $7::jsonb, $8),
+       ($9, 'Publication', $10, 'PublicationPublished',
+        $11::jsonb, $12),
+       ($13, 'unsupported', $14, 'UnsupportedProjectionEvent',
+        '{}'::jsonb, $15)`,
     [
       rawEventId,
       rawAggregateId,
@@ -173,10 +182,18 @@ test('dispatch routes normalization and trust events to separate queues', async 
       candidateRevisionId,
       JSON.stringify({ candidateRevisionId }),
       randomUUID(),
+      publicationEventId,
+      publicationId,
+      JSON.stringify({ publicationId }),
+      randomUUID(),
+      unsupportedEventId,
+      unsupportedAggregateId,
+      randomUUID(),
     ],
   );
   const normalizationJobs: string[] = [];
   const eligibilityJobs: string[] = [];
+  const publicationJobs: string[] = [];
   const eligibilityQueue: OutboxQueue = {
     async add(_name, _data, options) {
       eligibilityJobs.push(String(options.jobId));
@@ -187,17 +204,124 @@ test('dispatch routes normalization and trust events to separate queues', async 
       normalizationJobs.push(String(options.jobId));
     },
   };
+  const publicationQueue: OutboxQueue = {
+    async add(_name, _data, options) {
+      publicationJobs.push(String(options.jobId));
+    },
+  };
 
   const result = await dispatchOutbox({
     pool,
     queues: {
       eligibility: eligibilityQueue,
       normalization: normalizationQueue,
+      publication: publicationQueue,
     },
   });
 
-  assert.deepEqual(result, { claimed: 2, delivered: 2, failed: 0 });
+  assert.deepEqual(result, { claimed: 3, delivered: 3, failed: 0 });
   assert.deepEqual(normalizationJobs, [rawEventId]);
   assert.deepEqual(eligibilityJobs, [gateEventId]);
+  assert.deepEqual(publicationJobs, [publicationEventId]);
+  const unsupported = await pool.query<{
+    delivery_state: string;
+    lease_token: string | null;
+  }>(
+    `select delivery_state, lease_token
+       from outbox_events
+      where outbox_event_id = $1`,
+    [unsupportedEventId],
+  );
+  assert.deepEqual(unsupported.rows[0], {
+    delivery_state: 'pending',
+    lease_token: null,
+  });
   assert.notEqual(ELIGIBILITY_QUEUE_NAME, NORMALIZATION_QUEUE_NAME);
+  assert.notEqual(PUBLICATION_QUEUE_NAME, NORMALIZATION_QUEUE_NAME);
+  assert.notEqual(PUBLICATION_QUEUE_NAME, ELIGIBILITY_QUEUE_NAME);
+});
+
+test('publication queue failure retries only that immutable event while other routes deliver', async () => {
+  pool = await resetDatabase();
+  const rawEventId = randomUUID();
+  const rawAggregateId = randomUUID();
+  const gateEventId = randomUUID();
+  const candidateRevisionId = randomUUID();
+  const publicationEventId = randomUUID();
+  const publicationId = randomUUID();
+  const rawPayload = { observationId: rawAggregateId };
+  const gatePayload = { candidateRevisionId };
+  const publicationPayload = { publicationId };
+  await pool.query(
+    `insert into outbox_events
+      (outbox_event_id, aggregate_type, aggregate_id, event_type,
+       payload, correlation_id)
+     values
+       ($1, 'raw_observation', $2, 'RawObservationIngested',
+        $3::jsonb, $4),
+       ($5, 'candidate_revision', $6, 'ModerationDecisionRecorded',
+        $7::jsonb, $8),
+       ($9, 'Publication', $10, 'PublicationRolledBack',
+        $11::jsonb, $12)`,
+    [
+      rawEventId,
+      rawAggregateId,
+      JSON.stringify(rawPayload),
+      randomUUID(),
+      gateEventId,
+      candidateRevisionId,
+      JSON.stringify(gatePayload),
+      randomUUID(),
+      publicationEventId,
+      publicationId,
+      JSON.stringify(publicationPayload),
+      randomUUID(),
+    ],
+  );
+  const deliveredJobs: string[] = [];
+  const result = await dispatchOutbox({
+    pool,
+    retryDelayMs: 10,
+    queues: {
+      normalization: {
+        async add(_name, _data, options) {
+          deliveredJobs.push(String(options.jobId));
+        },
+      },
+      eligibility: {
+        async add(_name, _data, options) {
+          deliveredJobs.push(String(options.jobId));
+        },
+      },
+      publication: {
+        async add() {
+          throw new Error('injected Publication queue outage');
+        },
+      },
+    },
+  });
+
+  assert.deepEqual(result, { claimed: 3, delivered: 2, failed: 1 });
+  assert.deepEqual(deliveredJobs, [rawEventId, gateEventId]);
+  const rows = await pool.query<{
+    delivery_state: string;
+    outbox_event_id: string;
+    payload: Record<string, unknown>;
+  }>(
+    `select outbox_event_id, delivery_state, payload
+       from outbox_events
+      where outbox_event_id = any($1::uuid[])
+      order by outbox_event_id`,
+    [[rawEventId, gateEventId, publicationEventId]],
+  );
+  const byId = new Map(rows.rows.map((row) => [row.outbox_event_id, row]));
+  assert.equal(byId.get(rawEventId)?.delivery_state, 'delivered');
+  assert.equal(byId.get(gateEventId)?.delivery_state, 'delivered');
+  assert.equal(
+    byId.get(publicationEventId)?.delivery_state,
+    'retryable_failed',
+  );
+  assert.deepEqual(byId.get(rawEventId)?.payload, rawPayload);
+  assert.deepEqual(byId.get(gateEventId)?.payload, gatePayload);
+  assert.deepEqual(byId.get(publicationEventId)?.payload, publicationPayload);
 });
