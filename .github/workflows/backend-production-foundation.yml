@@ -1,4 +1,4 @@
-name: Sprint 4A moderation and eligibility gate
+name: Sprint 4B publication authority gate
 
 on:
   workflow_dispatch:
@@ -16,12 +16,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: sprint-4a-moderation-eligibility-${{ github.ref }}
+  group: sprint-4b-publication-authority-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   verify:
-    name: verify moderation and eligibility
+    name: verify publication authority
     runs-on: ubuntu-latest
     timeout-minutes: 40
     services:
@@ -91,16 +91,12 @@ jobs:
             "TEST_REDIS_URL",
             "reference_only",
             "retryable_failed",
-            "No AI",
-            "No publication",
             "No production credentials",
-            "No deployment",
             "CatalogSnapshotV1",
             "catalog_import",
             "CATALOG_ACTIVE_POINTER_CONFLICT",
             "CATALOG_REVISION_NOT_ACTIVE",
             "No external catalog fetch",
-            "No normalization",
             "ObservationNormalizationSnapshotV1",
             "Fingerprint exclusions",
             "Candidate identity",
@@ -127,10 +123,18 @@ jobs:
             "Stale Eligibility reads needs_review",
             "Eligibility re-evaluation queue",
             "PostgreSQL remains Eligibility authority",
-            "No Publication",
+            "PublicationVersion immutable",
+            "Publisher permission required",
+            "Fresh Eligibility rechecked at commit",
+            "Publication activation history",
+            "Item-level rollback",
+            "Public read independent from workers",
+            "PostgreSQL remains Publication authority",
+            "No automatic publication",
+            "No HTTP mutation route",
             "No UI",
-            "No auth",
             "No merge",
+            "No deploy",
           ]) {
             if (!runbook.includes(contract)) {
               throw new Error(`backend runbook is missing contract: ${contract}`);
@@ -182,7 +186,8 @@ jobs:
         run: |
           set -euo pipefail
           workflow=".github/workflows/backend-production-foundation.yml"
-          executable="$RUNNER_TEMP/sprint-4a-moderation-eligibility-before-guard.yml"
+          executable="$RUNNER_TEMP/sprint-4b-publication-authority-before-guard.yml"
           sed '/- name: Deployment guard/,$d' "$workflow" > "$executable"
           ! grep -Eq '(contents|packages|pages|id-token):[[:space:]]*write' "$workflow"
           ! grep -Eq 'git push|wrangler[[:space:]]+deploy|npm run deploy|actions/deploy-pages' "$executable"
+          ! grep -Eq '(CLOUDFLARE_API_TOKEN|AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY|GOOGLE_APPLICATION_CREDENTIALS|BEGIN (RSA|OPENSSH|EC) PRIVATE KEY)' "$executable"
