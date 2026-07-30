@@ -27,6 +27,15 @@ export interface BuiltPublicationPayload {
   payloadHash: string;
 }
 
+export interface ActivePublicationRead {
+  publicationId: string;
+  candidateId: string;
+  candidateRevisionId: string;
+  publicationVersionId: string;
+  versionNumber: number;
+  publishedAt: string;
+  payload: PublicationPayloadV1;
+}
 
 export interface PublicationAuthorizationContext {
   actorId: string;
