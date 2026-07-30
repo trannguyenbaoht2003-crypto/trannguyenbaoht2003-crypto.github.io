@@ -41,22 +41,20 @@ interface StubReader {
   listActive(): Promise<ActivePublicationRead[]>;
 }
 
-function createReader(
-  overrides: Partial<Pick<StubReader, 'findActiveById' | 'listActive'>> = {},
-): StubReader {
-  return {
+function createReader(): StubReader {
+  const reader: StubReader = {
     findCalls: [],
     listCalls: 0,
     async findActiveById(publicationId) {
-      this.findCalls.push(publicationId);
+      reader.findCalls.push(publicationId);
       return activePublication;
     },
     async listActive() {
-      this.listCalls += 1;
+      reader.listCalls += 1;
       return [activePublication];
     },
-    ...overrides,
   };
+  return reader;
 }
 
 function buildTestApp(reader: StubReader) {
@@ -123,12 +121,11 @@ test('Publication HTTP invalid UUID returns safe 400 before reader invocation', 
 });
 
 test('Publication HTTP missing active Publication returns safe 404', async () => {
-  const reader = createReader({
-    async findActiveById(publicationId) {
-      this.findCalls.push(publicationId);
-      return null;
-    },
-  });
+  const reader = createReader();
+  reader.findActiveById = async (publicationId) => {
+    reader.findCalls.push(publicationId);
+    return null;
+  };
   const app = buildTestApp(reader);
 
   const response = await app.inject({
@@ -148,12 +145,11 @@ test('Publication HTTP missing active Publication returns safe 404', async () =>
 
 test('Publication HTTP reader failure returns safe 500 without leaking source detail', async () => {
   const sourceDetail = 'password=secret postgres://internal-host/private';
-  const reader = createReader({
-    async listActive() {
-      this.listCalls += 1;
-      throw new Error(sourceDetail);
-    },
-  });
+  const reader = createReader();
+  reader.listActive = async () => {
+    reader.listCalls += 1;
+    throw new Error(sourceDetail);
+  };
   const app = buildTestApp(reader);
 
   const response = await app.inject({
