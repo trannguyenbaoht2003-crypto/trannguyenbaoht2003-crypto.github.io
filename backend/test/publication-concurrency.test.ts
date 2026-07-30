@@ -381,3 +381,41 @@ test('concurrent rollbacks of different Publication items proceed independently'
     await Promise.all([left.end(), right.end(), setupPool.end()]);
   }
 });
+
+test('concurrent duplicate projection deliveries create one effect', async () => {
+  const setupPool = await resetDatabase();
+  await seedEligiblePublicationContext(setupPool);
+  await publishCandidateRevision(setupPool, firstPublishCommand());
+  const left = boundedPool();
+  const right = boundedPool();
+  const project = (pool: Pool) => pool.query(
+    `insert into publication_projection_effects
+       (outbox_event_id, publication_id, publication_version_id,
+        event_type, projected_state, projected_at)
+     select event.outbox_event_id,
+            activation.publication_id,
+            activation.to_publication_version_id,
+            event.event_type,
+            'active',
+            activation.activated_at
+       from outbox_events event
+       join publication_activation_history activation
+         on activation.outbox_event_id = event.outbox_event_id
+      where event.outbox_event_id = $1
+        and event.event_type = 'PublicationPublished'
+     on conflict (outbox_event_id) do nothing
+     returning outbox_event_id`,
+    [PUBLICATION_IDS.outboxEventId],
+  );
+
+  try {
+    const results = await Promise.all([project(left), project(right)]);
+    assert.equal(
+      results.reduce((sum, result) => sum + (result.rowCount ?? 0), 0),
+      1,
+    );
+    assert.equal(await tableCount(setupPool, 'publication_projection_effects'), 1);
+  } finally {
+    await Promise.all([left.end(), right.end(), setupPool.end()]);
+  }
+});
