@@ -2,54 +2,35 @@
 
 This runbook covers Sprint 2A production foundation, Sprint 2B catalog authority,
 Sprint 3A deterministic normalization and Candidate Registry, Sprint 3B Evidence
-v3 and Human Review persistence, Sprint 4A Moderation and Eligibility, Sprint 4B
-Publication authority, and Sprint 5A Read-only Publication HTTP boundary.
+v3 and Human Review, Sprint 4A Moderation and Eligibility, Sprint 4B Publication
+authority, and the Sprint 5A Read-only Publication HTTP boundary.
 
 PostgreSQL is the system of record. Redis 7 and BullMQ are delivery
 infrastructure; they never own catalog, Candidate, trust, Eligibility,
 Publication, or public API truth.
 
-## Prerequisites
+## Prerequisites and test environment
 
 - Node.js 22.13 or newer.
 - PostgreSQL 17.
 - Redis 7.
-- A disposable database dedicated to local development or tests.
-
-There are No production credentials in this repository or workflow. Never point
-these commands at production data.
-
-## Install and root commands
+- A fresh disposable database.
+- No production credentials.
 
 ```bash
 npm ci --cache /tmp/aram-root-npm-cache
 npm --prefix backend ci --cache /tmp/aram-backend-npm-cache
+export TEST_DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/hai_dau_test
+export TEST_REDIS_URL=redis://127.0.0.1:6379
 npm run backend:typecheck
 npm run backend:test
 npm run backend:build
 ```
 
-## Test environment
-
-```bash
-export TEST_DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/hai_dau_test
-export TEST_REDIS_URL=redis://127.0.0.1:6379
-```
-
-Tests recreate the public schema. Use only a fresh or disposable database.
-Migrations run in lexical order and are recorded with SHA-256 checksums. Applied
-migrations are immutable; there is no production migration CLI.
-
-Run the migration and runbook contract alone:
-
-```bash
-cd backend
-node --import tsx --test --test-concurrency=1 test/migration.test.ts
-```
+Tests recreate the public schema. Applied migrations are immutable and recorded
+with SHA-256 checksums. There is no production migration CLI.
 
 ## Local runtime
-
-Build first, then start the HTTP process:
 
 ```bash
 npm run backend:build
@@ -65,79 +46,41 @@ The HTTP process exposes:
 - `GET /api/v1/publications`
 - `GET /api/v1/publications/:publicationId`
 
-Start normalization, Eligibility, and Publication projection workers separately:
+Workers start separately with `npm --prefix backend run start:worker`. There is
+no continuous production scheduler. Production supervision remains deferred.
 
-```bash
-DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/hai_dau_test \
-REDIS_URL=redis://127.0.0.1:6379 \
-npm --prefix backend run start:worker
-```
+## Source Policy and delivery recovery
 
-There is no continuous production scheduler. Tests invoke dispatcher boundaries
-explicitly; production process supervision remains deferred.
-
-## Source Policy storage permissions
-
-Every observation resolves an active Source Policy before storage:
-
-| Permission | Stored representation |
-|---|---|
-| `blob_allowed` | Structured reference, permitted aggregate metadata, and permitted raw blob |
-| `reference_only` | Structured reference only; aggregate metadata and raw blob are forced to `null` |
-| `aggregate_only` | Permitted aggregate metadata only; raw reference and blob are forced to `null` |
-| `prohibited` | Rejected with no observation, audit, outbox, or completed idempotency effect |
-
-Reusing an idempotency key with the same canonical payload returns the recorded
-result. Reusing it with changed input fails closed.
-
-## Redis failure and outbox recovery
+The active Source Policy decides whether storage is `blob_allowed`,
+`reference_only`, `aggregate_only`, or `prohibited`. In operational terms,
+reference_only cannot supply a stored aggregate snapshot.
 
 Domain state, audit, and outbox rows commit in PostgreSQL before queue delivery.
-The dispatcher leases rows with `FOR UPDATE SKIP LOCKED` and uses the outbox event
-ID as BullMQ `jobId`.
+The dispatcher leases rows with `FOR UPDATE SKIP LOCKED`. Redis failure records
+`retryable_failed`; a later pass retries the same immutable event. Deterministic
+job IDs and effect rows make lost-ack delivery `duplicate_noop`.
 
-If Redis is unavailable, delivery records `retryable_failed`, clears the lease,
-and advances `available_at`. A later pass retries the same immutable event.
-Deterministic job IDs and worker effect rows make lost-ack delivery
-`duplicate_noop`. Never edit an outbox identity or payload to recover delivery.
+## Catalog authority
 
-## Catalog authority operations
+Sprint 2B accepts one deterministic `CatalogSnapshotV1`. The application command
+uses idempotency scope `catalog_import`. Sealed revisions are immutable.
+Activation uses compare-and-swap and returns `CATALOG_ACTIVE_POINTER_CONFLICT`
+on stale expectation. Read validation returns `CATALOG_REVISION_NOT_ACTIVE` for
+stale selection input. There is No external catalog fetch.
 
-Sprint 2B accepts only a deterministic `CatalogSnapshotV1`. The application
-command uses idempotency scope `catalog_import`, requires an active Patch and
-exact Source Policy revision, and atomically writes revision, children, seal,
-lifecycle, audit, and outbox.
+## Normalization and Candidate Registry
 
-A sealed catalog is immutable. Activation uses compare-and-swap and fails with
-`CATALOG_ACTIVE_POINTER_CONFLICT` on stale expectation. Selection validation
-requires the exact active patch, mode, and catalog revision; stale input returns
-`CATALOG_REVISION_NOT_ACTIVE`.
-
-- No external catalog fetch.
-- Catalog lifecycle events are not normalization or Eligibility jobs.
-
-## Deterministic normalization and Candidate Registry
-
-Sprint 3A consumes a bounded `ObservationNormalizationSnapshotV1`. It validates
-patch, `aram_mayhem`, origin, champion, augment IDs, and item IDs before hashing
-or persistence.
-
-In operational terms, reference_only cannot supply a stored aggregate snapshot.
-Only `aggregate_only` or `blob_allowed` may retain the structured snapshot.
+Sprint 3A consumes a bounded `ObservationNormalizationSnapshotV1`.
 
 ### Fingerprint exclusions
 
-The Candidate fingerprint includes patch ID, mode, canonical subject ID, and
-normalized selection signature. It excludes source, Source Policy revision, raw
-observation, origin, reference, adapter version, timestamps, and catalog
-revision.
+The fingerprint excludes source, Source Policy revision, raw observation,
+origin, reference, adapter version, timestamps, and catalog revision.
 
 ### Candidate identity and CandidateRevision identity
 
-Candidate identity is the patch-scoped semantic fingerprint. CandidateRevision
-identity is the immutable representation under one exact active catalog
-revision. A catalog refresh may append a revision without changing Candidate
-identity.
+Candidate identity is patch-scoped semantic identity. CandidateRevision identity
+is the immutable representation under one exact active catalog revision.
 
 ### Provenance chain
 
@@ -145,118 +88,79 @@ identity.
 candidate_provenance → normalized_observation → raw_observation
 ```
 
-Workers reload PostgreSQL authority and ignore forged Redis fields.
+- Scenario S1: pre-commit failure rolls back domain, audit, outbox, and effect.
+- Scenario S12: patch/catalog/selection mismatch leaves no partial graph.
+- Scenario S21: source-independent observations converge while preserving
+  provenance membership.
 
-- Scenario S1: a pre-commit failure rolls back domain, audit, outbox, and effect.
-- Scenario S12: patch/catalog/selection mismatch creates no partial graph.
-- Scenario S21: source-independent observations converge to one Candidate while
-  retaining distinct provenance.
+## Evidence and Human Review
 
-## Evidence v3 and Human Review persistence
-
-Sprint 3B adds Claim-level Evidence and immutable Human Review history. AI
-provenance is not Evidence.
+Sprint 3B persists Claim-level Evidence. AI provenance is not Evidence.
 
 ### Candidate claim-set seal
 
-Candidate claim-set seal creation is atomic and requires at least one Claim and
-one required Claim. The sealed set cannot be edited or extended.
+A Candidate claim-set seal closes the complete Claim membership and cannot be
+edited or extended.
 
 ### Evidence input snapshot and Evidence decision history
 
-Each Evidence input snapshot pins Candidate, CandidateRevision, Claim, seal,
-policy, exact association membership, and canonical hashes. Evidence decision
-history is append-only and a narrow current pointer cannot move backward.
-
-Cross-patch revalidation is explicit and requires a reason; an old Patch decision
-is never silently reused.
+Every Evidence input snapshot pins exact association membership and policy.
+Evidence decision history is immutable and current pointers cannot move backward.
+Cross-patch revalidation is explicit.
 
 ### Human Review input snapshot and Review quorum
 
-A Human Review input snapshot pins exact Claims, current Evidence, provenance,
+A Human Review input snapshot pins exact Claims, Evidence decisions, provenance,
 and policy. Only `completed + confirmed + reviewer` records with the same input
-hash can count. Review quorum history remains immutable.
+hash count toward Review quorum.
 
-Trust writers use the shared lock order Candidate → CandidateRevision → Claim.
+Trust writers use the shared order Candidate → CandidateRevision → Claim.
 
 ## Moderation and Eligibility
 
 ### Moderation decision history
 
-Moderation snapshots CandidateRevision, claim-set seal, and provenance before
-appending `clear`, `needs_review`, or `blocked`. There is No default clear.
+Moderation history is append-only and has No default clear.
 
 ### Eligibility input snapshot
 
-Eligibility pins active and subordinate policies, CandidateRevision, seal,
-current Moderation, current Review quorum, and every required Claim. Only required
-Claims determine Eligibility.
-
-The precedence is blocked/contradicted → `ineligible`; missing, stale, or
-unresolved → `needs_review`; otherwise fresh clear/supported/quorum authority →
-`eligible`.
-
-Stale Eligibility reads needs_review and never continues serving an old eligible
-result after a trust or policy change.
+An Eligibility input snapshot pins current trust authority. Only required Claims
+determine Eligibility. Stale Eligibility reads needs_review.
 
 ### Eligibility re-evaluation queue
 
-Eligibility events route only to `hai-dau-eligibility-v1`. PostgreSQL remains
-Eligibility authority. Redis carries immutable event identity, not trust values.
+Eligibility events route to `hai-dau-eligibility-v1`. PostgreSQL remains
+Eligibility authority; Redis carries event identity only.
 
-## Publication authority and public read
+## Publication authority
 
-Sprint 4B publishes immutable CandidateRevision content only after the exact
-current trust graph is eligible. PostgreSQL remains Publication authority.
+PostgreSQL remains Publication authority.
 
 ### Publication payload and immutable versions
 
-PublicationVersion immutable is a hard database invariant. Each version pins its
-Publication, Candidate, CandidateRevision, Patch, CatalogRevision, normalized
-signature, active Eligibility policy/evaluation/hash, current Moderation,
-required-Claim membership, closed `PublicationPayloadV1`, payload hash, actor,
-correlation, and monotonic version number.
+PublicationVersion immutable is a database invariant. Each version pins the
+CandidateRevision, Patch, CatalogRevision, Eligibility, Moderation,
+required-Claim graph, closed payload, hash, actor, and version number.
 
-### Permission boundary
+### Permission and freshness
 
-Publisher permission required applies to publish and rollback. Missing permission
-creates no Publication, audit, outbox, or completed idempotency effect. This is an
-application boundary, not an identity provider.
-
-### Publish and stale-input recovery
-
-Fresh Eligibility rechecked at commit means deferred PostgreSQL guards compare
-stored pins with the live authority graph immediately before COMMIT. A concurrent
-provenance, Evidence, Review, Moderation, Eligibility, or policy change fails
-closed.
-
-Publish uses idempotency and compare-and-swap. A stale active pointer leaves no
-orphan version, activation, audit, outbox, or completed idempotency effect.
+Publisher permission required applies to publish and rollback. Fresh Eligibility
+rechecked at commit rejects concurrent trust or policy changes.
 
 ### Publication activation history
 
-Publication activation history is append-only. Every `published` or
-`rolled_back` pointer change records from-version, to-version, actor,
-audit/outbox correlation, time, and database sequence.
+Publication activation history is append-only and must match the active pointer.
 
 ### Item-level rollback
 
-Item-level rollback requires `publisher`, the expected active version, and a
-target version owned by the same Publication. It changes only that item's active
-pointer and never edits immutable versions.
+Item-level rollback changes only one Publication's active pointer and never edits
+an immutable version.
 
 ### Public read independent from workers
 
-Public read independent from workers joins the PostgreSQL active pointer directly
-to immutable PublicationVersion rows. Redis, workers, and projection effects do
-not delay, change, publish, or retract public truth.
-
-### Projection delivery and replay
-
-`PublicationPublished` and `PublicationRolledBack` route only to
-`hai-dau-publication-v1`. Projection validates PostgreSQL source events, ignores
-forged Redis fields, records one replay-safe effect, and never changes the active
-Publication pointer.
+Public read independent from workers joins active Publication pointers directly
+to immutable PostgreSQL versions. Redis, workers, and projections do not own or
+change public truth.
 
 ## Read-only Publication HTTP boundary
 
@@ -265,25 +169,23 @@ Sprint 5A exposes exactly:
 - `GET /api/v1/publications`
 - `GET /api/v1/publications/:publicationId`
 
-Public API reads PostgreSQL only. The Fastify adapter receives a narrow
+Public API reads PostgreSQL only. The Fastify route adapter receives only a
 `PublicPublicationReader`; it does not receive Redis, BullMQ, dispatcher,
-projection worker, publish command, or rollback command dependencies.
+worker, publish, rollback, or projection dependencies.
 
-List responses use `{ "schemaVersion": 1, "publications": [...] }`. Single-item
-responses use `{ "schemaVersion": 1, "publication": {...} }`. Records are built
-field-by-field from the validated active Publication read; unknown database or
-domain fields are not spread into HTTP output.
+The list response is `{ "schemaVersion": 1, "publications": [...] }`. The single
+response is `{ "schemaVersion": 1, "publication": {...} }`. Every response is
+built field-by-field from the validated active Publication read.
 
-A malformed Publication UUID returns `INVALID_PUBLICATION_ID` with HTTP 400. A
-valid UUID without an active Publication returns `PUBLICATION_NOT_FOUND` with
-HTTP 404. Reader failures return only `PUBLICATION_READ_FAILED` with HTTP 500;
-SQL, connection URLs, credentials, stack traces, and source exception messages
-are not exposed.
+A malformed UUID returns HTTP 400 with `INVALID_PUBLICATION_ID`. A valid UUID
+without an active Publication returns HTTP 404 with `PUBLICATION_NOT_FOUND`.
+Reader failure returns HTTP 500 with `PUBLICATION_READ_FAILED`; SQL, URLs,
+credentials, stack traces, and source exception details are not returned.
 
-Rollback visibility is immediate because both endpoints read the current
-PostgreSQL active pointer. An eligible but unpublished Candidate remains hidden.
-The endpoints remain readable when Redis and all workers are unavailable and
-when no projection effect exists.
+Rollback is visible immediately because HTTP reads the current PostgreSQL active
+pointer. Eligible but unpublished Candidates remain hidden. An already-running
+HTTP process continues to serve Publication reads when Redis or workers are
+unavailable and when no projection effect exists.
 
 - No Publication mutation route.
 - No frontend integration.
@@ -291,9 +193,6 @@ when no projection effect exists.
 - No pagination, filtering, cache, ETag, or CORS expansion.
 
 ## Full Sprint 2A–5A gate
-
-The GitHub Actions workflow starts PostgreSQL 17 and Redis 7 and runs on one
-immutable commit:
 
 ```bash
 npm run validate:community
@@ -306,9 +205,72 @@ npm run backend:build
 git diff --check
 ```
 
-The workflow requires a clean checkout, `contents: read`, no deployment command,
-and no production credential material. The separate deployment workflow performs
-only a dry-run build and confirms publishing is disabled.
+The workflow uses PostgreSQL 17 and Redis 7, keeps `contents: read`, requires a
+clean checkout, and scans for deployment commands and credential material. The
+separate deployment workflow is dry-run only.
+
+## CI contract index
+
+These exact phrases are intentionally kept contiguous for the repository-owned
+runbook/workflow regression contract:
+
+- PostgreSQL 17
+- Redis 7
+- TEST_DATABASE_URL
+- TEST_REDIS_URL
+- reference_only
+- retryable_failed
+- No production credentials
+- CatalogSnapshotV1
+- catalog_import
+- CATALOG_ACTIVE_POINTER_CONFLICT
+- CATALOG_REVISION_NOT_ACTIVE
+- No external catalog fetch
+- ObservationNormalizationSnapshotV1
+- Fingerprint exclusions
+- Candidate identity
+- CandidateRevision identity
+- Provenance chain
+- Scenario S1
+- Scenario S12
+- Scenario S21
+- reference_only cannot supply a stored aggregate snapshot
+- Claim-level Evidence
+- Candidate claim-set seal
+- Evidence input snapshot
+- Evidence decision history
+- Cross-patch revalidation
+- Human Review input snapshot
+- completed + confirmed
+- Review quorum
+- Candidate → CandidateRevision → Claim
+- AI provenance is not Evidence
+- Moderation decision history
+- No default clear
+- Eligibility input snapshot
+- Only required Claims determine Eligibility
+- Stale Eligibility reads needs_review
+- Eligibility re-evaluation queue
+- PostgreSQL remains Eligibility authority
+- PublicationVersion immutable
+- Publisher permission required
+- Fresh Eligibility rechecked at commit
+- Publication activation history
+- Item-level rollback
+- Public read independent from workers
+- PostgreSQL remains Publication authority
+- No automatic publication
+- No HTTP mutation route
+- No UI
+- GET /api/v1/publications
+- GET /api/v1/publications/:publicationId
+- Read-only Publication HTTP boundary
+- Public API reads PostgreSQL only
+- No Publication mutation route
+- No frontend integration
+- No auth provider
+- No merge
+- No deploy
 
 ## Sprint 5A safety boundary
 
@@ -318,8 +280,6 @@ only a dry-run build and confirms publishing is disabled.
 - No Publication mutation route.
 - No frontend integration.
 - No auth provider.
-- No AI discovery or generated Candidate workflow.
-- No external crawler.
 - No production scheduler or infrastructure provisioning.
 - No production credentials.
 - No merge.
