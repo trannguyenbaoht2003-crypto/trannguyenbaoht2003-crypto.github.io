@@ -19,6 +19,13 @@ const ELIGIBILITY_EVENT_TYPES = [
   'HumanReviewCompleted',
   'ModerationDecisionRecorded',
 ] as const;
+const PUBLICATION_EVENT_TYPES = [
+  'PublicationPublished',
+  'PublicationRolledBack',
+] as const;
+const NORMALIZATION_EVENTS = new Set<string>(NORMALIZATION_EVENT_TYPES);
+const ELIGIBILITY_EVENTS = new Set<string>(ELIGIBILITY_EVENT_TYPES);
+const PUBLICATION_EVENTS = new Set<string>(PUBLICATION_EVENT_TYPES);
 
 interface ClaimedOutboxEvent {
   aggregate_id: string;
@@ -33,15 +40,18 @@ export interface OutboxQueue {
   add(name: string, data: OutboxJobData, options: JobsOptions): Promise<unknown>;
 }
 
+export interface RoutedOutboxQueues {
+  eligibility: OutboxQueue;
+  normalization: OutboxQueue;
+  publication: OutboxQueue;
+}
+
 export interface DispatchOutboxOptions {
   batchSize?: number;
   leaseMs?: number;
   pool: Pool;
   queue?: OutboxQueue;
-  queues?: {
-    eligibility: OutboxQueue;
-    normalization: OutboxQueue;
-  };
+  queues?: RoutedOutboxQueues;
   retryDelayMs?: number;
 }
 
@@ -89,6 +99,22 @@ async function claimEvents(
   });
 }
 
+function routeEvent(
+  eventType: string,
+  queues: RoutedOutboxQueues,
+): OutboxQueue {
+  if (NORMALIZATION_EVENTS.has(eventType)) {
+    return queues.normalization;
+  }
+  if (ELIGIBILITY_EVENTS.has(eventType)) {
+    return queues.eligibility;
+  }
+  if (PUBLICATION_EVENTS.has(eventType)) {
+    return queues.publication;
+  }
+  throw new Error('UNSUPPORTED_OUTBOX_EVENT');
+}
+
 export async function dispatchOutbox(
   options: DispatchOutboxOptions,
 ): Promise<DispatchOutboxResult> {
@@ -96,7 +122,11 @@ export async function dispatchOutbox(
     throw new Error('OUTBOX_QUEUE_REQUIRED');
   }
   const eventTypes = options.queues
-    ? [...NORMALIZATION_EVENT_TYPES, ...ELIGIBILITY_EVENT_TYPES]
+    ? [
+        ...NORMALIZATION_EVENT_TYPES,
+        ...ELIGIBILITY_EVENT_TYPES,
+        ...PUBLICATION_EVENT_TYPES,
+      ]
     : [...NORMALIZATION_EVENT_TYPES];
   const leaseToken = randomUUID();
   const events = await claimEvents(
@@ -121,11 +151,7 @@ export async function dispatchOutbox(
 
     try {
       const queue = options.queues
-        ? (
-            event.event_type === 'RawObservationIngested'
-              ? options.queues.normalization
-              : options.queues.eligibility
-          )
+        ? routeEvent(event.event_type, options.queues)
         : options.queue!;
       await queue.add(event.event_type, jobData, {
         attempts: 3,
