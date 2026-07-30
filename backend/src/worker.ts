@@ -6,11 +6,15 @@ import {
 import { createWorkerConnection } from './queue/connection.js';
 import { createEligibilityWorker } from './queue/eligibility-worker.js';
 import { createNormalizationWorker } from './queue/normalization-worker.js';
+import {
+  createPublicationProjectionWorker,
+} from './queue/publication-projection-worker.js';
 
 const config = parseConfig(process.env);
 const pool = createPool(config.databaseUrl);
 const normalizationConnection = createWorkerConnection(config.redisUrl);
 const eligibilityConnection = createWorkerConnection(config.redisUrl);
+const publicationConnection = createWorkerConnection(config.redisUrl);
 const normalizationWorker = createNormalizationWorker({
   connection: normalizationConnection,
   normalizeObservation: registerStoredObservationInTransaction,
@@ -20,6 +24,10 @@ const eligibilityWorker = createEligibilityWorker({
   connection: eligibilityConnection,
   pool,
 });
+const publicationWorker = createPublicationProjectionWorker({
+  connection: publicationConnection,
+  pool,
+});
 
 let shutdownPromise: Promise<void> | undefined;
 async function shutdown(): Promise<void> {
@@ -27,10 +35,12 @@ async function shutdown(): Promise<void> {
     await Promise.all([
       normalizationWorker.close(),
       eligibilityWorker.close(),
+      publicationWorker.close(),
     ]);
     await Promise.all([
       normalizationConnection.quit(),
       eligibilityConnection.quit(),
+      publicationConnection.quit(),
     ]);
     await pool.end();
   })();
