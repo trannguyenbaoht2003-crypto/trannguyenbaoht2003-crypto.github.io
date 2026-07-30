@@ -23,7 +23,6 @@ import type {
 } from '../src/modules/trust/record-claim-evidence-decision.js';
 import { resetDatabase, tableCount } from './helpers/database.js';
 import {
-  CANDIDATE_IDS,
   registrationCommand,
   seedRawObservation,
 } from './helpers/candidate.js';
@@ -43,7 +42,6 @@ const TRUST_RACE_IDS = {
   unusedCandidateId: '7b300000-0000-4000-8000-000000000003',
   unusedCandidateRevisionId: '7b300000-0000-4000-8000-000000000004',
   provenanceId: '7b300000-0000-4000-8000-000000000005',
-  evidenceAssociationId: '7b400000-0000-4000-8000-000000000001',
   evidenceInputSnapshotId: '7b400000-0000-4000-8000-000000000002',
   evidenceDecisionId: '7b400000-0000-4000-8000-000000000003',
   reviewInputSnapshotId: '7b500000-0000-4000-8000-000000000001',
@@ -135,23 +133,14 @@ function provenanceCommand(): RegisterNormalizedObservationCommand {
 function reevaluateEvidenceCommand(): RecordClaimEvidenceDecisionCommand {
   return evidenceDecisionCommand({
     actorId: 'publication-race-evidence',
-    associations: [
-      {
-        associationId: TRUST_RACE_IDS.evidenceAssociationId,
-        crossPatchRevalidated: false,
-        evidenceId: TRUST_IDS.evidenceId,
-        normalizedObservationId: CANDIDATE_IDS.normalizedObservationId,
-        revalidationReason: null,
-        stance: 'contradicts',
-      },
-    ],
+    associations: [],
     correlationId: 'publication-race-evidence',
-    decision: 'contradicted',
+    decision: 'insufficient',
     decisionId: TRUST_RACE_IDS.evidenceDecisionId,
     evaluatedAt: '2026-07-30T05:00:00.000Z',
     evidenceInputSnapshotId: TRUST_RACE_IDS.evidenceInputSnapshotId,
     idempotencyKey: 'publication-race-evidence',
-    reason: 'Contradicting Evidence reevaluation serialized behind Publication.',
+    reason: 'Evidence reevaluation without qualifying input serialized behind Publication.',
   });
 }
 
