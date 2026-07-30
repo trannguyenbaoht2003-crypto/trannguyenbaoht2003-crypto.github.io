@@ -2,7 +2,19 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { buildApp } from '../src/app.js';
+import type {
+  PublicPublicationReader,
+} from '../src/modules/publication/public-publication-reader.js';
 import type { ResourceHealth } from '../src/resources.js';
+
+const publications: PublicPublicationReader = {
+  async findActiveById() {
+    return null;
+  },
+  async listActive() {
+    return [];
+  },
+};
 
 const failingResources: ResourceHealth = {
   async checkPostgres() {
@@ -23,7 +35,11 @@ const healthyResources: ResourceHealth = {
 };
 
 test('live endpoint does not depend on external resources', async () => {
-  const app = buildApp({ resources: failingResources, logger: false });
+  const app = buildApp({
+    publications,
+    resources: failingResources,
+    logger: false,
+  });
 
   const response = await app.inject({ method: 'GET', url: '/health/live' });
 
@@ -33,7 +49,11 @@ test('live endpoint does not depend on external resources', async () => {
 });
 
 test('ready endpoint fails closed without leaking resource detail', async () => {
-  const app = buildApp({ resources: failingResources, logger: false });
+  const app = buildApp({
+    publications,
+    resources: failingResources,
+    logger: false,
+  });
 
   const response = await app.inject({ method: 'GET', url: '/health/ready' });
 
@@ -44,7 +64,11 @@ test('ready endpoint fails closed without leaking resource detail', async () => 
 });
 
 test('ready endpoint reports ready only when every resource is healthy', async () => {
-  const app = buildApp({ resources: healthyResources, logger: false });
+  const app = buildApp({
+    publications,
+    resources: healthyResources,
+    logger: false,
+  });
 
   const response = await app.inject({ method: 'GET', url: '/health/ready' });
 
