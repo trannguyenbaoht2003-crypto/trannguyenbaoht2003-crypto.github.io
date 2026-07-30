@@ -1,4 +1,4 @@
-name: Sprint 4B publication authority gate
+name: Sprint 5A public read API gate
 
 on:
   workflow_dispatch:
@@ -16,12 +16,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: sprint-4b-publication-authority-${{ github.ref }}
+  group: sprint-5a-public-read-api-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   verify:
-    name: verify publication authority
+    name: verify public read API
     runs-on: ubuntu-latest
     timeout-minutes: 40
     services:
@@ -133,6 +133,13 @@ jobs:
             "No automatic publication",
             "No HTTP mutation route",
             "No UI",
+            "GET /api/v1/publications",
+            "GET /api/v1/publications/:publicationId",
+            "Read-only Publication HTTP boundary",
+            "Public API reads PostgreSQL only",
+            "No Publication mutation route",
+            "No frontend integration",
+            "No auth provider",
             "No merge",
             "No deploy",
           ]) {
@@ -186,7 +193,7 @@ jobs:
         run: |
           set -euo pipefail
           workflow=".github/workflows/backend-production-foundation.yml"
-          executable="$RUNNER_TEMP/sprint-4b-publication-authority-before-guard.yml"
+          executable="$RUNNER_TEMP/sprint-5a-public-read-api-before-guard.yml"
           sed '/- name: Deployment guard/,$d' "$workflow" > "$executable"
           ! grep -Eq '(contents|packages|pages|id-token):[[:space:]]*write' "$workflow"
           ! grep -Eq 'git push|wrangler[[:space:]]+deploy|npm run deploy|actions/deploy-pages' "$executable"
