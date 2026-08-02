@@ -35,4 +35,5 @@ A GitHub Pages build without this variable remains fully static and makes no pub
 - No retry, polling, timer, background refresh, service worker, or subscription.
 - No automatic publication or moderation behavior change.
 - No browser token, authorization header, API credential, or authenticated write.
-- No CORS expansion, reverse proxy, API deployment, production URL selection, merge, or deploy in Sprint 5B.
+- No CORS expansion, reverse proxy, API deployment, or production URL selection.
+- No merge or deploy in Sprint 5B.
