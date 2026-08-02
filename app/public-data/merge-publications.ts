@@ -1,5 +1,9 @@
 import type { Augment, ChampionGuide, ItemAsset } from "../data.ts";
-import type { PublicPublicationV1 } from "./types.ts";
+import type { PublicPublicationMetadata, PublicPublicationV1 } from "./types.ts";
+
+export type PublicChampionGuide = ChampionGuide & {
+  publicPublication?: PublicPublicationMetadata;
+};
 
 function normalizeExternalId(value: string): string {
   return value.trim().toLocaleLowerCase("en-US");
@@ -32,7 +36,7 @@ function addItems(target: Map<string, ItemAsset>, items: readonly ItemAsset[]): 
 export function mergePublicationsIntoGuides(
   guides: readonly ChampionGuide[],
   publications: readonly PublicPublicationV1[],
-): ChampionGuide[] {
+): PublicChampionGuide[] {
   const augmentById = new Map<string, Augment>();
   const itemById = new Map<string, ItemAsset>();
 
