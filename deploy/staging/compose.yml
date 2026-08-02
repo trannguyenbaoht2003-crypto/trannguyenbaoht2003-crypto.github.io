@@ -83,9 +83,6 @@ services:
       dockerfile: deploy/staging/Dockerfile.frontend
       args:
         NEXT_PUBLIC_PUBLIC_API_BASE_URL: same-origin
-    depends_on:
-      backend:
-        condition: service_healthy
     ports:
       - "${STAGING_PORT:-8080}:80"
     healthcheck:
