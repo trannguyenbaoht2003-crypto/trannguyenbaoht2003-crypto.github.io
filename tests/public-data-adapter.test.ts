@@ -11,9 +11,12 @@ import {
   fetchPublications,
 } from "../app/public-data/http-publication-adapter.ts";
 import { mergePublicationsIntoGuides } from "../app/public-data/merge-publications.ts";
-import type { PublicPublicationListV1 } from "../app/public-data/types.ts";
+import type {
+  PublicPublicationListV1,
+  PublicPublicationV1,
+} from "../app/public-data/types.ts";
 
-const publication = {
+const publication: PublicPublicationV1 = {
   publicationId: "77000000-0000-4000-8000-000000000001",
   candidateId: "62000000-0000-4000-8000-000000000001",
   candidateRevisionId: "62000000-0000-4000-8000-000000000002",
@@ -29,7 +32,7 @@ const publication = {
     augmentExternalIds: ["1194"],
     itemExternalIds: ["3006", "6672"],
   },
-} as const;
+};
 
 const validEnvelope: PublicPublicationListV1 = {
   schemaVersion: 1,
@@ -184,7 +187,7 @@ test("overlays localized API assets while preserving editorial copy", () => {
 
 test("keeps the exact static guide when any API asset is unresolved", () => {
   const guides = createGuides();
-  const unresolved = {
+  const unresolved: PublicPublicationV1 = {
     ...publication,
     payload: {
       ...publication.payload,
@@ -199,14 +202,14 @@ test("keeps the exact static guide when any API asset is unresolved", () => {
 test("selects a deterministic winner for duplicate champion Publications", () => {
   const guides = createGuides();
   const older = publication;
-  const newerLowerVersion = {
+  const newerLowerVersion: PublicPublicationV1 = {
     ...publication,
     publicationId: "77000000-0000-4000-8000-000000000003",
     publicationVersionId: "77000000-0000-4000-8000-000000000004",
     publishedAt: "2026-07-30T02:00:00.000Z",
     payload: { ...publication.payload, patchKey: "26.16" },
   };
-  const newerHigherVersion = {
+  const newerHigherVersion: PublicPublicationV1 = {
     ...newerLowerVersion,
     publicationId: "77000000-0000-4000-8000-000000000005",
     publicationVersionId: "77000000-0000-4000-8000-000000000006",
