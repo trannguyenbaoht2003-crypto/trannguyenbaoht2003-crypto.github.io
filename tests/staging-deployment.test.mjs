@@ -73,3 +73,42 @@ test("staging smoke checks normal, outage, recovery, and the absent mutation rou
   assert.doesNotMatch(smoke, /authorization|bearer|setInterval|setTimeout/i);
   assert.doesNotMatch(smoke, /retry|poll/i);
 });
+
+test("Sprint 5C documents and verifies staging without production deployment", async () => {
+  const [runbook, workflow] = await Promise.all([
+    read("docs/runbooks/staging-environment.md"),
+    read(".github/workflows/sprint-5c-staging-integration.yml"),
+  ]);
+
+  for (const contract of [
+    "same-origin",
+    "PostgreSQL 17",
+    "Redis 7",
+    "migration",
+    "backend outage",
+    "application rollback",
+    "forward-only",
+    "No production deployment",
+  ]) {
+    assert.ok(runbook.includes(contract), `staging runbook is missing: ${contract}`);
+  }
+
+  assert.match(workflow, /^name: Sprint 5C staging integration gate$/m);
+  assert.match(workflow, /^permissions:\n  contents: read$/m);
+  assert.match(workflow, /npm run test:staging-contract/);
+  assert.match(workflow, /npm run staging:config/);
+  assert.match(workflow, /npm run staging:up/);
+  assert.match(workflow, /npm run staging:smoke -- normal/);
+  assert.match(workflow, /stop backend/);
+  assert.match(workflow, /npm run staging:smoke -- backend-down/);
+  assert.match(workflow, /up -d --wait backend/);
+  assert.match(workflow, /npm run staging:smoke -- recovered/);
+  assert.match(workflow, /if: always\(\)/);
+  assert.match(workflow, /npm run staging:down/);
+
+  const executableWorkflow = workflow.split("- name: Deployment guard")[0];
+  assert.doesNotMatch(workflow, /(contents|packages|pages|id-token):\s*write/);
+  assert.doesNotMatch(executableWorkflow, /docker\s+(?:login|push)|git push|actions\/deploy-pages|wrangler\s+deploy/);
+  assert.doesNotMatch(executableWorkflow, /kubectl|terraform|pulumi|aws |gcloud|az login/i);
+  assert.doesNotMatch(workflow, /BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY/);
+});
