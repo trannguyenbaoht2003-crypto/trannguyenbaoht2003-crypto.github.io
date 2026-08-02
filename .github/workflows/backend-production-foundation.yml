@@ -1,4 +1,4 @@
-name: Sprint 5B frontend public data gate
+name: Sprint 5C frontend and backend regression gate
 
 on:
   workflow_dispatch:
@@ -7,11 +7,15 @@ on:
       - "app/**"
       - "tests/**"
       - "backend/**"
+      - "deploy/**"
+      - "scripts/staging-smoke.mjs"
+      - ".dockerignore"
       - "package.json"
       - "package-lock.json"
       - "tsconfig.json"
       - "README.md"
       - ".github/workflows/backend-production-foundation.yml"
+      - ".github/workflows/sprint-5c-staging-integration.yml"
       - "docs/adr/**"
       - "docs/runbooks/**"
       - "docs/superpowers/**"
@@ -20,12 +24,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: sprint-5b-frontend-public-data-${{ github.ref }}
+  group: sprint-5c-frontend-backend-regression-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   verify:
-    name: verify frontend public data
+    name: verify frontend and backend regression
     runs-on: ubuntu-latest
     timeout-minutes: 40
     services:
@@ -78,6 +82,11 @@ jobs:
           const rootPackage = JSON.parse(await readFile("package.json", "utf8"));
           const expectedScripts = {
             "test:public-data": "node --experimental-strip-types --test tests/public-data-adapter.test.ts",
+            "test:staging-contract": "node --test tests/staging-deployment.test.mjs",
+            "staging:config": "docker compose --env-file deploy/staging/.env.example -f deploy/staging/compose.yml config",
+            "staging:up": "docker compose --env-file deploy/staging/.env.example -f deploy/staging/compose.yml up --build -d --wait",
+            "staging:smoke": "node scripts/staging-smoke.mjs",
+            "staging:down": "docker compose --env-file deploy/staging/.env.example -f deploy/staging/compose.yml down -v --remove-orphans",
             "backend:typecheck": "npm --prefix backend run typecheck",
             "backend:test": "npm --prefix backend test",
             "backend:build": "npm --prefix backend run build",
@@ -156,6 +165,7 @@ jobs:
           const frontendRunbook = await readFile("docs/runbooks/frontend-public-data.md", "utf8");
           for (const contract of [
             "NEXT_PUBLIC_PUBLIC_API_BASE_URL",
+            "same-origin",
             "one `GET /api/v1/publications` request",
             "Dữ liệu tĩnh",
             "API tạm thời không khả dụng",
@@ -168,6 +178,21 @@ jobs:
           ]) {
             if (!frontendRunbook.includes(contract)) {
               throw new Error(`frontend runbook is missing contract: ${contract}`);
+            }
+          }
+
+          const stagingRunbook = await readFile("docs/runbooks/staging-environment.md", "utf8");
+          for (const contract of [
+            "same-origin",
+            "PostgreSQL 17",
+            "Redis 7",
+            "backend outage",
+            "application rollback",
+            "forward-only",
+            "No production deployment",
+          ]) {
+            if (!stagingRunbook.includes(contract)) {
+              throw new Error(`staging runbook is missing contract: ${contract}`);
             }
           }
           NODE
@@ -187,6 +212,9 @@ jobs:
       - name: Frontend public-data tests
         run: npm run test:public-data
 
+      - name: Staging source contracts
+        run: npm run test:staging-contract
+
       - name: Frontend tests
         run: npm test
 
@@ -201,6 +229,9 @@ jobs:
 
       - name: Backend build
         run: npm run backend:build
+
+      - name: Compose configuration
+        run: npm run staging:config
 
       - name: Repository cleanliness
         shell: bash
@@ -219,8 +250,8 @@ jobs:
         run: |
           set -euo pipefail
           workflow=".github/workflows/backend-production-foundation.yml"
-          executable="$RUNNER_TEMP/sprint-5b-frontend-public-data-before-guard.yml"
+          executable="$RUNNER_TEMP/sprint-5c-regression-before-guard.yml"
           sed '/- name: Deployment guard/,$d' "$workflow" > "$executable"
           ! grep -Eq '(contents|packages|pages|id-token):[[:space:]]*write' "$workflow"
-          ! grep -Eq 'git push|wrangler[[:space:]]+deploy|npm run deploy|actions/deploy-pages' "$executable"
-          ! grep -Eq '(CLOUDFLARE_API_TOKEN|AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY|GOOGLE_APPLICATION_CREDENTIALS|BEGIN (RSA|OPENSSH|EC) PRIVATE KEY)' "$executable"
+          ! grep -Eq 'git push|docker[[:space:]]+(login|push)|wrangler[[:space:]]+deploy|npm run deploy|actions/deploy-pages' "$executable"
+          ! grep -Eq '(CLOUDFLARE_API_TOKEN|AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY|GOOGLE_APPLICATION_CREDENTIALS|BEGIN (RSA|OPENSSH|EC) PRIVATE KEY)' "$workflow"
