@@ -8,10 +8,13 @@ export class PublicPublicationRequestError extends Error {
   }
 }
 
-function buildPublicationListUrl(apiBaseUrl: string): string {
+export function buildPublicationListUrl(apiBaseUrl: string): string {
   const trimmed = apiBaseUrl.trim();
   if (!trimmed) {
     throw new PublicPublicationRequestError("Public API base URL is not configured");
+  }
+  if (trimmed === "same-origin") {
+    return "/api/v1/publications";
   }
 
   let parsed: URL;
@@ -20,7 +23,7 @@ function buildPublicationListUrl(apiBaseUrl: string): string {
   } catch {
     throw new PublicPublicationRequestError("Public API base URL is invalid");
   }
-  if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password) {
+  if (!["http:", "https:"].includes(parsed.protocol) || parsed.username || parsed.password) {
     throw new PublicPublicationRequestError("Public API base URL is invalid");
   }
 
