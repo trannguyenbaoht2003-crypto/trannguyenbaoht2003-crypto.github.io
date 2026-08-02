@@ -56,3 +56,20 @@ test("staging topology is same-origin, private by default, and deployment-free",
   assert.doesNotMatch(deploymentSource, /docker\s+(?:login|push)|gh-pages|pages deploy|kubectl|terraform|pulumi|aws |gcloud|az login/i);
   assert.doesNotMatch(deploymentSource, /BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY/);
 });
+
+test("staging smoke checks normal, outage, recovery, and the absent mutation route", async () => {
+  const smoke = await read("scripts/staging-smoke.mjs");
+
+  assert.match(smoke, /STAGING_BASE_URL/);
+  assert.match(smoke, /"normal"/);
+  assert.match(smoke, /"backend-down"/);
+  assert.match(smoke, /"recovered"/);
+  assert.match(smoke, /\/health\/live/);
+  assert.match(smoke, /\/health\/ready/);
+  assert.match(smoke, /\/api\/v1\/publications/);
+  assert.match(smoke, /method:\s*"POST"/);
+  assert.match(smoke, /404.*405|405.*404/s);
+  assert.match(smoke, /Lõi\.Meta/);
+  assert.doesNotMatch(smoke, /authorization|bearer|setInterval|setTimeout/i);
+  assert.doesNotMatch(smoke, /retry|poll/i);
+});
