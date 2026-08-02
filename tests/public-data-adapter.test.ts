@@ -8,6 +8,7 @@ import {
 } from "../app/public-data/parse-publications.ts";
 import {
   PublicPublicationRequestError,
+  buildPublicationListUrl,
   fetchPublications,
 } from "../app/public-data/http-publication-adapter.ts";
 import { mergePublicationsIntoGuides } from "../app/public-data/merge-publications.ts";
@@ -131,7 +132,43 @@ test("rejects unknown keys and invalid Publication invariants", () => {
   );
 });
 
-test("fetches the list once with GET and validates the response", async () => {
+test("resolves the closed same-origin sentinel and rejects other relative URLs", () => {
+  assert.equal(buildPublicationListUrl("same-origin"), "/api/v1/publications");
+  assert.equal(
+    buildPublicationListUrl("https://api.example.test/"),
+    "https://api.example.test/api/v1/publications",
+  );
+  assert.throws(() => buildPublicationListUrl("/relative"), PublicPublicationRequestError);
+  assert.throws(
+    () => buildPublicationListUrl("https://user:pass@example.test"),
+    PublicPublicationRequestError,
+  );
+});
+
+test("fetches the same-origin list once with GET and no browser credential", async () => {
+  const calls: Array<{ input: string; init?: RequestInit }> = [];
+  const fetchImpl = async (input: string | URL | Request, init?: RequestInit) => {
+    calls.push({ input: String(input), init });
+    return new Response(JSON.stringify(validEnvelope), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  };
+
+  const result = await fetchPublications({
+    apiBaseUrl: "same-origin",
+    fetchImpl: fetchImpl as typeof fetch,
+  });
+
+  assert.deepEqual(result, validEnvelope);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].input, "/api/v1/publications");
+  assert.equal(calls[0].init?.method, "GET");
+  assert.deepEqual(calls[0].init?.headers, { accept: "application/json" });
+  assert.equal(new Headers(calls[0].init?.headers).has("authorization"), false);
+});
+
+test("fetches the absolute-origin list once with GET and validates the response", async () => {
   const calls: Array<{ input: string; init?: RequestInit }> = [];
   const fetchImpl = async (input: string | URL | Request, init?: RequestInit) => {
     calls.push({ input: String(input), init });
