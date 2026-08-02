@@ -16,6 +16,14 @@ test("renders the Hai Dau-inspired information architecture", () => {
   assert.match(html, /Nguồn/i);
 });
 
+test("renders the complete static guide when no public API URL is configured", () => {
+  assert.match(html, /Dữ liệu tĩnh/i);
+  assert.match(html, /Kho tướng/i);
+  assert.match(source, /NEXT_PUBLIC_PUBLIC_API_BASE_URL/);
+  assert.match(source, /usePublicGuides/);
+  assert.match(source, /API · Bản/);
+});
+
 test("explains automatic moderation without presenting engagement as win rate", () => {
   assert.match(html, /Kiểm duyệt tự động đang bật/i);
   assert.match(html, /Không phải tỷ lệ thắng/i);
