@@ -1,27 +1,31 @@
-name: Sprint 5A public read API gate
+name: Sprint 5B frontend public data gate
 
 on:
   workflow_dispatch:
   pull_request:
     paths:
+      - "app/**"
+      - "tests/**"
       - "backend/**"
       - "package.json"
       - "package-lock.json"
+      - "tsconfig.json"
       - "README.md"
       - ".github/workflows/backend-production-foundation.yml"
       - "docs/adr/**"
+      - "docs/runbooks/**"
       - "docs/superpowers/**"
 
 permissions:
   contents: read
 
 concurrency:
-  group: sprint-5a-public-read-api-${{ github.ref }}
+  group: sprint-5b-frontend-public-data-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   verify:
-    name: verify public read API
+    name: verify frontend public data
     runs-on: ubuntu-latest
     timeout-minutes: 40
     services:
@@ -73,6 +77,7 @@ jobs:
 
           const rootPackage = JSON.parse(await readFile("package.json", "utf8"));
           const expectedScripts = {
+            "test:public-data": "node --experimental-strip-types --test tests/public-data-adapter.test.ts",
             "backend:typecheck": "npm --prefix backend run typecheck",
             "backend:test": "npm --prefix backend test",
             "backend:build": "npm --prefix backend run build",
@@ -83,7 +88,7 @@ jobs:
             }
           }
 
-          const runbook = await readFile("backend/README.md", "utf8");
+          const backendRunbook = await readFile("backend/README.md", "utf8");
           for (const contract of [
             "PostgreSQL 17",
             "Redis 7",
@@ -132,19 +137,35 @@ jobs:
             "PostgreSQL remains Publication authority",
             "No automatic publication",
             "No HTTP mutation route",
-            "No UI",
             "GET /api/v1/publications",
             "GET /api/v1/publications/:publicationId",
             "Read-only Publication HTTP boundary",
             "Public API reads PostgreSQL only",
             "No Publication mutation route",
-            "No frontend integration",
             "No auth provider",
             "No merge",
             "No deploy",
           ]) {
-            if (!runbook.includes(contract)) {
+            if (!backendRunbook.includes(contract)) {
               throw new Error(`backend runbook is missing contract: ${contract}`);
+            }
+          }
+
+          const frontendRunbook = await readFile("docs/runbooks/frontend-public-data.md", "utf8");
+          for (const contract of [
+            "NEXT_PUBLIC_PUBLIC_API_BASE_URL",
+            "one `GET /api/v1/publications` request",
+            "Dữ liệu tĩnh",
+            "API tạm thời không khả dụng",
+            "no Publication mutation route",
+            "No retry, polling, timer",
+            "No automatic publication",
+            "No browser token",
+            "No CORS expansion",
+            "No merge",
+          ]) {
+            if (!frontendRunbook.includes(contract)) {
+              throw new Error(`frontend runbook is missing contract: ${contract}`);
             }
           }
           NODE
@@ -160,6 +181,9 @@ jobs:
 
       - name: Frontend lint
         run: npm run lint
+
+      - name: Frontend public-data tests
+        run: npm run test:public-data
 
       - name: Frontend tests
         run: npm test
@@ -193,7 +217,7 @@ jobs:
         run: |
           set -euo pipefail
           workflow=".github/workflows/backend-production-foundation.yml"
-          executable="$RUNNER_TEMP/sprint-5a-public-read-api-before-guard.yml"
+          executable="$RUNNER_TEMP/sprint-5b-frontend-public-data-before-guard.yml"
           sed '/- name: Deployment guard/,$d' "$workflow" > "$executable"
           ! grep -Eq '(contents|packages|pages|id-token):[[:space:]]*write' "$workflow"
           ! grep -Eq 'git push|wrangler[[:space:]]+deploy|npm run deploy|actions/deploy-pages' "$executable"
