@@ -69,7 +69,7 @@ This removes containers, the local staging volume, and orphaned Compose resource
 
 ## Application rollback
 
-Application rollback means checking out or selecting a previously verified commit/image set and starting that complete frontend/backend pair through the same Compose topology. Run the normal smoke check after rollback.
+The application rollback procedure means checking out or selecting a previously verified commit/image set and starting that complete frontend/backend pair through the same Compose topology. Run the normal smoke check after rollback.
 
 Database migrations are forward-only and checksum-protected. Sprint 5C does not automate schema rollback or destructive down migrations. A migration checksum mismatch blocks startup rather than rewriting applied history.
 
