@@ -1,0 +1,30 @@
+name: Diagnose inherited stale lock test
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/diagnose-backend-stale-lock.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  locate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Locate test and lock implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '=== matching test source ==='
+          match="$(grep -RIl --exclude-dir=node_modules 'live content-update queue outage does not create a stale lock overlap' backend || true)"
+          if [[ -z "$match" ]]; then
+            echo 'test title not found'
+            exit 1
+          fi
+          echo "$match"
+          grep -n -B 45 -A 90 'live content-update queue outage does not create a stale lock overlap' "$match"
+          echo '=== lock-related source candidates ==='
+          grep -RIn --exclude-dir=node_modules -E 'lockDuration|lockRenewTime|stalledInterval|removeOnFail|retryable_failed|activeAttempts|content-update' backend/src backend/test | head -240
