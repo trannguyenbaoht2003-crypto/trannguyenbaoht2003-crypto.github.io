@@ -28,6 +28,14 @@ test("staging topology is same-origin, private by default, and deployment-free",
   assert.doesNotMatch(compose, /5432:5432|6379:6379|3001:3001/);
   assert.doesNotMatch(compose, /\n  worker:/);
 
+  const gatewayBlock = compose.match(/\n  gateway:\n[\s\S]*?(?=\nvolumes:)/)?.[0];
+  assert.ok(gatewayBlock, "gateway service block is missing");
+  assert.doesNotMatch(
+    gatewayBlock,
+    /depends_on:/,
+    "gateway must start independently so static files remain available during backend startup failure",
+  );
+
   assert.match(caddy, /handle \/api\/v1\/\*/);
   assert.match(caddy, /handle \/health\/\*/);
   assert.match(caddy, /reverse_proxy backend:3001/);
