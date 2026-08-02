@@ -10,15 +10,54 @@ permissions:
   contents: read
 
 jobs:
-  locate:
+  diagnose:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: hai_dau_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d hai_dau_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      NODE_ENV: test
+      TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/hai_dau_test
+      TEST_REDIS_URL: redis://127.0.0.1:6379
     steps:
       - uses: actions/checkout@v4
-      - name: Locate test and lock implementation
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.0"
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm --prefix backend ci --cache /tmp/aram-backend-npm-cache
+      - name: Capture exact backend failure
         shell: bash
         run: |
-          set -euo pipefail
-          echo '=== backend test files ==='
-          find backend/test -type f -name '*.test.ts' -print | sort
-          echo '=== broad stale-lock matches ==='
-          grep -RIn --exclude-dir=node_modules -E 'stale|outage|overlap|activeAttempts|active attempts|lockDuration|lockRenewTime|stalledInterval|retryable_failed|content-update|content update' backend/test backend/src | head -500 || true
+          set +e
+          npm --prefix backend test > /tmp/backend-test.log 2>&1
+          status=$?
+          set -e
+          echo "backend test exit=$status"
+          echo '=== failure title and stack ==='
+          grep -n -B 20 -A 45 -E 'stale lock overlap|AssertionError|ERR_ASSERTION|not ok' /tmp/backend-test.log | tail -240 || true
+          echo '=== source references from failure output ==='
+          grep -n -E 'backend/(test|src)/[^: ]+:[0-9]+:[0-9]+' /tmp/backend-test.log | tail -80 || true
+          exit "$status"
