@@ -30,12 +30,12 @@ npm run staging:up
 npm run staging:smoke -- normal
 ```
 
-Startup order is:
+Startup behavior is:
 
-1. PostgreSQL 17 and Redis 7 become healthy.
-2. The one-shot migration container runs checksum-protected, append-only migrations.
-3. The backend starts only after migration completion and Redis health.
-4. The gateway starts after backend readiness and serves the static export.
+1. The gateway starts independently and can serve the static export even while backend dependencies are starting or unavailable.
+2. PostgreSQL 17 and Redis 7 become healthy.
+3. The one-shot migration container runs checksum-protected, append-only migrations.
+4. The backend starts only after migration completion and Redis health.
 
 The normal smoke check requires:
 
@@ -57,7 +57,7 @@ npm run staging:smoke -- recovered
 
 During the outage, `/` remains available while the API returns a sanitized gateway 5xx. The browser adapter then retains static guide data. It does not retry, poll, mutate Publication state, or trigger automatic publication.
 
-A PostgreSQL or Redis outage causes backend readiness to fail closed. The gateway continues serving static files, and PostgreSQL remains the only Publication authority.
+A PostgreSQL or Redis outage causes backend readiness to fail closed. Because gateway startup is independent, it continues serving static files, and PostgreSQL remains the only Publication authority.
 
 ## Teardown
 
