@@ -49,7 +49,7 @@ function HeartIcon({ filled = false }: { filled?: boolean }) {
 }
 
 function CloseIcon() {
-  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6l-6 6" /></svg>;
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>;
 }
 
 function BackIcon() {
@@ -376,7 +376,7 @@ export default function Home() {
   const [role, setRole] = useState<Role>("Tất cả");
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [favorites, setFavorites] = useState<string[]>([]);
-  const [selected, setSelected] = useState<PublicChampionGuide | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
   const { totalBuilds, augmentCount, itemCount } = useMemo(() => ({
@@ -389,6 +389,10 @@ export default function Home() {
     ].map((augment) => augment.id ?? augment.cn))).size,
     itemCount: new Set(guides.flatMap((champion) => (champion.itemData ?? []).map((item) => item.id ?? item.original))).size,
   }), [guides]);
+  const selected = useMemo(
+    () => selectedId ? guides.find((guide) => guide.id === selectedId) ?? null : null,
+    [guides, selectedId],
+  );
 
   useEffect(() => {
     const saved = window.localStorage.getItem("loi-meta-favorites");
@@ -408,7 +412,7 @@ export default function Home() {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
-      if (event.key === "Escape") setSelected(null);
+      if (event.key === "Escape") setSelectedId(null);
       if (event.key === "/" && !target?.matches("input, textarea, select, [contenteditable='true']")) {
         event.preventDefault();
         searchRef.current?.focus();
@@ -421,12 +425,6 @@ export default function Home() {
       document.body.style.overflow = "";
     };
   }, [selected]);
-
-  useEffect(() => {
-    if (!selected) return;
-    const current = guides.find((guide) => guide.id === selected.id);
-    if (current && current !== selected) setSelected(current);
-  }, [guides, selected]);
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase("vi");
@@ -481,7 +479,7 @@ export default function Home() {
           <button type="button" aria-pressed={favoritesOnly} className={`favorite-filter ${favoritesOnly ? "active" : ""}`} onClick={() => setFavoritesOnly((value) => !value)}><HeartIcon filled={favoritesOnly} />Đã lưu <span>{favorites.length}</span></button>
         </div>
         {filtered.length > 0 ? (
-          <div className="champion-grid" id="champion-grid">{filtered.map((champion) => <ChampionCard key={champion.id} champion={champion} favorite={favorites.includes(champion.id)} onOpen={() => setSelected(champion)} onFavorite={() => toggleFavorite(champion.id)} />)}</div>
+          <div className="champion-grid" id="champion-grid">{filtered.map((champion) => <ChampionCard key={champion.id} champion={champion} favorite={favorites.includes(champion.id)} onOpen={() => setSelectedId(champion.id)} onFavorite={() => toggleFavorite(champion.id)} />)}</div>
         ) : (
           <div className="empty-state" role="status"><SearchIcon /><h3>Không tìm thấy tướng</h3><p>Thử tên khác hoặc bỏ bộ lọc hiện tại.</p><button type="button" onClick={() => { setQuery(""); setRole("Tất cả"); setFavoritesOnly(false); }}>Xóa bộ lọc</button></div>
         )}
@@ -507,7 +505,7 @@ export default function Home() {
 
       <footer className="site-footer"><div className="footer-brand"><span className="brand-mark"><LogoIcon /></span><div><b>LÕI.META</b><p>Hướng dẫn ARAM: Mayhem bằng tiếng Việt.</p></div></div><p>Dự án cộng đồng, không được Riot Games bảo trợ. Đã đồng bộ {sourceSync.championCount} tướng từ phần công khai của Hải Đấu; tên và ảnh game được đối chiếu qua Riot/CommunityDragon.</p><nav><a href="https://lolhaidou.cn/" target="_blank" rel="noreferrer">Hải Đấu <ExternalIcon /></a><a href="https://www.communitydragon.org/" target="_blank" rel="noreferrer">CommunityDragon <ExternalIcon /></a></nav></footer>
 
-      {selected && <GuideDrawer key={selected.id} champion={selected} favorite={favorites.includes(selected.id)} onFavorite={() => toggleFavorite(selected.id)} onClose={() => setSelected(null)} />}
+      {selected && <GuideDrawer key={selected.id} champion={selected} favorite={favorites.includes(selected.id)} onFavorite={() => toggleFavorite(selected.id)} onClose={() => setSelectedId(null)} />}
 
       <nav className="mobile-nav" aria-label="Điều hướng nhanh"><a href="#top"><LogoIcon />Trang đầu</a><a href="#champions"><GridIcon />Kho tướng</a><button type="button" aria-pressed={favoritesOnly} onClick={() => setFavoritesOnly((value) => !value)}><HeartIcon filled={favoritesOnly} />Đã lưu</button></nav>
     </main>
