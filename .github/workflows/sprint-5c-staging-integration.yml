@@ -77,17 +77,23 @@ jobs:
         env:
           TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/hai_dau_test
           TEST_REDIS_URL: redis://127.0.0.1:6379
+        shell: bash
         run: |
-          docker run --name sprint-5c-test-postgres -d --rm \
+          set -euo pipefail
+          cleanup() {
+            docker rm -f sprint-5c-test-postgres sprint-5c-test-redis >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          cleanup
+          docker run --name sprint-5c-test-postgres -d \
             -e POSTGRES_USER=postgres \
             -e POSTGRES_PASSWORD=postgres \
             -e POSTGRES_DB=hai_dau_test \
             -p 5432:5432 postgres:17
-          docker run --name sprint-5c-test-redis -d --rm -p 6379:6379 redis:7
+          docker run --name sprint-5c-test-redis -d -p 6379:6379 redis:7
           until docker exec sprint-5c-test-postgres pg_isready -U postgres -d hai_dau_test; do sleep 1; done
           until docker exec sprint-5c-test-redis redis-cli ping | grep -q PONG; do sleep 1; done
           npm run backend:test
-          docker stop sprint-5c-test-postgres sprint-5c-test-redis
 
       - name: Backend build
         run: npm run backend:build
