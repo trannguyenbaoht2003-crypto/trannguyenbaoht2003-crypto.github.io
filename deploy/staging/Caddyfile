@@ -1,0 +1,23 @@
+:80 {
+  root * /srv
+  encode zstd gzip
+
+  handle /api/v1/* {
+    header Cache-Control "no-store"
+    reverse_proxy backend:3001
+  }
+
+  handle /health/* {
+    header Cache-Control "no-store"
+    reverse_proxy backend:3001
+  }
+
+  handle {
+    try_files {path} {path}/ /index.html
+    file_server
+  }
+
+  handle_errors {
+    respond "Service temporarily unavailable" {http.error.status_code}
+  }
+}
