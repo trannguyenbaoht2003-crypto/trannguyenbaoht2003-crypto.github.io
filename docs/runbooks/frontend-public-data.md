@@ -2,7 +2,7 @@
 
 ## Configuration
 
-`NEXT_PUBLIC_PUBLIC_API_BASE_URL` is the optional browser-visible origin for the read-only Publication API. Configure it without `/api/v1/publications`; the adapter appends that path itself.
+`NEXT_PUBLIC_PUBLIC_API_BASE_URL` is the optional browser-visible origin for the read-only Publication API. Configure an absolute HTTP(S) origin without `/api/v1/publications`; the adapter appends that path itself.
 
 Examples:
 
@@ -10,7 +10,13 @@ Examples:
 NEXT_PUBLIC_PUBLIC_API_BASE_URL=https://public-api.example.com npm run build:pages
 ```
 
-A GitHub Pages build without this variable remains fully static and makes no public API request.
+Sprint 5C also supports the exact sentinel:
+
+```bash
+NEXT_PUBLIC_PUBLIC_API_BASE_URL=same-origin npm run build:pages
+```
+
+With `same-origin`, the hydrated browser requests the relative path `/api/v1/publications` through the staging gateway. Other relative values remain invalid. A GitHub Pages build without this variable remains fully static and makes no public API request.
 
 ## Read behavior
 
@@ -35,5 +41,6 @@ A GitHub Pages build without this variable remains fully static and makes no pub
 - No retry, polling, timer, background refresh, service worker, or subscription.
 - No automatic publication or moderation behavior change.
 - No browser token, authorization header, API credential, or authenticated write.
-- No CORS expansion, reverse proxy, API deployment, or production URL selection.
-- No merge or deploy in Sprint 5B.
+- No CORS expansion; `same-origin` keeps the browser on the gateway origin.
+- No production URL selection in frontend source.
+- No merge or deploy in Sprint 5C.
