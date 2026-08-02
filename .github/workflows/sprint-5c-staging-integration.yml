@@ -138,10 +138,10 @@ jobs:
           workflow=".github/workflows/sprint-5c-staging-integration.yml"
           executable="$RUNNER_TEMP/sprint-5c-before-deployment-guard.yml"
           sed '/- name: Deployment guard/,$d' "$workflow" > "$executable"
-          ! grep -Eq '(contents|packages|pages|id-token):[[:space:]]*write' "$workflow"
+          ! grep -Eq '(contents|packages|pages|id-token):[[:space:]]*write' "$executable"
           ! grep -Eq 'docker[[:space:]]+(login|push)|git push|actions/deploy-pages|wrangler[[:space:]]+deploy' "$executable"
           ! grep -Eqi 'kubectl|terraform|pulumi|aws[[:space:]]|gcloud|az login' "$executable"
-          ! grep -Eq '(CLOUDFLARE_API_TOKEN|AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY|GOOGLE_APPLICATION_CREDENTIALS|BEGIN (RSA|OPENSSH|EC) PRIVATE KEY)' "$workflow"
+          ! grep -Eq '(CLOUDFLARE_API_TOKEN|AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY|GOOGLE_APPLICATION_CREDENTIALS|BEGIN (RSA|OPENSSH|EC) PRIVATE KEY)' "$executable"
 
       - name: Staging diagnostics
         if: failure()
