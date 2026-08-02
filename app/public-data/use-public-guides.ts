@@ -28,14 +28,9 @@ export function usePublicGuides(
   }));
 
   useEffect(() => {
-    if (!configuredUrl) {
-      setState({ guides: staticGuides, status: "static", publicationCount: 0 });
-      return;
-    }
+    if (!configuredUrl) return;
 
     const controller = new AbortController();
-    setState({ guides: staticGuides, status: "loading", publicationCount: 0 });
-
     fetchPublications({ apiBaseUrl: configuredUrl, signal: controller.signal })
       .then((result) => {
         const guides = mergePublicationsIntoGuides(staticGuides, result.publications);
