@@ -1,0 +1,105 @@
+name: hai-dau-staging
+
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: "${POSTGRES_DB:-hai_dau_staging}"
+      POSTGRES_USER: "${POSTGRES_USER:-hai_dau}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/staging/.env}"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+    networks:
+      - staging
+
+  redis:
+    image: redis:7
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+    networks:
+      - staging
+
+  migrate:
+    image: hai-dau-backend:staging
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile
+    command: ["node", "dist/src/migrate-cli.js"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-hai_dau}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-hai_dau_staging}"
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    networks:
+      - staging
+
+  backend:
+    image: hai-dau-backend:staging
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3001
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-hai_dau}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-hai_dau_staging}"
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3001/health/ready').then((response) => { if (!response.ok) process.exit(1); }).catch(() => process.exit(1));"
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+    networks:
+      - staging
+
+  gateway:
+    image: hai-dau-gateway:staging
+    build:
+      context: ../..
+      dockerfile: deploy/staging/Dockerfile.frontend
+      args:
+        NEXT_PUBLIC_PUBLIC_API_BASE_URL: same-origin
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${STAGING_PORT:-8080}:80"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1/"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+    networks:
+      - staging
+
+volumes:
+  postgres-data:
+
+networks:
+  staging:
+    internal: false
