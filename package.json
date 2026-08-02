@@ -18,6 +18,7 @@
     "test:staging-contract": "node --test tests/staging-deployment.test.mjs",
     "staging:config": "docker compose --env-file deploy/staging/.env.example -f deploy/staging/compose.yml config",
     "staging:up": "docker compose --env-file deploy/staging/.env.example -f deploy/staging/compose.yml up --build -d",
+    "staging:smoke": "node scripts/staging-smoke.mjs",
     "staging:down": "docker compose --env-file deploy/staging/.env.example -f deploy/staging/compose.yml down -v --remove-orphans",
     "review:apply": "node scripts/apply-community-review-package.mjs",
     "moderate:community": "node scripts/moderate-community-candidates.mjs",
