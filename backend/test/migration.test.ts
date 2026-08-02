@@ -104,7 +104,7 @@ const sprint5aRunbookContracts = [
   'No deploy',
 ] as const;
 
-test('Sprint 5A workflow requires the public read API operations contract', async () => {
+test('Sprint 5B workflow preserves the backend public read operations contract', async () => {
   const runbook = await readFile(new URL('../README.md', import.meta.url), 'utf8');
   const workflow = await readFile(
     new URL('../../.github/workflows/backend-production-foundation.yml', import.meta.url),
@@ -117,20 +117,20 @@ test('Sprint 5A workflow requires the public read API operations contract', asyn
   ]) {
     assert.ok(
       runbook.includes(contract),
-      `backend runbook is missing Sprint 5A contract: ${contract}`,
+      `backend runbook is missing inherited contract: ${contract}`,
     );
     assert.ok(
       workflow.includes(`"${contract}"`),
-      `workflow is missing Sprint 5A contract assertion: ${contract}`,
+      `Sprint 5B workflow is missing inherited contract assertion: ${contract}`,
     );
   }
 
-  assert.match(workflow, /^name: Sprint 5A public read API gate$/m);
+  assert.match(workflow, /^name: Sprint 5B frontend public data gate$/m);
   assert.match(
     workflow,
-    /group: sprint-5a-public-read-api-\$\{\{ github\.ref \}\}/,
+    /group: sprint-5b-frontend-public-data-\$\{\{ github\.ref \}\}/,
   );
-  assert.match(workflow, /^    name: verify public read API$/m);
+  assert.match(workflow, /^    name: verify frontend public data$/m);
   assert.match(workflow, /^permissions:\n  contents: read$/m);
   assert.doesNotMatch(
     workflow,
