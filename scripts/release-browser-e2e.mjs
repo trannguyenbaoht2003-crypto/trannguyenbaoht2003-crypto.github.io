@@ -56,6 +56,7 @@ function dumpHydratedDom() {
 }
 
 const brandPattern = /LÕI<span>\.META<\/span>|LÕI\.META/i;
+const livePublicationStatusPattern = /Đang dùng bản xuất bản API(?: · 1 tướng)?/i;
 
 if (expected === 'backend-down') {
   const response = await fetch(`${baseUrl}/api/v1/publications`);
@@ -80,7 +81,7 @@ if (expected === 'backend-down') {
   assert.match(dom, brandPattern);
   assert.match(dom, /Samira/);
   assert.match(dom, /public-data-status live/);
-  assert.match(dom, /Bản đã xuất bản|bản đã xuất bản/i);
+  assert.match(dom, livePublicationStatusPattern);
   assert.doesNotMatch(dom, /8d000000-/);
   console.log(`release-browser: ${expected} version ${expectedVersion} PASS`);
 }
