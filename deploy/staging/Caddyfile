@@ -1,4 +1,4 @@
-:80 {
+:8080 {
   root * /srv
   encode zstd gzip
 
