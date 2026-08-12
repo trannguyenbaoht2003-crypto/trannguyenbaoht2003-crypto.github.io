@@ -1,0 +1,213 @@
+name: Sprint 5D release candidate gate
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sprint-5d-release-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  rehearsal:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      NODE_ENV: test
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/hai_dau_test
+      TEST_REDIS_URL: redis://127.0.0.1:6379
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: hai_dau_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d hai_dau_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout exact pull request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Verify immutable release head
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'release-head=%s\n' "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.0
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            backend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci --cache /tmp/aram-root-npm-cache
+
+      - name: Install backend dependencies
+        run: npm --prefix backend ci --cache /tmp/aram-backend-npm-cache
+
+      - name: Validate community data
+        run: npm run validate:community
+
+      - name: Frontend lint
+        run: npm run lint
+
+      - name: Public data contract
+        run: npm run test:public-data
+
+      - name: Staging source contract
+        run: npm run test:staging-contract
+
+      - name: Sprint 5D source contract
+        run: npm run test:release-source
+
+      - name: Frontend full test and static export
+        run: npm test
+
+      - name: Backend typecheck
+        run: npm run backend:typecheck
+
+      - name: Backend full tests
+        run: npm run backend:test
+
+      - name: Backend build
+        run: npm run backend:build
+
+      - name: Compose configuration
+        run: npm run staging:config
+
+      - name: Start fresh staging stack
+        run: npm run staging:up
+
+      - name: Publish rehearsal V1
+        run: >-
+          docker compose --env-file deploy/staging/.env.example -f deploy/staging/compose.yml
+          run --rm -T --no-deps -e STAGING_REHEARSAL_ENABLED=1 backend
+          node dist/src/rehearsal/release-rehearsal-cli.js seed-v1
+
+      - name: Browser and API rehearsal V1
+        env:
+          RELEASE_E2E_EXPECT: v1
+        run: npm run release:browser-e2e
+
+      - name: Publish rehearsal V2
+        run: >-
+          docker compose --env-file deploy/staging/.env.example -f deploy/staging/compose.yml
+          run --rm -T --no-deps -e STAGING_REHEARSAL_ENABLED=1 backend
+          node dist/src/rehearsal/release-rehearsal-cli.js publish-v2
+
+      - name: Browser and API rehearsal V2
+        env:
+          RELEASE_E2E_EXPECT: v2
+        run: npm run release:browser-e2e
+
+      - name: Roll back rehearsal to V1
+        run: >-
+          docker compose --env-file deploy/staging/.env.example -f deploy/staging/compose.yml
+          run --rm -T --no-deps -e STAGING_REHEARSAL_ENABLED=1 backend
+          node dist/src/rehearsal/release-rehearsal-cli.js rollback-v1
+
+      - name: Browser and API verify rollback V1
+        env:
+          RELEASE_E2E_EXPECT: v1
+        run: npm run release:browser-e2e
+
+      - name: Stop backend for fail-open rehearsal
+        run: docker compose --env-file deploy/staging/.env.example -f deploy/staging/compose.yml stop backend
+
+      - name: Browser fail-open while backend is down
+        env:
+          RELEASE_E2E_EXPECT: backend-down
+        run: npm run release:browser-e2e
+
+      - name: Recover backend
+        run: docker compose --env-file deploy/staging/.env.example -f deploy/staging/compose.yml up -d --wait backend
+
+      - name: Browser verify recovered rolled-back V1
+        env:
+          RELEASE_E2E_EXPECT: recovered-v1
+        run: npm run release:browser-e2e
+
+      - name: Backup and restore rehearsal
+        run: npm run staging:backup-restore
+
+      - name: Release security gate
+        run: npm run release:security-gate
+
+      - name: Repository cleanliness
+        run: |
+          set -euo pipefail
+          test -z "$(git status --short)"
+
+      - name: Deployment guard
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { readFile } from 'node:fs/promises';
+          const workflow = await readFile('.github/workflows/sprint-5d-release-candidate.yml', 'utf8');
+          const executable = workflow.split('- name: Deployment guard')[0];
+          const forbidden = [
+            /contents:\s*write/i,
+            /packages:\s*write/i,
+            /pages:\s*write/i,
+            /id-token:\s*write/i,
+            /docker\s+(?:login|push)/i,
+            /git\s+push/i,
+            /actions\/deploy-pages/i,
+            /wrangler\s+deploy/i,
+            /kubectl/i,
+            /terraform\s+apply/i,
+            /pulumi/i,
+            /\baws\s+/i,
+            /\bgcloud\s+/i,
+            /\baz\s+login/i,
+          ];
+          for (const pattern of forbidden) {
+            if (pattern.test(executable)) throw new Error(`deployment capability detected: ${pattern}`);
+          }
+          console.log('release deployment guard PASS');
+          NODE
+
+      - name: Bounded diagnostics on failure
+        if: failure()
+        run: |
+          docker compose --env-file deploy/staging/.env.example -f deploy/staging/compose.yml ps || true
+          docker compose --env-file deploy/staging/.env.example -f deploy/staging/compose.yml logs --tail=100 gateway backend migrate postgres redis || true
+
+      - name: Unconditional staging teardown
+        if: always()
+        run: npm run staging:down
+
+  rc-ready:
+    needs: rehearsal
+    if: ${{ needs.rehearsal.result == 'success' }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Release candidate marker
+        run: echo RC_READY
