@@ -10,7 +10,7 @@ Base commit: `62e2ccaefa9bb5aa15d5a9258bd1ee923c6b14d4` (Sprint 5C exact head).
 
 Prove that one real Publication can travel through the complete authority path and be rendered by the browser through the Sprint 5C same-origin topology, while rollback, backend outage, recovery, migration, backup/restore, and security boundaries remain safe.
 
-Sprint 5D ends only when the exact head can produce an `RC_READY` result from a fresh disposable staging environment.
+Sprint 5D ends only when the exact branch head can produce an `RC_READY` result from a fresh disposable staging environment.
 
 ## Chosen approach
 
@@ -67,7 +67,8 @@ Mocks are useful for unit coverage but do not exercise PostgreSQL, Fastify, Cadd
 7. Browser fallback remains static and non-blocking when the API is unavailable.
 8. No credential, database URL, token, private key, or raw environment file may be printed into CI output.
 9. Production deployment remains disabled in every Sprint 5D workflow.
-10. `RC_READY` is emitted only by the final CI gate after every required rehearsal and security check has passed on the same exact head.
+10. `RC_READY` is emitted only by the final CI gate after every required rehearsal and security check has passed on the same exact branch head.
+11. Pull-request workflows used as release evidence must explicitly checkout `github.event.pull_request.head.sha` (or an equivalent immutable head SHA) instead of relying on GitHub's synthetic PR merge ref. The workflow must print the non-secret commit SHA it verified.
 
 ## Architecture
 
@@ -122,17 +123,18 @@ The test must select elements using stable semantic/test IDs added only where ex
 
 The workflow starts the fresh Sprint 5C stack and performs failure injection only against disposable CI containers:
 
-1. start stack and run migrations;
-2. seed/publish V1;
-3. browser/API V1 checks;
-4. publish V2;
-5. browser/API V2 checks;
-6. rollback to V1;
-7. browser/API rollback checks;
-8. stop backend;
-9. reload browser and verify static fail-open behavior;
-10. start backend and wait for readiness;
-11. reload browser and verify V1 authority is visible again.
+1. checkout and record the immutable Sprint 5D branch-head SHA;
+2. start stack and run migrations;
+3. seed/publish V1;
+4. browser/API V1 checks;
+5. publish V2;
+6. browser/API V2 checks;
+7. rollback to V1;
+8. browser/API rollback checks;
+9. stop backend;
+10. reload browser and verify static fail-open behavior;
+11. start backend and wait for readiness;
+12. reload browser and verify V1 authority is visible again.
 
 No polling is added to the application. CI may explicitly wait for container health between orchestrated steps.
 
@@ -222,26 +224,29 @@ backend recovered
 - Browser/API mismatch: fail the E2E job and retain bounded diagnostics (status, route, semantic selector), not response bodies containing sensitive data.
 - Backup/restore mismatch: fail the release gate; do not change the authoritative source database to make the comparison pass.
 - Dependency/security finding: fail `RC_READY` when it is high/critical and affects a shipped runtime until explicitly fixed or proven non-applicable.
+- Verified commit mismatch: fail before starting the rehearsal if the checked-out commit does not equal the immutable head SHA expected by the workflow event.
 
 ## Test strategy and TDD order
 
 Implementation follows RED -> GREEN -> refactor checkpoints. The planned order is:
 
-1. rehearsal guard and deterministic dataset contract;
-2. CLI command contract and idempotency/fail-closed behavior;
-3. V1/V2/rollback authoritative backend integration;
-4. browser E2E for V1, V2, rollback, outage, and recovery;
-5. backup/restore rehearsal;
-6. non-root/network/dependency/secret security gates;
-7. runbook/workflow contract;
-8. exact-head full regression and staging rehearsal.
+1. exact-head checkout/identity contract;
+2. rehearsal guard and deterministic dataset contract;
+3. CLI command contract and idempotency/fail-closed behavior;
+4. V1/V2/rollback authoritative backend integration;
+5. browser E2E for V1, V2, rollback, outage, and recovery;
+6. backup/restore rehearsal;
+7. non-root/network/dependency/secret security gates;
+8. runbook/workflow contract;
+9. exact-head full regression and staging rehearsal.
 
 Existing Sprint 5C regression gates remain inherited and must stay green.
 
 ## `RC_READY` acceptance gate
 
-The final exact-head workflow may emit `RC_READY` only when all of the following pass on one commit:
+The final exact-head workflow may emit `RC_READY` only when all of the following pass on one immutable commit SHA:
 
+- checked-out SHA equals the expected Sprint 5D branch-head SHA;
 - frontend lint and existing frontend regression;
 - public-data adapter tests;
 - staging source contracts;
