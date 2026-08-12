@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import { createPool } from '../src/database/pool.js';
@@ -15,10 +16,14 @@ function testDatabaseUrl(): string {
 
 const expectedTables = [
   'active_catalog_revisions',
+  'active_eligibility_policy_revision',
+  'active_publication_versions',
   'active_source_policies',
   'audit_events',
   'candidate_claim_set_seals',
   'candidate_claims',
+  'candidate_eligibility_evaluation_reasons',
+  'candidate_eligibility_evaluations',
   'candidate_provenance',
   'candidate_revisions',
   'candidates',
@@ -28,8 +33,14 @@ const expectedTables = [
   'catalog_validation_results',
   'claim_evidence_decisions',
   'compatibility_rules',
+  'current_candidate_eligibility_evaluations',
+  'current_candidate_moderation_decisions',
   'current_claim_evidence_decisions',
   'current_review_quorum_evaluations',
+  'eligibility_input_snapshot_required_claims',
+  'eligibility_input_snapshots',
+  'eligibility_policy_revisions',
+  'eligibility_recalculation_effects',
   'evidence_associations',
   'evidence_input_snapshot_associations',
   'evidence_input_snapshots',
@@ -39,11 +50,20 @@ const expectedTables = [
   'game_entity_revisions',
   'human_reviews',
   'idempotency_records',
+  'moderation_decisions',
+  'moderation_input_snapshot_provenance',
+  'moderation_input_snapshots',
+  'moderation_policy_revisions',
   'normalization_effects',
   'normalized_observations',
   'outbox_events',
   'patch_lifecycle_events',
   'patches',
+  'publication_activation_history',
+  'publication_projection_effects',
+  'publication_version_input_required_claims',
+  'publication_versions',
+  'publications',
   'raw_observations',
   'review_input_snapshot_claims',
   'review_input_snapshot_provenance',
@@ -56,6 +76,67 @@ const expectedTables = [
   'sources',
   'worker_job_attempts',
 ];
+
+const sprint4bRunbookContracts = [
+  'PublicationVersion immutable',
+  'Publisher permission required',
+  'Fresh Eligibility rechecked at commit',
+  'Publication activation history',
+  'Item-level rollback',
+  'Public read independent from workers',
+  'PostgreSQL remains Publication authority',
+  'No automatic publication',
+  'No HTTP mutation route',
+  'No UI',
+  'No merge',
+  'No deploy',
+] as const;
+
+const sprint5aRunbookContracts = [
+  'GET /api/v1/publications',
+  'GET /api/v1/publications/:publicationId',
+  'Read-only Publication HTTP boundary',
+  'Public API reads PostgreSQL only',
+  'No Publication mutation route',
+  'No frontend integration',
+  'No auth provider',
+  'No merge',
+  'No deploy',
+] as const;
+
+test('Sprint 5C workflow preserves the inherited backend public read operations contract', async () => {
+  const runbook = await readFile(new URL('../README.md', import.meta.url), 'utf8');
+  const workflow = await readFile(
+    new URL('../../.github/workflows/backend-production-foundation.yml', import.meta.url),
+    'utf8',
+  );
+
+  for (const contract of [
+    ...sprint4bRunbookContracts,
+    ...sprint5aRunbookContracts,
+  ]) {
+    assert.ok(
+      runbook.includes(contract),
+      `backend runbook is missing inherited contract: ${contract}`,
+    );
+    assert.ok(
+      workflow.includes(`"${contract}"`),
+      `Sprint 5C workflow is missing inherited contract assertion: ${contract}`,
+    );
+  }
+
+  assert.match(workflow, /^name: Sprint 5C frontend and backend regression gate$/m);
+  assert.match(
+    workflow,
+    /group: sprint-5c-frontend-backend-regression-\$\{\{ github\.ref \}\}/,
+  );
+  assert.match(workflow, /^    name: verify frontend and backend regression$/m);
+  assert.match(workflow, /^permissions:\n  contents: read$/m);
+  assert.doesNotMatch(
+    workflow,
+    /(contents|packages|pages|id-token):[ \t]*write/,
+  );
+});
 
 test('migration creates the production foundation tables from an empty schema', async () => {
   const pool = createPool(testDatabaseUrl());

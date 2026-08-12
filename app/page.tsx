@@ -15,16 +15,20 @@ import {
   roles,
   sourceSync,
 } from "./data";
+import type { PublicChampionGuide } from "./public-data/merge-publications.ts";
+import type { PublicDataStatus } from "./public-data/types.ts";
+import { usePublicGuides } from "./public-data/use-public-guides.ts";
 
 const tierOrder = { SSS: 5, SS: 4, S: 3, A: 2, B: 1 } as const;
-const totalBuilds = champions.reduce((total, champion) => total + 1 + (champion.communityBuilds?.length ?? 0), 0);
-const augmentCount = new Set(champions.flatMap((champion) => [
-  ...champion.coreAugments,
-  ...champion.prismatic,
-  ...champion.gold,
-  ...champion.silver,
-].map((augment) => augment.id ?? augment.cn))).size;
-const itemCount = new Set(champions.flatMap((champion) => (champion.itemData ?? []).map((item) => item.id ?? item.original))).size;
+
+function publicDataStatusLabel(status: PublicDataStatus, publicationCount: number) {
+  if (status === "loading") return "Đang kiểm tra bản xuất bản";
+  if (status === "live") return publicationCount > 0
+    ? `Đang dùng bản xuất bản API · ${publicationCount} tướng`
+    : "Đang dùng bản xuất bản API · Chưa có bản khớp";
+  if (status === "fallback") return "API tạm thời không khả dụng — đang dùng dữ liệu tĩnh";
+  return "Dữ liệu tĩnh";
+}
 
 function formatSourceDate(value?: string) {
   if (!value) return "Không ghi ngày";
@@ -74,7 +78,7 @@ function ChampionCard({
   onOpen,
   onFavorite,
 }: {
-  champion: ChampionGuide;
+  champion: PublicChampionGuide;
   favorite: boolean;
   onOpen: () => void;
   onFavorite: () => void;
@@ -208,7 +212,7 @@ function GuideDrawer({
   onClose,
   onFavorite,
 }: {
-  champion: ChampionGuide;
+  champion: PublicChampionGuide;
   favorite: boolean;
   onClose: () => void;
   onFavorite: () => void;
@@ -293,9 +297,12 @@ function GuideDrawer({
                 <div className="build-card-heading">
                   <span className={`grade-badge grade-${champion.buildGrade.toLowerCase()}`}>{champion.buildGrade}</span>
                   <div><h4>{champion.buildName}</h4><small>{champion.buildOriginal}</small></div>
-                  <span className="status-pill source">Hải Đấu</span>
+                  <span className={`status-pill ${champion.publicPublication ? "verified" : "source"}`}>
+                    {champion.publicPublication ? `API · Bản ${champion.publicPublication.patchKey}` : "Hải Đấu"}
+                  </span>
                 </div>
                 <div className="build-tags"><span>{champion.role}</span><span>{champion.coreAugments.length} lõi chính</span><span>{champion.items.length} món gợi ý</span></div>
+                {champion.publicPublication && <small className="publication-meta">Phiên bản {champion.publicPublication.versionNumber} · Xuất bản {formatSourceDate(champion.publicPublication.publishedAt)}</small>}
                 <p className="build-summary">{champion.summary}</p>
                 <div className="build-assets">
                   <div className="augment-groups">
@@ -361,12 +368,31 @@ function GuideDrawer({
 }
 
 export default function Home() {
+  const { guides, status, publicationCount } = usePublicGuides(
+    champions,
+    process.env.NEXT_PUBLIC_PUBLIC_API_BASE_URL,
+  );
   const [query, setQuery] = useState("");
   const [role, setRole] = useState<Role>("Tất cả");
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [favorites, setFavorites] = useState<string[]>([]);
-  const [selected, setSelected] = useState<ChampionGuide | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+
+  const { totalBuilds, augmentCount, itemCount } = useMemo(() => ({
+    totalBuilds: guides.reduce((total, champion) => total + 1 + (champion.communityBuilds?.length ?? 0), 0),
+    augmentCount: new Set(guides.flatMap((champion) => [
+      ...champion.coreAugments,
+      ...champion.prismatic,
+      ...champion.gold,
+      ...champion.silver,
+    ].map((augment) => augment.id ?? augment.cn))).size,
+    itemCount: new Set(guides.flatMap((champion) => (champion.itemData ?? []).map((item) => item.id ?? item.original))).size,
+  }), [guides]);
+  const selected = useMemo(
+    () => selectedId ? guides.find((guide) => guide.id === selectedId) ?? null : null,
+    [guides, selectedId],
+  );
 
   useEffect(() => {
     const saved = window.localStorage.getItem("loi-meta-favorites");
@@ -386,7 +412,7 @@ export default function Home() {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
-      if (event.key === "Escape") setSelected(null);
+      if (event.key === "Escape") setSelectedId(null);
       if (event.key === "/" && !target?.matches("input, textarea, select, [contenteditable='true']")) {
         event.preventDefault();
         searchRef.current?.focus();
@@ -402,7 +428,7 @@ export default function Home() {
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase("vi");
-    return champions
+    return guides
       .filter((champion) => role === "Tất cả" || champion.role === role)
       .filter((champion) => !favoritesOnly || favorites.includes(champion.id))
       .filter((champion) => !normalized || [
@@ -415,7 +441,7 @@ export default function Home() {
         ...(champion.communityBuilds ?? []).flatMap((build) => [build.title, build.titleOriginal]),
       ].join(" ").toLocaleLowerCase("vi").includes(normalized))
       .sort((left, right) => tierOrder[right.tier] - tierOrder[left.tier] || left.name.localeCompare(right.name, "vi"));
-  }, [favorites, favoritesOnly, query, role]);
+  }, [favorites, favoritesOnly, guides, query, role]);
 
   function toggleFavorite(id: string) {
     setFavorites((current) => {
@@ -435,9 +461,10 @@ export default function Home() {
 
       <section className="discovery-panel" aria-labelledby="discovery-title">
         <div className="product-title"><span className="eyebrow">CẨM NANG ARAM: MAYHEM TIẾNG VIỆT</span><h1 id="discovery-title">Lõi<span>.Meta</span></h1><p>Tìm đúng tướng, xem ngay lõi chính và thứ tự trang bị.</p></div>
+        <div className={`public-data-status ${status}`} role="status" aria-live="polite"><span aria-hidden="true" /><b>{publicDataStatusLabel(status, publicationCount)}</b></div>
         <div className="metric-strip" aria-label="Quy mô dữ liệu">
           <span><b>{totalBuilds}</b><small>lối chơi</small></span>
-          <span><b>{champions.length}</b><small>tướng</small></span>
+          <span><b>{guides.length}</b><small>tướng</small></span>
           <span><b>{augmentCount}</b><small>lõi</small></span>
           <span><b>{itemCount}</b><small>trang bị</small></span>
         </div>
@@ -446,13 +473,13 @@ export default function Home() {
       </section>
 
       <section className="champion-section" id="champions">
-        <div className="section-heading-row"><div><span className="section-accent" /><h2>Kho tướng</h2></div><p><b>{filtered.length}</b> / {champions.length} tướng</p></div>
+        <div className="section-heading-row"><div><span className="section-accent" /><h2>Kho tướng</h2></div><p><b>{filtered.length}</b> / {guides.length} tướng</p></div>
         <div className="filter-bar">
           <div className="role-tabs" aria-label="Lọc theo vai trò">{roles.map((item) => <button type="button" key={item} aria-pressed={role === item} className={role === item ? "active" : ""} onClick={() => setRole(item)}>{item}</button>)}</div>
           <button type="button" aria-pressed={favoritesOnly} className={`favorite-filter ${favoritesOnly ? "active" : ""}`} onClick={() => setFavoritesOnly((value) => !value)}><HeartIcon filled={favoritesOnly} />Đã lưu <span>{favorites.length}</span></button>
         </div>
         {filtered.length > 0 ? (
-          <div className="champion-grid" id="champion-grid">{filtered.map((champion) => <ChampionCard key={champion.id} champion={champion} favorite={favorites.includes(champion.id)} onOpen={() => setSelected(champion)} onFavorite={() => toggleFavorite(champion.id)} />)}</div>
+          <div className="champion-grid" id="champion-grid">{filtered.map((champion) => <ChampionCard key={champion.id} champion={champion} favorite={favorites.includes(champion.id)} onOpen={() => setSelectedId(champion.id)} onFavorite={() => toggleFavorite(champion.id)} />)}</div>
         ) : (
           <div className="empty-state" role="status"><SearchIcon /><h3>Không tìm thấy tướng</h3><p>Thử tên khác hoặc bỏ bộ lọc hiện tại.</p><button type="button" onClick={() => { setQuery(""); setRole("Tất cả"); setFavoritesOnly(false); }}>Xóa bộ lọc</button></div>
         )}
@@ -478,7 +505,7 @@ export default function Home() {
 
       <footer className="site-footer"><div className="footer-brand"><span className="brand-mark"><LogoIcon /></span><div><b>LÕI.META</b><p>Hướng dẫn ARAM: Mayhem bằng tiếng Việt.</p></div></div><p>Dự án cộng đồng, không được Riot Games bảo trợ. Đã đồng bộ {sourceSync.championCount} tướng từ phần công khai của Hải Đấu; tên và ảnh game được đối chiếu qua Riot/CommunityDragon.</p><nav><a href="https://lolhaidou.cn/" target="_blank" rel="noreferrer">Hải Đấu <ExternalIcon /></a><a href="https://www.communitydragon.org/" target="_blank" rel="noreferrer">CommunityDragon <ExternalIcon /></a></nav></footer>
 
-      {selected && <GuideDrawer key={selected.id} champion={selected} favorite={favorites.includes(selected.id)} onFavorite={() => toggleFavorite(selected.id)} onClose={() => setSelected(null)} />}
+      {selected && <GuideDrawer key={selected.id} champion={selected} favorite={favorites.includes(selected.id)} onFavorite={() => toggleFavorite(selected.id)} onClose={() => setSelectedId(null)} />}
 
       <nav className="mobile-nav" aria-label="Điều hướng nhanh"><a href="#top"><LogoIcon />Trang đầu</a><a href="#champions"><GridIcon />Kho tướng</a><button type="button" aria-pressed={favoritesOnly} onClick={() => setFavoritesOnly((value) => !value)}><HeartIcon filled={favoritesOnly} />Đã lưu</button></nav>
     </main>

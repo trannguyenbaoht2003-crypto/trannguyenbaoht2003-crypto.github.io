@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import "./public-data-status.css";
 
 export const metadata: Metadata = {
   title: "Lõi.Meta — Hướng dẫn ARAM: Mayhem tiếng Việt",

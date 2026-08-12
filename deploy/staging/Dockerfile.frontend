@@ -1,0 +1,17 @@
+FROM node:22.13.0-bookworm-slim AS build
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY . .
+ARG NEXT_PUBLIC_PUBLIC_API_BASE_URL=same-origin
+ENV NEXT_PUBLIC_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_PUBLIC_API_BASE_URL
+RUN npm run build:pages
+
+FROM caddy:2-alpine
+COPY deploy/staging/Caddyfile /etc/caddy/Caddyfile
+COPY --from=build /app/out /srv
+RUN chown -R 10001:10001 /srv /data /config /etc/caddy
+USER 10001:10001
+EXPOSE 8080

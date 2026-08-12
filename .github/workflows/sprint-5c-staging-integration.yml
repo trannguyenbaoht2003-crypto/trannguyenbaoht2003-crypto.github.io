@@ -1,0 +1,154 @@
+name: Sprint 5C staging integration gate
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "app/**"
+      - "backend/**"
+      - "deploy/**"
+      - "docs/runbooks/**"
+      - "docs/superpowers/**"
+      - "scripts/staging-smoke.mjs"
+      - "tests/**"
+      - ".dockerignore"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig.json"
+      - ".github/workflows/sprint-5c-staging-integration.yml"
+      - ".github/workflows/backend-production-foundation.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sprint-5c-staging-integration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  staging:
+    name: verify staging integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      NODE_ENV: test
+      STAGING_BASE_URL: http://127.0.0.1:8080
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.0"
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            backend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci --cache /tmp/aram-root-npm-cache
+
+      - name: Install backend dependencies
+        run: npm --prefix backend ci --cache /tmp/aram-backend-npm-cache
+
+      - name: Validate community data
+        run: npm run validate:community
+
+      - name: Frontend lint
+        run: npm run lint
+
+      - name: Public-data adapter tests
+        run: npm run test:public-data
+
+      - name: Staging source contracts
+        run: npm run test:staging-contract
+
+      - name: Frontend regression and static export
+        run: npm test
+
+      - name: Canonical frontend Pages build
+        run: npm run build:pages
+
+      - name: Backend typecheck
+        run: npm run backend:typecheck
+
+      - name: Backend tests
+        env:
+          TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/hai_dau_test
+          TEST_REDIS_URL: redis://127.0.0.1:6379
+        shell: bash
+        run: |
+          set -euo pipefail
+          cleanup() {
+            docker rm -f sprint-5c-test-postgres sprint-5c-test-redis >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          cleanup
+          docker run --name sprint-5c-test-postgres -d \
+            -e POSTGRES_USER=postgres \
+            -e POSTGRES_PASSWORD=postgres \
+            -e POSTGRES_DB=hai_dau_test \
+            -p 5432:5432 postgres:17
+          docker run --name sprint-5c-test-redis -d -p 6379:6379 redis:7
+          until docker exec sprint-5c-test-postgres pg_isready -U postgres -d hai_dau_test; do sleep 1; done
+          until docker exec sprint-5c-test-redis redis-cli ping | grep -q PONG; do sleep 1; done
+          npm run backend:test
+
+      - name: Backend build
+        run: npm run backend:build
+
+      - name: Compose configuration
+        run: npm run staging:config
+
+      - name: Build and start staging stack
+        run: npm run staging:up
+
+      - name: Normal-path smoke
+        run: npm run staging:smoke -- normal
+
+      - name: Stop backend
+        run: docker compose --env-file deploy/staging/.env.example -f deploy/staging/compose.yml stop backend
+
+      - name: Backend-outage smoke
+        run: npm run staging:smoke -- backend-down
+
+      - name: Recover backend
+        run: docker compose --env-file deploy/staging/.env.example -f deploy/staging/compose.yml up -d --wait backend
+
+      - name: Recovery smoke
+        run: npm run staging:smoke -- recovered
+
+      - name: Repository cleanliness
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          status="$(git status --short)"
+          if [[ -n "$status" ]]; then
+            echo "Generated files changed the checkout:"
+            echo "$status"
+            exit 1
+          fi
+
+      - name: Deployment guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          workflow=".github/workflows/sprint-5c-staging-integration.yml"
+          executable="$RUNNER_TEMP/sprint-5c-before-deployment-guard.yml"
+          sed '/- name: Deployment guard/,$d' "$workflow" > "$executable"
+          ! grep -Eq '(contents|packages|pages|id-token):[[:space:]]*write' "$executable"
+          ! grep -Eq 'docker[[:space:]]+(login|push)|git push|actions/deploy-pages|wrangler[[:space:]]+deploy' "$executable"
+          ! grep -Eqi 'kubectl|terraform|pulumi|aws[[:space:]]|gcloud|az login' "$executable"
+          ! grep -Eq '(CLOUDFLARE_API_TOKEN|AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY|GOOGLE_APPLICATION_CREDENTIALS|BEGIN (RSA|OPENSSH|EC) PRIVATE KEY)' "$executable"
+
+      - name: Staging diagnostics
+        if: failure()
+        run: |
+          docker compose --env-file deploy/staging/.env.example -f deploy/staging/compose.yml ps || true
+          docker compose --env-file deploy/staging/.env.example -f deploy/staging/compose.yml logs --tail=100 gateway backend migrate postgres redis || true
+
+      - name: Teardown staging stack
+        if: always()
+        run: npm run staging:down

@@ -1,5 +1,11 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 
+import {
+  registerPublicPublicationRoutes,
+} from './http/public-publications.js';
+import type {
+  PublicPublicationReader,
+} from './modules/publication/public-publication-reader.js';
 import type { ResourceHealth } from './resources.js';
 
 const loggerOptions = {
@@ -18,6 +24,7 @@ const loggerOptions = {
 
 export interface BuildAppOptions {
   resources: ResourceHealth;
+  publications: PublicPublicationReader;
   logger?: boolean;
 }
 
@@ -40,6 +47,8 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     }
     return { status: 'ready' };
   });
+
+  registerPublicPublicationRoutes(app, options.publications);
 
   return app;
 }
