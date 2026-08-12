@@ -23,7 +23,7 @@ test("staging topology is same-origin, private by default, and deployment-free",
   assert.match(compose, /condition: service_completed_successfully/);
   assert.match(compose, /\n  backend:/);
   assert.match(compose, /\n  gateway:/);
-  assert.match(compose, /ports:\n\s+- "\$\{STAGING_PORT:-8080\}:80"/);
+  assert.match(compose, /ports:\n\s+- "\$\{STAGING_PORT:-8080\}:8080"/);
   assert.equal((compose.match(/\n\s+ports:/g) ?? []).length, 1);
   assert.doesNotMatch(compose, /5432:5432|6379:6379|3001:3001/);
   assert.doesNotMatch(compose, /\n  worker:/);
@@ -36,6 +36,7 @@ test("staging topology is same-origin, private by default, and deployment-free",
     "gateway must start independently so static files remain available during backend startup failure",
   );
 
+  assert.match(caddy, /^:8080\s*\{/m);
   assert.match(caddy, /handle \/api\/v1\/\*/);
   assert.match(caddy, /handle \/health\/\*/);
   assert.match(caddy, /reverse_proxy backend:3001/);
@@ -47,6 +48,8 @@ test("staging topology is same-origin, private by default, and deployment-free",
   assert.match(frontendDockerfile, /ENV NEXT_PUBLIC_PUBLIC_API_BASE_URL=\$NEXT_PUBLIC_PUBLIC_API_BASE_URL/);
   assert.match(frontendDockerfile, /RUN npm run build:pages/);
   assert.match(frontendDockerfile, /FROM caddy:2-alpine/);
+  assert.match(frontendDockerfile, /^USER\s+\S+/m);
+  assert.match(frontendDockerfile, /^EXPOSE 8080$/m);
 
   assert.match(exampleEnv, /STAGING_PORT=8080/);
   assert.match(exampleEnv, /POSTGRES_DB=/);
