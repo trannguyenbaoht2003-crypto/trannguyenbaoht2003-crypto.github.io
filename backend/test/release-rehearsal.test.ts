@@ -23,11 +23,24 @@ type RehearsalModule = {
 };
 
 async function loadRehearsal(): Promise<RehearsalModule> {
-  const modulePath = [
+  const dataModulePath = [
     '../src/rehearsal/release-rehearsal-data',
     '.js',
   ].join('');
-  return import(modulePath) as Promise<RehearsalModule>;
+  const versioningModulePath = [
+    '../src/rehearsal/release-rehearsal-versioning',
+    '.js',
+  ].join('');
+
+  const dataModule = await import(dataModulePath) as RehearsalModule;
+  let versioningModule: RehearsalModule = {};
+  try {
+    versioningModule = await import(versioningModulePath) as RehearsalModule;
+  } catch {
+    // Keep the module boundary explicit while RED proves version transitions
+    // have not been implemented yet.
+  }
+  return { ...dataModule, ...versioningModule };
 }
 
 test('release rehearsal fails closed without explicit staging enablement', async () => {
