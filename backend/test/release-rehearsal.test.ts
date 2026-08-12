@@ -5,9 +5,13 @@ test('release rehearsal fails closed without explicit staging enablement', async
   let rehearsal: {
     assertReleaseRehearsalEnabled?: (env: NodeJS.ProcessEnv) => void;
   };
+  const modulePath = [
+    '../src/rehearsal/release-rehearsal-data',
+    '.js',
+  ].join('');
 
   try {
-    rehearsal = await import('../src/rehearsal/release-rehearsal-data.js');
+    rehearsal = await import(modulePath);
   } catch (error) {
     assert.fail(
       `release rehearsal module must exist before this contract can pass: ${
