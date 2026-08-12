@@ -33,6 +33,15 @@ function requireNonRoot(service) {
   return user;
 }
 
+function blockedAuditPackages(auditBody) {
+  return Object.entries(auditBody?.vulnerabilities ?? {})
+    .filter(([, finding]) => finding?.severity === 'high' || finding?.severity === 'critical')
+    .map(([packageName]) => packageName)
+    .filter((packageName) => /^[A-Za-z0-9@/._-]+$/.test(packageName))
+    .sort()
+    .slice(0, 10);
+}
+
 const configuration = JSON.parse(compose(['config', '--format', 'json']).stdout);
 const services = configuration.services ?? {};
 assert.ok(services.gateway, 'gateway service must exist');
@@ -77,7 +86,11 @@ const vulnerabilityCounts = auditBody?.metadata?.vulnerabilities ?? {};
 const high = Number(vulnerabilityCounts.high ?? 0);
 const critical = Number(vulnerabilityCounts.critical ?? 0);
 if (high > 0 || critical > 0) {
-  throw new Error(`BACKEND_RUNTIME_AUDIT_BLOCKED:high=${high}:critical=${critical}`);
+  const packages = blockedAuditPackages(auditBody);
+  const packageSummary = packages.length > 0 ? packages.join(',') : 'unknown';
+  throw new Error(
+    `BACKEND_RUNTIME_AUDIT_BLOCKED:high=${high}:critical=${critical}:packages=${packageSummary}`,
+  );
 }
 
 const secretPattern = [
