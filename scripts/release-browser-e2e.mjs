@@ -55,11 +55,13 @@ function dumpHydratedDom() {
   return result.stdout;
 }
 
+const brandPattern = /LÕI<span>\.META<\/span>|LÕI\.META/i;
+
 if (expected === 'backend-down') {
   const response = await fetch(`${baseUrl}/api/v1/publications`);
   assert.ok(response.status >= 500, `backend-down API must fail closed, got ${response.status}`);
   const dom = dumpHydratedDom();
-  assert.match(dom, /Lõi<span>\.Meta<\/span>|Lõi\.Meta/);
+  assert.match(dom, brandPattern);
   assert.match(dom, /Samira/);
   assert.match(dom, /public-data-status fallback/);
   assert.match(dom, /API tạm thời không khả dụng/);
@@ -75,7 +77,7 @@ if (expected === 'backend-down') {
   assert.deepEqual(publication.payload.itemExternalIds, ['3006', '6672']);
 
   const dom = dumpHydratedDom();
-  assert.match(dom, /Lõi<span>\.Meta<\/span>|Lõi\.Meta/);
+  assert.match(dom, brandPattern);
   assert.match(dom, /Samira/);
   assert.match(dom, /public-data-status live/);
   assert.match(dom, /Bản đã xuất bản|bản đã xuất bản/i);
