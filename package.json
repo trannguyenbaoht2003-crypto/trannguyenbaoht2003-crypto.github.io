@@ -18,6 +18,8 @@
     "test:staging-contract": "node --test tests/staging-deployment.test.mjs",
     "test:release-source": "node --test tests/release-rehearsal-source.test.mjs",
     "test:production-contract": "node --test tests/production-delivery.test.mjs",
+    "production:smoke": "node scripts/production-smoke.mjs",
+    "production:browser-smoke": "node scripts/production-browser-smoke.mjs",
     "release:browser-e2e": "node scripts/release-browser-e2e.mjs",
     "staging:backup-restore": "node scripts/staging-backup-restore.mjs",
     "release:security-gate": "node scripts/release-security-gate.mjs",
