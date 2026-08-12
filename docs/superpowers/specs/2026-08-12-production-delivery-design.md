@@ -4,38 +4,38 @@
 **Branch:** `feat/6a-production-delivery`  
 **Base:** `main` after Sprint 5D merge (`512baaaa730c39b20d22ec5faa1bca727cae6283`)  
 **Provider:** Railway  
-**Primary goal:** make the verified Sprint 5D application deployable as a real, same-origin production service without weakening the publication, moderation, security, or fallback boundaries already proven in staging.
+**Primary goal:** deliver the verified Sprint 5D application as a real same-origin production service without weakening Publication authority, moderation, security, migration, rollback, or static-fallback boundaries.
 
 ## 1. Scope
 
-Sprint 6A turns the existing staging-shaped stack into a production delivery system. It does **not** add a new collector, AI publisher, public mutation API, browser authentication, or automatic publication. Those remain separate concerns for Sprint 6B and later.
+Sprint 6A turns the staging-shaped stack into a production delivery system. It does not add a collector, AI publisher, public mutation API, browser authentication, or automatic Publication. Those are separate Sprint 6B+ concerns.
 
-The production release must preserve the same user-visible behavior already proven by Sprint 5D:
+Production must preserve the behavior already proven in Sprint 5D:
 
-- the static frontend is immediately usable;
-- the browser reads active Publications through one same-origin `GET /api/v1/publications` request;
+- static frontend remains immediately usable;
+- browser performs one same-origin `GET /api/v1/publications` request;
 - API outage falls back to static guides;
-- Publication authority remains PostgreSQL;
+- PostgreSQL remains Publication authority;
 - Redis/workers never become public-read authority;
 - migrations fail closed;
-- publication is never created by the browser or gateway;
+- no browser/gateway Publication write path exists;
 - no CORS expansion is required.
 
-## 2. Selected deployment approach
+## 2. Selected approach
 
 ### Selected — Railway full-stack same-origin
 
-Railway hosts one public gateway service and one private backend service in the same project/environment, together with Railway PostgreSQL and Redis services.
+Railway hosts one public gateway, one private backend, Railway PostgreSQL, and Railway Redis in one production project/environment.
 
-This is selected because it is the smallest production change from the exact topology already exercised in Sprint 5C/5D.
+This is the smallest change from the exact topology exercised by Sprint 5C/5D.
 
-### Rejected — GitHub Pages plus a public Railway API
+### Rejected — GitHub Pages + public Railway API
 
-This would require a separate public backend origin, browser CORS policy, public API host lifecycle, and additional failure/security handling. It provides no benefit to the current product and weakens the same-origin boundary already tested.
+That model would introduce a second public origin, CORS, public API-host lifecycle, and additional browser security behavior without product benefit.
 
-### Rejected — provider migration before first production release
+### Rejected — changing provider before first real release
 
-Moving to another provider would force a new deployment model before the current one has been proven in production. Provider portability is retained through Dockerfiles, environment variables, and the existing Compose staging model; it is not a reason to change providers during this sprint.
+Dockerfiles, environment variables, and Compose already preserve portability. Provider migration is not required to prove the current release model.
 
 ## 3. Production architecture
 
@@ -43,71 +43,58 @@ Moving to another provider would force a new deployment model before the current
 Internet
    |
    v
-Railway public domain / custom domain
+Railway public/custom domain
    |
    v
-Gateway service (Caddy + static Next export)
-   |                    \
-   | static files         \ /api/v1/* and /health/*
-   v                       v
-Browser                 Backend service (Fastify)
-                           |              |
-                           v              v
-                    Railway Postgres   Railway Redis
+Gateway (Caddy + static Next export)
+   |                       \
+   | static files            \ /api/v1/* + /health/*
+   v                          v
+Browser                   Backend Fastify
+                              |        |
+                              v        v
+                         Postgres     Redis
 ```
 
-### Gateway service
+### Gateway
 
-Responsibilities:
+The gateway is the only application service with public HTTP exposure. It:
 
-- the only application service with a public HTTP domain;
-- serve the immutable static frontend export;
-- proxy `/api/v1/*` to the backend over Railway private networking;
-- proxy `/health/*` only for operational health/smoke use;
-- never cache Publication API responses;
-- return a sanitized gateway error when the backend is unavailable;
-- start independently from backend/database readiness so static fallback remains available.
+- serves the immutable frontend export;
+- proxies `/api/v1/*` and `/health/*` over Railway private networking;
+- never caches Publication responses;
+- returns sanitized proxy failures;
+- starts independently from backend/database readiness;
+- never injects Authorization or CORS headers.
 
-The frontend build keeps:
+Frontend build remains:
 
 ```text
 NEXT_PUBLIC_PUBLIC_API_BASE_URL=same-origin
 ```
 
-No production hostname is embedded in the browser bundle.
+No production hostname is embedded in browser code.
 
-### Backend service
+### Backend
 
-Responsibilities:
+The backend:
 
-- run the existing Fastify API image;
-- bind to `0.0.0.0` on a fixed internal `PORT=3001`;
-- expose no Railway public domain;
-- read/write PostgreSQL according to the existing domain commands;
-- use Redis for queue/lifecycle concerns only;
-- keep the Publication HTTP boundary GET-only.
+- runs the existing Fastify image;
+- binds `HOST=0.0.0.0`, `PORT=3001`;
+- has no public Railway domain;
+- uses PostgreSQL for domain authority;
+- uses Redis only for queue/lifecycle concerns;
+- keeps the Publication HTTP boundary GET-only.
 
-Gateway connects to the backend through Railway private DNS, using an environment/reference value derived from the backend service private domain and its explicit internal port.
+Gateway reaches the backend through a Railway reference variable derived from the backend private domain plus explicit internal port.
 
-### PostgreSQL
+### PostgreSQL and Redis
 
-- Railway PostgreSQL service;
-- private connectivity only for application operation;
-- persistent storage owned by the database service;
-- no application-managed local volume;
-- production `DATABASE_URL` is supplied as a Railway reference variable, never committed.
+Railway-provided PostgreSQL and Redis services remain private for application operation. `DATABASE_URL` and `REDIS_URL` are Railway reference variables, never committed values. Application services do not manage database persistence volumes themselves.
 
-### Redis
+## 4. Production repository assets
 
-- Railway Redis service;
-- private connectivity only;
-- `REDIS_URL` supplied as a Railway reference variable;
-- not part of public Publication authority;
-- worker scheduling remains disabled in Sprint 6A unless explicitly needed for an existing production lifecycle command.
-
-## 4. Repository production artifacts
-
-Sprint 6A will add production-specific deployment assets without changing the proven staging assets:
+Sprint 6A will add production assets without replacing the proven staging assets:
 
 ```text
 deploy/production/
@@ -116,6 +103,9 @@ deploy/production/
   railway.gateway.toml
   production.env.example
 
+backend/
+  railway.toml
+
 docs/runbooks/
   production-delivery.md
 
@@ -123,288 +113,281 @@ docs/runbooks/
   production-release-gate.yml
 ```
 
-The backend will gain a Railway config file scoped to its monorepo service, expected at:
-
-```text
-backend/railway.toml
-```
-
-Railway service settings must point to the correct absolute config path because Config-as-Code lookup is independent of a service Root Directory.
+Railway Config-as-Code location is explicit because config-file lookup does not follow a monorepo service Root Directory automatically.
 
 ## 5. Railway service configuration
 
-### Gateway
+### Gateway service
 
-Expected service settings:
+Expected settings:
 
-- source: this GitHub repository;
-- root directory: repository root;
-- config path: `/deploy/production/railway.gateway.toml`;
-- Dockerfile: `/deploy/production/Dockerfile.gateway`;
-- public domain: enabled;
+- repository root as build context;
+- config path `/deploy/production/railway.gateway.toml`;
+- Dockerfile `/deploy/production/Dockerfile.gateway`;
+- public domain enabled;
 - `PORT=8080`;
-- healthcheck path: `/`;
-- restart policy: `ON_FAILURE` or stricter equivalent supported by current Railway Config-as-Code;
-- backend private URL supplied using a Railway reference variable, not a committed hostname.
+- healthcheck `/`;
+- production backend origin supplied only by Railway reference variable;
+- GitHub autodeploy **disabled** for Sprint 6A.
 
-### Backend
+### Backend service
 
-Expected service settings:
+Expected settings:
 
-- source: this GitHub repository;
-- root directory: `/backend`;
-- config path: `/backend/railway.toml`;
-- Dockerfile: `/backend/Dockerfile`;
+- Root Directory `/backend`;
+- config path `/backend/railway.toml`;
+- Dockerfile `/backend/Dockerfile`;
 - no public domain;
 - `NODE_ENV=production`;
 - `HOST=0.0.0.0`;
 - `PORT=3001`;
 - `DATABASE_URL` references Railway Postgres;
 - `REDIS_URL` references Railway Redis;
-- healthcheck path: `/health/ready`;
-- pre-deploy command: `node dist/src/migrate-cli.js`;
-- start command: existing backend image default unless Config-as-Code must make it explicit.
+- healthcheck `/health/ready`;
+- pre-deploy command `node dist/src/migrate-cli.js`;
+- GitHub autodeploy **disabled** for Sprint 6A.
 
-If the pre-deploy migration exits non-zero, deployment must stop and no new backend deployment may receive traffic.
+A non-zero pre-deploy migration blocks the new backend deployment.
 
 ## 6. Production gateway routing
 
-Production Caddy behavior mirrors the tested staging contract while replacing the Docker Compose hostname with a Railway-supplied private backend origin.
-
-Routing rules:
+Production routing mirrors staging while replacing the Compose backend hostname with a trusted environment-supplied private origin:
 
 ```text
 /api/v1/*  -> backend private origin, Cache-Control: no-store
 /health/*  -> backend private origin, Cache-Control: no-store
-/*         -> static export with SPA/static fallback behavior
+/*         -> static export
 ```
 
-Constraints:
+The production Caddy configuration must use one trusted backend origin from process environment. It must not accept an upstream from request data, expose the private hostname in error output, or become an open proxy.
 
-- no open reverse proxy;
-- no arbitrary upstream supplied by browser input;
-- only one backend origin from trusted environment configuration;
-- no Authorization header injection;
-- no CORS headers;
-- gateway errors must not expose private Railway domains or credentials.
+## 7. Migration safety
 
-## 7. Migration and database safety
+Existing checksum-protected append-only migrations remain authoritative.
 
-The existing checksum-protected, append-only migration system remains authoritative.
+Backend deployment order:
 
-Production release order:
+1. build backend artifact/image;
+2. run `node dist/src/migrate-cli.js` as Railway pre-deploy;
+3. abort the deployment if migration fails;
+4. start new backend only after migration success;
+5. require HTTP 200 from `/health/ready` before deployment is healthy.
 
-1. build backend image;
-2. run migration CLI as Railway pre-deploy command;
-3. if migration fails, abort deployment;
-4. if migration passes, start the new backend deployment;
-5. healthcheck `/health/ready` must return HTTP 200 before traffic is accepted;
-6. gateway remains available throughout because it is independently deployed and static-first.
+No automated down migrations are added.
 
-Sprint 6A does not add automated down migrations.
-
-Application rollback means redeploying the previous verified application revision. Database rollback remains forward-only/manual according to the existing migration policy.
+Application rollback means restoring a previous verified application deployment. Schema changes must remain backward compatible with the rollback candidate; otherwise the release must use an expand/migrate/contract sequence before production.
 
 ## 8. Production data state
 
-Sprint 6A is allowed to launch with zero active Publications. That state is valid:
+Zero active Publications is a valid initial production state:
 
-- the public API returns a valid empty envelope;
-- the static frontend remains fully useful;
-- no synthetic Sprint 5D rehearsal data is inserted into production;
-- no direct SQL seed may manufacture a production Publication.
+- API returns a valid empty schemaVersion 1 envelope;
+- static frontend remains useful;
+- Sprint 5D rehearsal records are never seeded into production;
+- no direct SQL may manufacture a production Publication.
 
-Real automatically discovered content enters the backend authority chain in Sprint 6B. Any initial real Publication before Sprint 6B must use the existing production domain command chain and publisher authorization, not the rehearsal fixture.
+Real automatically discovered content is Sprint 6B. Any real Publication before 6B must traverse the existing domain authority and publisher authorization path.
 
-## 9. Deployment workflow
+## 9. Release gate
 
-A new production workflow will be explicit and separate from the existing staging/release-candidate workflows.
+The production release workflow is separate from staging/release-candidate workflows.
 
 ### Trigger
 
-Production deployment is permitted only from `main` and only for a commit that has passed the production release gate.
+The actual production workflow uses `workflow_dispatch` with an explicit `release_sha` input.
 
-The first implementation should prefer `workflow_dispatch` for the actual production deployment boundary. Automatic deploy-on-push may be enabled only after the manual path has been exercised successfully and rollback has been proven against a real Railway environment.
+The workflow must fail unless:
 
-### Release gate
+- `release_sha` is a full commit SHA;
+- the SHA is reachable from `main`;
+- checkout resolves to exactly `release_sha`;
+- `release_sha` is still the intended release revision when deploy begins.
 
-Before a deployment is authorized, the workflow must verify:
+Railway GitHub autodeploy remains disabled, so a push to `main` cannot bypass this gate.
 
-- checkout is the exact requested `main` SHA;
-- frontend dependency install;
-- community/static validation;
+### Verification job
+
+Before any deploy command, verify:
+
+- exact-SHA checkout;
+- frontend dependency install and community/static validation;
 - frontend lint;
 - public-data tests;
-- staging and release source contracts;
-- full frontend static build and rendered HTML tests;
+- staging/release/production source contracts;
+- full static build and rendered HTML tests;
 - backend dependency install;
 - backend typecheck;
 - all backend tests;
 - backend build;
-- runtime `npm audit --omit=dev --audit-level=high`;
-- production Config-as-Code source contracts;
+- `npm audit --omit=dev --audit-level=high`;
+- production Config-as-Code contracts;
 - production gateway image build;
 - backend image build;
 - no committed production secret;
-- no public backend URL configuration;
+- no public backend exposure configuration;
 - no CORS expansion;
-- no public Publication mutation route;
+- no Publication mutation route;
 - no automatic Publication creation;
 - repository cleanliness.
 
-The release gate and the deploy action are separate jobs. A deploy job must depend on a successful release-gate job.
+The deploy job depends on successful completion of this verification job.
 
-## 10. Actual deployment authorization
+## 10. Exact-SHA Railway deployment
 
-No Railway token will be committed to the repository.
+The deployment path for Sprint 6A is GitHub Actions -> Railway CLI, not Railway GitHub autodeploy.
 
-Preferred authorization order:
+A Railway **project token** is stored only as the GitHub Actions secret `RAILWAY_TOKEN`. Project/environment/service identifiers are stored as non-secret repository/environment configuration where safe, or as GitHub environment secrets/variables where appropriate.
 
-1. Railway GitHub repository integration and service-level automatic builds from `main`, with the application release workflow serving as a required quality boundary; or
-2. a GitHub Actions deploy job using a Railway token stored only as an Actions secret, if an explicit CLI deployment is required.
+The deploy job runs from the exact checked-out `release_sha` and targets the pre-created Railway production project/environment explicitly. It uses Railway CLI CI mode, conceptually:
 
-Because this ChatGPT session currently has no Railway connector, repository implementation can fully create and verify the production manifests/workflows, but first-time Railway project/service creation and secret binding require the external Railway account/GitHub integration. This is an operational binding step, not a reason to weaken or simulate production deployment.
+```text
+railway up --ci --project <project> --environment production --service backend
+railway up --ci --project <project> --environment production --service gateway
+```
 
-## 11. Production smoke verification
+The implementation plan must validate the current Railway CLI flag behavior before committing executable workflow syntax.
 
-After a real production deployment, verify through the public gateway domain:
+Backend deploy occurs first. Gateway deploy occurs only after backend deployment succeeds. The production public smoke follows gateway deployment.
 
-1. `GET /` -> 200 and contains the expected application marker;
+The workflow must never create a new Railway project implicitly. If project/service binding is missing, deployment fails closed.
+
+First-time creation of the Railway project, gateway/backend services, PostgreSQL, Redis, service reference variables, domain, and `RAILWAY_TOKEN` binding is an external account bootstrap step because this ChatGPT session has no Railway connector. After that one-time binding, releases are repository-driven and exact-SHA gated.
+
+## 11. Production smoke
+
+After a real deployment, verify through the public gateway domain:
+
+1. `GET /` -> 200 and application marker exists;
 2. `GET /health/live` -> 200;
 3. `GET /health/ready` -> 200;
-4. `GET /api/v1/publications` -> 200 with schemaVersion 1 and a closed envelope;
-5. `POST /api/v1/publications` -> 404/405 and never mutates data;
+4. `GET /api/v1/publications` -> 200 with closed schemaVersion 1 envelope;
+5. `POST /api/v1/publications` -> 404/405 and causes no mutation;
 6. browser hydration completes;
-7. if Publication list is empty, static data remains visible;
-8. if backend is temporarily unavailable, gateway still serves `/` and browser falls back to static data;
+7. empty Publication list still shows static content;
+8. temporary backend failure keeps `/` available and browser falls back to static content;
 9. restored backend returns valid Publication reads without frontend rebuild.
 
-Smoke diagnostics must print endpoint class/status only. They must not print database URLs, Redis URLs, Railway private domains containing secret material, or environment dumps.
+Diagnostics print safe endpoint/status summaries only. They never dump environment variables, database URLs, Redis URLs, tokens, or private-domain values.
 
-## 12. Rollback rehearsal
+## 12. Real-environment rollback rehearsal
 
-Before production delivery is declared complete, a real-environment rollback rehearsal must prove:
+`PRODUCTION_DELIVERY_READY` requires a real Railway rollback rehearsal:
 
 - deploy verified revision A;
-- deploy verified revision B with no schema-destructive change;
-- roll application back to A using Railway deployment rollback/redeploy capability;
-- gateway remains available;
-- backend returns healthy;
-- Publication read contract remains valid;
-- no database restore is required for an application-only rollback.
+- deploy verified revision B with a backward-compatible schema state;
+- use Railway's deployment rollback action on the prior successful deployment;
+- verify gateway availability;
+- verify backend health;
+- verify Publication read contract;
+- verify no database restore is required for the application-only rollback.
 
-If a schema change is not backward compatible with A, the release must not claim rollback readiness and must be redesigned as an expand/migrate/contract sequence before production.
+Railway rollback restores the selected previous deployment image/configuration subject to Railway deployment retention. The runbook must document the retention limitation and the redeploy fallback for older deployments.
 
 ## 13. Security boundaries
 
-Production delivery must preserve all of these:
+All of these remain mandatory:
 
-- only gateway is public;
-- backend has no public Railway domain;
-- Postgres and Redis have no application-required public exposure;
-- no credentials in source control;
-- no browser auth token;
+- only gateway public;
+- backend private;
+- Postgres/Redis need no public application exposure;
+- no source-controlled credentials;
+- no browser token;
 - no CORS expansion;
 - no public mutation route;
 - no automatic Publication;
 - no raw SQL Publication seeding;
-- no deployment from an unverified branch;
-- no workflow that prints secret environment variables;
-- no lowering of runtime audit severity to make a release pass.
+- no deployment from an unverified SHA;
+- no workflow secret/environment dump;
+- no lowering runtime audit severity to pass release;
+- Railway autodeploy disabled during Sprint 6A.
 
 ## 14. Failure behavior
 
 ### Backend unavailable
 
-- gateway continues serving static frontend;
-- API proxy returns sanitized 5xx;
-- browser switches to the existing static fallback state;
-- no client polling/retry loop is introduced.
+Gateway serves static frontend; API proxy fails with sanitized 5xx; browser uses existing static fallback; no polling/retry loop is added.
 
 ### PostgreSQL unavailable
 
-- backend readiness fails;
-- new backend deployment cannot become healthy;
-- gateway remains static-available;
-- public read fails safely.
+Backend readiness fails and cannot become healthy; gateway remains static-available; public reads fail safely.
 
 ### Redis unavailable
 
-- backend readiness behavior remains as currently implemented;
-- public Publication authority is still PostgreSQL;
-- no alternate cache becomes authoritative.
+Current readiness behavior remains in force; PostgreSQL remains Publication authority; no cache becomes authoritative.
 
 ### Migration failure
 
-- Railway pre-deploy command exits non-zero;
-- new backend deployment is blocked;
-- previous healthy deployment remains the serving application where Railway deployment lifecycle permits it.
+Railway pre-deploy exits non-zero and blocks new backend deployment.
 
 ### Gateway deployment failure
 
-- Railway must retain/recover the prior healthy gateway deployment according to its deployment lifecycle;
-- backend must not be made public as an emergency workaround.
+Backend is never made public as an emergency workaround. Prior healthy gateway deployment/rollback path remains the recovery mechanism.
+
+### Missing Railway binding/token
+
+Deploy job exits before `railway up`; no implicit project/service creation is permitted in CI.
 
 ## 15. Observability
 
-Sprint 6A adds only production-essential diagnostics:
+Sprint 6A adds production-essential diagnostics only:
 
-- gateway access/error status sufficient to distinguish static vs proxy failures;
-- backend structured safe logs already used by the application;
-- `/health/live` and `/health/ready` as machine-readable health boundaries;
-- release workflow records exact Git SHA and release outcome;
-- production smoke records only safe status summaries.
+- safe gateway access/error status;
+- existing backend structured safe logs;
+- `/health/live` and `/health/ready` boundaries;
+- exact Git SHA recorded by release workflow;
+- Railway deployment result recorded without secret values;
+- safe public smoke result.
 
-A third-party monitoring vendor, distributed tracing platform, or alerting suite is not required for the first production release.
+A new monitoring vendor or tracing platform is out of scope for the first production delivery.
 
 ## 16. Acceptance criteria
 
-Sprint 6A is complete only when all of the following are true:
+Sprint 6A is complete only when:
 
 - production deployment assets are version-controlled and tested;
-- Railway backend and gateway configuration are deterministic enough to recreate the service build/deploy settings;
+- Railway gateway/backend Config-as-Code is reproducible;
 - backend migration pre-deploy is fail-closed;
-- gateway and backend images build from a clean checkout;
-- only gateway is intended for public exposure;
-- the browser remains same-origin and requires no CORS change;
-- existing Sprint 5D regression/rehearsal gates remain green;
-- production security gate passes with no high/critical runtime dependency finding;
-- a real Railway environment is bound to the repo/account;
-- production public smoke passes on an exact `main` SHA;
-- application rollback is rehearsed successfully on the real environment;
+- clean-checkout gateway/backend images build;
+- only gateway is public by design and actual Railway binding;
+- browser remains same-origin with no CORS change;
+- all Sprint 5D regression/rehearsal gates remain green;
+- runtime security gate has no high/critical finding;
+- a real Railway project/environment is bound;
+- GitHub autodeploy is disabled;
+- exact-SHA production deployment succeeds through the gated workflow;
+- public smoke succeeds on that exact SHA;
+- real-environment application rollback rehearsal succeeds;
 - no production secret is committed;
-- no synthetic rehearsal Publication is inserted into production;
+- no synthetic rehearsal Publication is inserted;
 - release evidence records the deployed Git SHA.
 
-The completion marker is:
+Completion marker:
 
 ```text
 PRODUCTION_DELIVERY_READY
 ```
 
-This marker may be emitted only after **real-environment** smoke and rollback rehearsal succeed. Repository-only or CI-only validation must never emit it.
+This marker may be emitted only after real-environment deployment, public smoke, and rollback rehearsal succeed. Repository-only or CI-only validation must never emit it.
 
 ## 17. Explicit exclusions
 
 Sprint 6A does not implement:
 
 - Collector -> PostgreSQL authority bridge;
-- automated Bilibili/Douyin discovery scheduling;
+- scheduled Bilibili/Douyin discovery;
 - AI extraction/translation/publication;
-- public write APIs;
+- public write API;
 - publisher UI;
 - browser authentication;
-- automatic Publication creation;
-- automatic rollback based on metrics;
+- automatic Publication;
+- metric-triggered automatic rollback;
 - cross-region database failover;
-- custom domain purchase/DNS ownership;
+- custom-domain purchase/DNS ownership;
 - a new monitoring vendor.
-
-Those are intentionally deferred so production delivery can be proven independently before automated discovery begins.
 
 ## 18. Next sprint boundary
 
-After `PRODUCTION_DELIVERY_READY`, Sprint 6B will connect the existing community collector to the backend authority chain:
+After `PRODUCTION_DELIVERY_READY`, Sprint 6B connects the existing collector to backend authority rather than creating a parallel collector:
 
 ```text
 existing collector
@@ -418,4 +401,4 @@ existing collector
   -> frontend
 ```
 
-Sprint 6B must reuse the existing collector rather than create a competing collector pipeline.
+Sprint 6B preserves the rule that discovery/AI may create evidence-backed Candidates but cannot bypass publisher-controlled Publication.
