@@ -1,0 +1,221 @@
+name: Production release gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_sha:
+        description: Full main commit SHA to release
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-release
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: verify exact production release
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    env:
+      RELEASE_SHA: ${{ inputs.release_sha }}
+      NODE_ENV: test
+      TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/hai_dau_test
+      TEST_REDIS_URL: redis://127.0.0.1:6379
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: hai_dau_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d hai_dau_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Validate release SHA format
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "release_sha must be a full lowercase 40-character commit SHA" >&2
+            exit 1
+          }
+
+      - name: Checkout exact release SHA
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify exact SHA is reachable from main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main --no-tags
+          git merge-base --is-ancestor "$RELEASE_SHA" origin/main
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          echo "production-release: exact main SHA verified"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.0"
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            backend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci --cache /tmp/production-root-npm-cache
+
+      - name: Install backend dependencies
+        run: npm --prefix backend ci --cache /tmp/production-backend-npm-cache
+
+      - name: Validate community data
+        run: npm run validate:community
+
+      - name: Frontend lint
+        run: npm run lint
+
+      - name: Production source contracts
+        run: npm run test:production-contract
+
+      - name: Full frontend regression and static export
+        run: npm test
+
+      - name: Canonical frontend Pages build
+        run: npm run build:pages
+
+      - name: Backend typecheck
+        run: npm run backend:typecheck
+
+      - name: Backend tests
+        run: npm run backend:test
+
+      - name: Backend build
+        run: npm run backend:build
+
+      - name: Runtime dependency audit
+        run: npm --prefix backend audit --omit=dev --audit-level=high
+
+      - name: Build production gateway image
+        run: docker build -f deploy/production/Dockerfile.gateway -t loi-meta-gateway:${RELEASE_SHA} .
+
+      - name: Build production backend image
+        run: docker build -f backend/Dockerfile -t loi-meta-backend:${RELEASE_SHA} backend
+
+      - name: Repository cleanliness
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --short)"
+
+  deploy:
+    name: deploy exact SHA to Railway production
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: production
+    env:
+      RELEASE_SHA: ${{ inputs.release_sha }}
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      RAILWAY_PROJECT_ID: ${{ vars.RAILWAY_PROJECT_ID }}
+      RAILWAY_ENVIRONMENT: ${{ vars.RAILWAY_ENVIRONMENT }}
+      RAILWAY_BACKEND_SERVICE: ${{ vars.RAILWAY_BACKEND_SERVICE }}
+      RAILWAY_GATEWAY_SERVICE: ${{ vars.RAILWAY_GATEWAY_SERVICE }}
+      PRODUCTION_BASE_URL: ${{ vars.PRODUCTION_BASE_URL }}
+
+    steps:
+      - name: Checkout exact release SHA
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Re-verify release SHA before deploy
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          git fetch origin main --no-tags
+          git merge-base --is-ancestor "$RELEASE_SHA" origin/main
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          echo "production-release: deploy SHA verified"
+
+      - name: Validate external Railway binding
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in RAILWAY_TOKEN RAILWAY_PROJECT_ID RAILWAY_ENVIRONMENT RAILWAY_BACKEND_SERVICE RAILWAY_GATEWAY_SERVICE PRODUCTION_BASE_URL; do
+            if [ -z "${!name:-}" ]; then
+              echo "production-release: required Railway/GitHub binding is missing: ${name}" >&2
+              exit 1
+            fi
+          done
+          echo "production-release: external binding present"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.0"
+          cache: npm
+
+      - name: Install smoke dependencies
+        run: npm ci --cache /tmp/production-deploy-npm-cache
+
+      - name: Install pinned Railway CLI
+        run: |
+          npm install --global @railway/cli@5.30.1
+          railway --version
+
+      - name: Deploy backend from exact tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          railway up --ci \
+            --project "$RAILWAY_PROJECT_ID" \
+            --environment "$RAILWAY_ENVIRONMENT" \
+            --service "$RAILWAY_BACKEND_SERVICE" \
+            --message "release ${RELEASE_SHA} backend"
+
+      - name: Deploy gateway from exact tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          railway up --ci \
+            --project "$RAILWAY_PROJECT_ID" \
+            --environment "$RAILWAY_ENVIRONMENT" \
+            --service "$RAILWAY_GATEWAY_SERVICE" \
+            --message "release ${RELEASE_SHA} gateway"
+
+      - name: Production HTTP smoke
+        run: npm run production:smoke
+
+      - name: Production browser smoke
+        run: npm run production:browser-smoke
+
+      - name: Record deployed exact SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "PRODUCTION_DEPLOYED_AND_SMOKE_VERIFIED release_sha=${RELEASE_SHA}"
