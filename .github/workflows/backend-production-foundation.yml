@@ -9,6 +9,8 @@ on:
       - "backend/**"
       - "deploy/**"
       - "scripts/staging-smoke.mjs"
+      - "scripts/production-smoke.mjs"
+      - "scripts/production-browser-smoke.mjs"
       - ".dockerignore"
       - "package.json"
       - "package-lock.json"
@@ -16,6 +18,7 @@ on:
       - "README.md"
       - ".github/workflows/backend-production-foundation.yml"
       - ".github/workflows/sprint-5c-staging-integration.yml"
+      - ".github/workflows/production-release-gate.yml"
       - "docs/adr/**"
       - "docs/runbooks/**"
       - "docs/superpowers/**"
@@ -31,7 +34,7 @@ jobs:
   verify:
     name: verify frontend and backend regression
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 60
     services:
       postgres:
         image: postgres:17
@@ -229,6 +232,15 @@ jobs:
 
       - name: Backend build
         run: npm run backend:build
+
+      - name: Runtime dependency audit
+        run: npm --prefix backend audit --omit=dev --audit-level=high
+
+      - name: Build production gateway image
+        run: docker build -f deploy/production/Dockerfile.gateway -t loi-meta-gateway:pr .
+
+      - name: Build production backend image
+        run: docker build -f backend/Dockerfile -t loi-meta-backend:pr backend
 
       - name: Compose configuration
         run: npm run staging:config
