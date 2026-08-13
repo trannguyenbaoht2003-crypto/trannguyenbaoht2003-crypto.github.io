@@ -44,27 +44,16 @@ test('community bootstrap fails closed instead of overwriting an operator policy
   const pool = await resetDatabase();
   const baseline = await bootstrapCommunitySource(pool);
 
-  try {
-    await activateSourcePolicy(pool, {
-      actorId: 'operator-1',
-      collectorEnabled: false,
-      correlationId: 'operator-policy-change',
-      reason: 'operator suspended collector pending review',
-      revision: 2,
-      revisionId: '6b000000-0000-4000-8000-000000000099',
-      sourceId: baseline.sourceId,
-      storagePermission: 'prohibited',
-    });
-  } catch (error) {
-    const constraints = await pool.query<{ conname: string; definition: string }>(`
-      select conname, pg_get_constraintdef(oid) as definition
-        from pg_constraint
-       where conrelid = 'active_source_policies'::regclass
-       order by conname
-    `);
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`SOURCE_POLICY_REV2_DIAGNOSTIC original=${message} constraints=${JSON.stringify(constraints.rows)}`);
-  }
+  await activateSourcePolicy(pool, {
+    actorId: 'operator-1',
+    collectorEnabled: false,
+    correlationId: 'operator-policy-change',
+    reason: 'operator suspended collector pending review',
+    revision: 2,
+    revisionId: '6b000000-0000-4000-8000-000000000099',
+    sourceId: baseline.sourceId,
+    storagePermission: 'prohibited',
+  });
 
   await assert.rejects(
     bootstrapCommunitySource(pool),
