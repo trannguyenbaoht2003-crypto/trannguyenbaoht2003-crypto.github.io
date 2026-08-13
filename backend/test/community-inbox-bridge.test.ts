@@ -54,6 +54,7 @@ test('maps one structurally valid collector row into a governed observation comm
   assert.equal(command.actorId, 'community-collector');
   assert.equal(command.adapterVersion, 'community-collector-bridge-v1');
   assert.equal(command.rawBlob, undefined);
+  assert.equal(command.collectedAt.toISOString(), '2026-08-13T00:00:00.000Z');
   assert.deepEqual(command.aggregateMetadata, {
     normalizationSnapshot: {
       schemaVersion: 1,
@@ -82,6 +83,17 @@ test('maps one structurally valid collector row into a governed observation comm
   assert.equal(JSON.stringify(command).includes('raw reason'), false);
 });
 
+test('uses first-seen time for stable collection identity instead of mutable inbox update time', () => {
+  const result = buildCommunityObservationBatch(batchInput([
+    candidate({
+      firstSeenAt: '2026-08-11',
+      publishedAt: '2026-08-01',
+    }),
+  ]));
+
+  assert.equal(result.commands[0]?.collectedAt.toISOString(), '2026-08-11T00:00:00.000Z');
+});
+
 test('unchanged collector input has stable observation and idempotency identity', () => {
   const first = buildCommunityObservationBatch(batchInput([candidate()])).commands[0]!;
   const second = buildCommunityObservationBatch(batchInput([candidate()])).commands[0]!;
@@ -108,6 +120,10 @@ test('skips rows that must not be coerced into backend candidates', () => {
     candidate({ id: 'stale', currentEnough: false }),
     candidate({ id: 'disqualified', disqualifiers: ['BUG'] }),
     candidate({ id: 'ambiguous', championMatches: [{ id: 'samira' }, { id: 'ashe' }] }),
+    candidate({ id: 'bad-disqualifiers', disqualifiers: 'BUG' }),
+    candidate({ id: 'bad-augments', augmentMatches: null }),
+    candidate({ id: 'bad-items', itemMatches: '6673' }),
+    candidate({ id: 'bad-date', firstSeenAt: 'not-a-date', publishedAt: 'also-not-a-date' }),
   ]));
 
   assert.equal(result.commands.length, 0);
@@ -116,6 +132,10 @@ test('skips rows that must not be coerced into backend candidates', () => {
     { candidateId: 'stale', reason: 'CANDIDATE_STALE' },
     { candidateId: 'disqualified', reason: 'CANDIDATE_DISQUALIFIED' },
     { candidateId: 'ambiguous', reason: 'SUBJECT_NOT_EXACT' },
+    { candidateId: 'bad-disqualifiers', reason: 'CANDIDATE_SCHEMA_INVALID' },
+    { candidateId: 'bad-augments', reason: 'SELECTION_IDS_INVALID' },
+    { candidateId: 'bad-items', reason: 'SELECTION_IDS_INVALID' },
+    { candidateId: 'bad-date', reason: 'COLLECTED_AT_INVALID' },
   ]);
 });
 
