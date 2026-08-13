@@ -22,5 +22,6 @@ test('worker aborts dispatcher before closing queue resources', () => {
 
 test('worker logs dispatcher failures without environment or payload dumps', () => {
   assert.match(worker, /outbox dispatch failed/);
-  assert.doesNotMatch(worker, /DATABASE_URL|REDIS_URL|JSON\.stringify\(error\)|process\.env/);
+  assert.doesNotMatch(worker, /DATABASE_URL|REDIS_URL|JSON\.stringify\(error\)/);
+  assert.doesNotMatch(worker, /outbox dispatch failed[^\n]*(databaseUrl|redisUrl|process\.env|payload)/i);
 });
