@@ -12,8 +12,10 @@ type SkipReason =
   | 'MODE_NOT_CONFIRMED'
   | 'CANDIDATE_STALE'
   | 'CANDIDATE_DISQUALIFIED'
+  | 'CANDIDATE_SCHEMA_INVALID'
   | 'SUBJECT_NOT_EXACT'
-  | 'SELECTION_IDS_INVALID';
+  | 'SELECTION_IDS_INVALID'
+  | 'COLLECTED_AT_INVALID';
 
 export interface CommunityObservationSkip {
   candidateId: string;
@@ -55,7 +57,7 @@ function scalarId(value: unknown): string | undefined {
 }
 
 function selectedIds(value: unknown): string[] | undefined {
-  if (!Array.isArray(value)) return [];
+  if (!Array.isArray(value)) return undefined;
   const ids: string[] = [];
   for (const entry of value) {
     if (!isRecord(entry)) return undefined;
@@ -66,11 +68,8 @@ function selectedIds(value: unknown): string[] | undefined {
   return [...new Set(ids)].sort();
 }
 
-function dateFromCandidate(
-  candidate: Record<string, unknown>,
-  inboxUpdatedAt: unknown,
-): Date {
-  for (const value of [candidate.publishedAt, candidate.firstSeenAt, inboxUpdatedAt]) {
+function stableCollectedAt(candidate: Record<string, unknown>): Date | undefined {
+  for (const value of [candidate.firstSeenAt, candidate.publishedAt]) {
     const candidateDate = text(value);
     if (!candidateDate) continue;
     const parsed = new Date(
@@ -80,7 +79,7 @@ function dateFromCandidate(
     );
     if (!Number.isNaN(parsed.getTime())) return parsed;
   }
-  throw new Error('COMMUNITY_COLLECTED_AT_REQUIRED');
+  return undefined;
 }
 
 function digest(value: unknown): string {
@@ -159,7 +158,11 @@ export function buildCommunityObservationBatch(
       skip(skipped, candidateId, 'CANDIDATE_STALE');
       continue;
     }
-    if (Array.isArray(value.disqualifiers) && value.disqualifiers.length > 0) {
+    if (!Array.isArray(value.disqualifiers)) {
+      skip(skipped, candidateId, 'CANDIDATE_SCHEMA_INVALID');
+      continue;
+    }
+    if (value.disqualifiers.length > 0) {
       skip(skipped, candidateId, 'CANDIDATE_DISQUALIFIED');
       continue;
     }
@@ -177,6 +180,11 @@ export function buildCommunityObservationBatch(
     const itemExternalIds = selectedIds(value.itemMatches);
     if (!augmentExternalIds || !itemExternalIds) {
       skip(skipped, candidateId, 'SELECTION_IDS_INVALID');
+      continue;
+    }
+    const collectedAt = stableCollectedAt(value);
+    if (!collectedAt) {
+      skip(skipped, candidateId, 'COLLECTED_AT_INVALID');
       continue;
     }
 
@@ -197,7 +205,7 @@ export function buildCommunityObservationBatch(
       actorId: ACTOR_ID,
       adapterVersion: ADAPTER_VERSION,
       aggregateMetadata: { normalizationSnapshot },
-      collectedAt: dateFromCandidate(value, input.inbox.updatedAt),
+      collectedAt,
       correlationId: `community:${candidateId}:${contentDigest.slice(0, 16)}`,
       externalReference,
       idempotencyKey: `community:${candidateId}:${contentDigest}`,
