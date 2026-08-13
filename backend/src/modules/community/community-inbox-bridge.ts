@@ -202,7 +202,6 @@ export function buildCommunityObservationBatch(
       externalReference,
       idempotencyKey: `community:${candidateId}:${contentDigest}`,
       observationId: deterministicUuid(identitySeed),
-      rawBlob: undefined,
       sourceId: input.sourceId,
     });
   }
