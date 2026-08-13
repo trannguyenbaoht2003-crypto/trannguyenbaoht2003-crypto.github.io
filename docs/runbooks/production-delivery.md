@@ -1,6 +1,6 @@
 # Production Delivery Runbook
 
-This runbook is the operational boundary for Sprint 6A. Repository validation can establish `PRODUCTION_REPO_READY`; only a real Railway environment deployment, public smoke verification, and a real rollback rehearsal can establish `PRODUCTION_DELIVERY_READY`.
+This runbook is the operational boundary for Sprint 6A and the governed community-ingestion extension in Sprint 6B. Repository validation can establish `PRODUCTION_REPO_READY`; only a real Railway environment deployment, public smoke verification, and a real rollback rehearsal can establish `PRODUCTION_DELIVERY_READY`.
 
 `PRODUCTION_DELIVERY_READY` cannot be emitted by CI-only validation.
 
@@ -8,16 +8,18 @@ This runbook is the operational boundary for Sprint 6A. Repository validation ca
 
 The initial Railway account/project binding is intentionally external to the repository. Do not simulate it with test data and do not commit resolved credentials, service IDs, private domains, or database URLs.
 
-Create one Railway project with a `production` environment and these four services:
+Create one Railway project with a `production` environment and these six services:
 
 1. `gateway` — sourced from this GitHub repository, repository Root Directory `/`, Config File `/deploy/production/railway.gateway.toml`.
 2. `backend` — sourced from this GitHub repository, Root Directory `/backend`, Config File `/backend/railway.toml`.
-3. `Postgres` — Railway PostgreSQL service.
-4. `Redis` — Railway Redis service.
+3. `worker` — sourced from this GitHub repository, Root Directory `/backend`, Config File `/backend/railway.worker.toml`.
+4. `collector` — sourced from this GitHub repository, Root Directory `/`, Config File `/deploy/production/railway.collector.toml`.
+5. `Postgres` — Railway PostgreSQL service.
+6. `Redis` — Railway Redis service.
 
 ### Gateway is the only public service
 
-Generate a Railway public domain for `gateway` only. Do not generate a public domain for `backend`, Postgres, or Redis.
+Generate a Railway public domain for `gateway` only. Do not generate a public domain for `backend`, `worker`, `collector`, Postgres, or Redis.
 
 Set gateway variables using Railway references:
 
@@ -38,13 +40,28 @@ DATABASE_URL=${{Postgres.DATABASE_URL}}
 REDIS_URL=${{Redis.REDIS_URL}}
 ```
 
-PostgreSQL remains Publication authority. Redis is not a public-read authority.
+Set worker variables:
+
+```text
+NODE_ENV=production
+DATABASE_URL=${{Postgres.DATABASE_URL}}
+REDIS_URL=${{Redis.REDIS_URL}}
+```
+
+Set collector variables:
+
+```text
+NODE_ENV=production
+DATABASE_URL=${{Postgres.DATABASE_URL}}
+```
+
+PostgreSQL remains Publication authority. Redis is delivery infrastructure and is not a public-read authority.
 
 ## Disable GitHub autodeploy
 
-Disable GitHub autodeploy for both `gateway` and `backend` during Sprint 6A. A push to `main` must not bypass the exact-SHA production release gate.
+Disable GitHub autodeploy for `gateway`, `backend`, `worker`, and `collector`. A push to `main` must not bypass the exact-SHA production release gate.
 
-The repository workflow `.github/workflows/production-release-gate.yml` is the only authorized Sprint 6A deployment path after bootstrap.
+The repository workflow `.github/workflows/production-release-gate.yml` is the only authorized repository deployment path after bootstrap.
 
 ## GitHub production environment
 
@@ -62,6 +79,8 @@ Add safe environment variables without secret values:
 RAILWAY_PROJECT_ID
 RAILWAY_ENVIRONMENT=production
 RAILWAY_BACKEND_SERVICE
+RAILWAY_WORKER_SERVICE
+RAILWAY_COLLECTOR_SERVICE
 RAILWAY_GATEWAY_SERVICE
 PRODUCTION_BASE_URL=https://<gateway-public-domain>
 ```
@@ -80,6 +99,60 @@ Zero active Publications is a valid initial production state. `/api/v1/publicati
 
 The static frontend remains usable. Any real Publication must traverse the existing domain authority and publisher authorization chain.
 
+## Sprint 6B governed community ingestion
+
+Sprint 6B connects the existing community discovery collector to the backend chain:
+
+```text
+public community sources
+  -> existing collector
+  -> community inbox
+  -> community-collector-v1 Source Policy
+  -> RawObservation
+  -> outbox/BullMQ Normalization
+  -> Candidate
+  -> Evidence / Human Review / Moderation / Eligibility
+  -> publisher-controlled Publication
+  -> public read projection
+```
+
+The collector is discovery-only authority. It may create a governed Observation through the one-shot importer, but it cannot create Candidate, Evidence, Moderation, Eligibility, or Publication rows directly.
+
+The legacy registry field `autoPublish` is ignored by the backend bridge. It does not grant publisher permission and it does not bypass Evidence, Human Review, Moderation, or Eligibility.
+
+The importer stores only bounded provenance metadata plus the canonical normalization snapshot. Raw page HTML, full title text, subtitle/transcript bodies, comment text, and image bytes are not written by the bridge.
+
+The `worker` runs the durable outbox dispatcher together with Normalization, Eligibility, and Publication projection consumers. PostgreSQL remains authority; Redis/BullMQ transports event identity and delivery only.
+
+The `collector` is a private cron service with schedule:
+
+```text
+0 */6 * * *
+```
+
+The scheduled process runs `scripts/collect-community-candidates.mjs`, then `backend/dist/src/community-import-cli.js`, then exits. A rerun of unchanged collector input is idempotent.
+
+Do not generate a public domain for `worker` or `collector`. Do not add an HTTP mutation endpoint, browser token, or CORS exception for ingestion.
+
+### Sprint 6B first-run evidence
+
+After a real production deployment, wait for one scheduled collector execution or invoke the same one-shot process through the private Railway service controls. Verify all of the following without exposing private URLs or credentials:
+
+1. the collector process exits successfully;
+2. `community-collector-v1` exists with the expected active source-policy revision;
+3. structurally valid input creates or replays governed Observations;
+4. `RawObservationIngested` outbox events are delivered to Normalization and Candidate processing is observable in PostgreSQL;
+5. replaying unchanged input does not create duplicate Observations;
+6. no Publication is created merely because collector score/status or legacy `autoPublish` is positive.
+
+Repository-only completion for this work is:
+
+```text
+SPRINT_6B_REPO_READY
+```
+
+Do not treat that marker as proof that the real cron execution has run.
+
 ## Release procedure
 
 A release candidate must first be merged to `main`. Copy the full 40-character commit SHA intended for production.
@@ -95,7 +168,7 @@ The workflow verifies that `release_sha` is a full SHA reachable from `main`, ch
 
 If any Railway/GitHub binding is absent, deployment fails closed before `railway up` runs.
 
-Backend deploys first. Its Railway Config-as-Code executes the migration CLI as a pre-deploy command. A failed migration prevents the new backend release from becoming healthy. Gateway deploys only after the backend deployment command succeeds.
+Backend deploys first. Its Railway Config-as-Code executes the migration CLI as a pre-deploy command. A failed migration prevents the new backend release from becoming healthy. The private worker deploys next, then the private collector, then the gateway. Gateway deployment therefore remains last in the exact-tree application sequence.
 
 ## Production smoke
 
@@ -124,16 +197,16 @@ A successful repository release workflow may record:
 PRODUCTION_DEPLOYED_AND_SMOKE_VERIFIED release_sha=<sha>
 ```
 
-That message is not the final Sprint 6A completion marker.
+That message is not the final Sprint 6A/6B production completion marker.
 
 ## Rollback rehearsal
 
-A real Railway rollback must be rehearsed before Sprint 6A is declared complete.
+A real Railway rollback must be rehearsed before production delivery is declared complete.
 
 1. Deploy verified revision A from `main` with the production workflow and record A's Git SHA and Railway deployment identifier/timestamp.
 2. Deploy verified revision B with no schema-destructive change and verify both production smoke probes.
 3. In the Railway dashboard, open the backend service Deployments view, select the previous healthy deployment A, and use the available Rollback action.
-4. If the gateway also changed between A and B, rollback/redeploy the matching verified gateway revision so the application pair is consistent.
+4. Roll back/redeploy the matching verified worker and collector revisions when their runtime contract changed between A and B. If the gateway also changed, rollback/redeploy the matching gateway revision so the application set is consistent.
 5. Wait for `/health/ready` to return 200 through the public gateway.
 6. Run `npm run production:smoke` and `npm run production:browser-smoke` against the public gateway again.
 7. Confirm the Publication read contract remains valid and no database restore was required.
@@ -177,10 +250,8 @@ Never include secret values, private service domains, database URLs, Redis URLs,
 
 - Backend unavailable: gateway remains static-available; API returns sanitized 5xx; browser uses static fallback.
 - PostgreSQL unavailable: backend readiness fails; do not expose backend publicly as a workaround.
-- Redis unavailable: readiness/lifecycle may fail, but PostgreSQL remains Publication authority.
+- Redis unavailable: readiness/lifecycle may fail, but PostgreSQL remains Publication authority and pending outbox work remains durable in PostgreSQL.
+- Worker unavailable: public read remains available from PostgreSQL; new asynchronous Candidate/Eligibility/projection processing pauses until the worker recovers.
+- Collector unavailable: no new community Observations are imported; existing Publication/public-read state remains unchanged.
 - Migration failure: new backend deployment must fail before healthy activation.
 - Gateway deployment failure: keep/restore the prior healthy gateway; never expose backend directly to the Internet.
-
-## Sprint 6B boundary
-
-Sprint 6A does not schedule or publish collected community content. After `PRODUCTION_DELIVERY_READY`, Sprint 6B connects the existing community collector to the backend Source Policy -> Observation -> Normalizer -> Candidate -> Evidence/Review/Moderation/Eligibility -> publisher-controlled Publication chain.
