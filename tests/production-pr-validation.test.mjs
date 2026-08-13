@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
-test('pull-request regression gate audits and builds both production images without deploying', async () => {
+test('pull-request regression gate audits and builds all production images without deploying', async () => {
   const workflow = await readFile('.github/workflows/backend-production-foundation.yml', 'utf8');
 
   assert.match(workflow, /Runtime dependency audit/);
@@ -11,6 +11,8 @@ test('pull-request regression gate audits and builds both production images with
   assert.match(workflow, /docker build -f deploy\/production\/Dockerfile\.gateway/);
   assert.match(workflow, /Build production backend image/);
   assert.match(workflow, /docker build -f backend\/Dockerfile/);
+  assert.match(workflow, /Build production collector image/);
+  assert.match(workflow, /docker build -f deploy\/production\/Dockerfile\.collector/);
 
   assert.doesNotMatch(workflow, /railway up/);
   assert.doesNotMatch(workflow, /RAILWAY_TOKEN/);
