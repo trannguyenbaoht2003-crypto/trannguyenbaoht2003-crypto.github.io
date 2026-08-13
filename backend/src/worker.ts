@@ -5,7 +5,10 @@ import { createPool } from './database/pool.js';
 import {
   registerStoredObservationInTransaction,
 } from './modules/candidate/register-stored-observation.js';
-import { createWorkerConnection } from './queue/connection.js';
+import {
+  createQueueConnection,
+  createWorkerConnection,
+} from './queue/connection.js';
 import { createEligibilityWorker } from './queue/eligibility-worker.js';
 import {
   ELIGIBILITY_QUEUE_NAME,
@@ -24,9 +27,9 @@ const pool = createPool(config.databaseUrl);
 const normalizationConnection = createWorkerConnection(config.redisUrl);
 const eligibilityConnection = createWorkerConnection(config.redisUrl);
 const publicationConnection = createWorkerConnection(config.redisUrl);
-const normalizationQueueConnection = createWorkerConnection(config.redisUrl);
-const eligibilityQueueConnection = createWorkerConnection(config.redisUrl);
-const publicationQueueConnection = createWorkerConnection(config.redisUrl);
+const normalizationQueueConnection = createQueueConnection(config.redisUrl);
+const eligibilityQueueConnection = createQueueConnection(config.redisUrl);
+const publicationQueueConnection = createQueueConnection(config.redisUrl);
 
 const normalizationWorker = createNormalizationWorker({
   connection: normalizationConnection,
