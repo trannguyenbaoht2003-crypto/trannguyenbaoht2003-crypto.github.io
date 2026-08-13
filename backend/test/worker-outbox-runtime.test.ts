@@ -13,6 +13,21 @@ test('worker owns the durable outbox dispatcher and all routed queues', () => {
   assert.match(worker, /new Queue/);
 });
 
+test('worker uses finite-retry Redis connections for outbox producer queues', () => {
+  assert.match(worker, /createQueueConnection/);
+  for (const name of [
+    'normalizationQueueConnection',
+    'eligibilityQueueConnection',
+    'publicationQueueConnection',
+  ]) {
+    assert.match(
+      worker,
+      new RegExp(`const ${name} = createQueueConnection\\(config\\.redisUrl\\)`),
+      `${name} must use the finite-retry queue connection`,
+    );
+  }
+});
+
 test('worker aborts dispatcher before closing queue resources', () => {
   const abortIndex = worker.indexOf('dispatcherController.abort()');
   const queueCloseIndex = worker.indexOf('.close()');
