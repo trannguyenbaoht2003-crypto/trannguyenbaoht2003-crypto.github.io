@@ -124,10 +124,7 @@ function normalizeCommand(
         permissions: ['publisher'],
       },
       auditId: requireUuid(input.auditId, 'auditId'),
-      outboxEventId: requireUuid(
-        input.outboxEventId,
-        'outboxEventId',
-      ),
+      outboxEventId: requireUuid(input.outboxEventId, 'outboxEventId'),
       correlationId: requireBoundedText(
         input.correlationId,
         'correlationId',
@@ -205,27 +202,19 @@ async function loadAuthority(
        join active_eligibility_policy_revision active_policy
          on active_policy.scope = 'candidate_revision'
        join current_candidate_eligibility_evaluations current_evaluation
-         on current_evaluation.candidate_revision_id =
-            revision.candidate_revision_id
-        and current_evaluation.eligibility_policy_revision_id =
-            active_policy.eligibility_policy_revision_id
+         on current_evaluation.candidate_revision_id = revision.candidate_revision_id
+        and current_evaluation.eligibility_policy_revision_id = active_policy.eligibility_policy_revision_id
        join candidate_eligibility_evaluations evaluation
-         on evaluation.candidate_eligibility_evaluation_id =
-            current_evaluation.candidate_eligibility_evaluation_id
+         on evaluation.candidate_eligibility_evaluation_id = current_evaluation.candidate_eligibility_evaluation_id
        join eligibility_input_snapshots snapshot
-         on snapshot.eligibility_input_snapshot_id =
-            evaluation.eligibility_input_snapshot_id
+         on snapshot.eligibility_input_snapshot_id = evaluation.eligibility_input_snapshot_id
        join current_candidate_moderation_decisions current_moderation
-         on current_moderation.candidate_revision_id =
-            revision.candidate_revision_id
-        and current_moderation.moderation_policy_revision_id =
-            snapshot.moderation_policy_revision_id
+         on current_moderation.candidate_revision_id = revision.candidate_revision_id
+        and current_moderation.moderation_policy_revision_id = snapshot.moderation_policy_revision_id
        join moderation_decisions moderation
-         on moderation.moderation_decision_id =
-            current_moderation.moderation_decision_id
+         on moderation.moderation_decision_id = current_moderation.moderation_decision_id
       where revision.candidate_revision_id = $1
-      for update of candidate, revision,
-                    current_evaluation, current_moderation`,
+      for update of candidate, revision, current_evaluation, current_moderation`,
     [candidateRevisionId],
   );
   const row = result.rows[0];
@@ -260,19 +249,12 @@ export async function publishCandidateRevision(
   ]);
 
   return withTransaction(pool, async (client) => {
-    const authority = await loadAuthority(
-      client,
-      command.candidateRevisionId,
-    );
+    const authority = await loadAuthority(client, command.candidateRevisionId);
     await client.query(
-      `select pg_advisory_xact_lock(
-         hashtextextended($1::text, 0)
-       )`,
+      `select pg_advisory_xact_lock(hashtextextended($1::text, 0))`,
       [authority.candidate_id],
     );
-    const replay = await beginIdempotentCommand<
-      PublishCandidateRevisionResult
-    >(
+    const replay = await beginIdempotentCommand<PublishCandidateRevisionResult>(
       client,
       'publication_publish',
       command.idempotencyKey,
@@ -282,94 +264,62 @@ export async function publishCandidateRevision(
       return { ...replay, replayed: true };
     }
 
-    if (
-      authority.eligibility_policy_revision_id
-      !== command.expectedActiveEligibilityPolicyRevisionId
-    ) {
+    if (authority.eligibility_policy_revision_id !== command.expectedActiveEligibilityPolicyRevisionId) {
       throw new Error('ACTIVE_ELIGIBILITY_POLICY_MISMATCH');
     }
-    if (
-      authority.candidate_eligibility_evaluation_id
-      !== command.expectedEligibilityEvaluationId
-    ) {
+    if (authority.candidate_eligibility_evaluation_id !== command.expectedEligibilityEvaluationId) {
       throw new Error('STALE_ELIGIBILITY_EVALUATION');
     }
     if (authority.eligibility_outcome !== 'eligible') {
       throw new Error('CANDIDATE_NOT_ELIGIBLE');
     }
-    if (
-      authority.moderation_decision_id
-      !== command.expectedModerationDecisionId
-    ) {
+    if (authority.moderation_decision_id !== command.expectedModerationDecisionId) {
       throw new Error('STALE_MODERATION_DECISION');
     }
     if (authority.moderation_outcome !== 'clear') {
       throw new Error('MODERATION_NOT_CLEAR');
     }
 
-    const existingPublication = await client.query<{
-      publication_id: string;
-    }>(
-      `select publication_id
-         from publications
-        where candidate_id = $1
-        for update`,
+    const existingPublication = await client.query<{ publication_id: string }>(
+      `select publication_id from publications where candidate_id = $1 for update`,
       [authority.candidate_id],
     );
-    const ownedPublicationId =
-      existingPublication.rows[0]?.publication_id;
-    if (
-      ownedPublicationId
-      && ownedPublicationId !== command.publicationId
-    ) {
+    const ownedPublicationId = existingPublication.rows[0]?.publication_id;
+    if (ownedPublicationId && ownedPublicationId !== command.publicationId) {
       throw new Error('PUBLICATION_CANDIDATE_CONFLICT');
     }
-    const publicationIdentity = await client.query<{
-      candidate_id: string;
-    }>(
-      `select candidate_id
-         from publications
-        where publication_id = $1
-        for update`,
+    const publicationIdentity = await client.query<{ candidate_id: string }>(
+      `select candidate_id from publications where publication_id = $1 for update`,
       [command.publicationId],
     );
     if (
       publicationIdentity.rows[0]
-      && publicationIdentity.rows[0].candidate_id
-         !== authority.candidate_id
+      && publicationIdentity.rows[0].candidate_id !== authority.candidate_id
     ) {
       throw new Error('PUBLICATION_CANDIDATE_CONFLICT');
     }
     if (!ownedPublicationId && publicationIdentity.rowCount === 0) {
       await client.query(
-        `insert into publications
-           (publication_id, candidate_id, created_by)
+        `insert into publications (publication_id, candidate_id, created_by)
          values ($1, $2, $3)`,
         [command.publicationId, authority.candidate_id, actorId],
       );
     }
 
-    const active = await client.query<{
-      publication_version_id: string;
-    }>(
+    const active = await client.query<{ publication_version_id: string }>(
       `select publication_version_id
          from active_publication_versions
         where publication_id = $1
         for update`,
       [command.publicationId],
     );
-    const currentActive =
-      active.rows[0]?.publication_version_id ?? null;
-    if (
-      currentActive
-      !== command.expectedActivePublicationVersionId
-    ) {
+    const currentActive = active.rows[0]?.publication_version_id ?? null;
+    if (currentActive !== command.expectedActivePublicationVersionId) {
       throw new Error('PUBLICATION_ACTIVE_POINTER_CONFLICT');
     }
 
     const versionResult = await client.query<{ next_version: number }>(
-      `select (coalesce(max(version_number), 0) + 1)::integer
-              as next_version
+      `select (coalesce(max(version_number), 0) + 1)::integer as next_version
          from publication_versions
         where publication_id = $1`,
       [command.publicationId],
@@ -396,9 +346,8 @@ export async function publishCandidateRevision(
           moderation_decision_id, moderation_input_hash,
           version_number, publication_payload, payload_hash,
           published_by, correlation_id, published_at)
-       values
-         ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-          $11, $12, $13, $14, $15::jsonb, $16, $17, $18, $19)`,
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+               $11, $12, $13, $14, $15::jsonb, $16, $17, $18, $19)`,
       [
         command.publicationVersionId,
         command.publicationId,
@@ -428,10 +377,8 @@ export async function publishCandidateRevision(
           claim_evidence_decision_id, evidence_decision,
           evidence_policy_revision_id, ordinal)
        select $1, $2, $3, $4, member.claim_id, 'required',
-              member.claim_evidence_decision_id,
-              member.evidence_decision,
-              member.evidence_policy_revision_id,
-              member.ordinal
+              member.claim_evidence_decision_id, member.evidence_decision,
+              member.evidence_policy_revision_id, member.ordinal
          from eligibility_input_snapshot_required_claims member
         where member.eligibility_input_snapshot_id = $5
         order by member.ordinal`,
@@ -448,10 +395,8 @@ export async function publishCandidateRevision(
       activationId: command.activationId,
       candidateId: authority.candidate_id,
       candidateRevisionId: authority.candidate_revision_id,
-      eligibilityEvaluationId:
-        authority.candidate_eligibility_evaluation_id,
-      eligibilityPolicyRevisionId:
-        authority.eligibility_policy_revision_id,
+      eligibilityEvaluationId: authority.candidate_eligibility_evaluation_id,
+      eligibilityPolicyRevisionId: authority.eligibility_policy_revision_id,
       payloadHash: built.payloadHash,
       publicationId: command.publicationId,
       publicationVersionId: command.publicationVersionId,
@@ -462,8 +407,7 @@ export async function publishCandidateRevision(
          (audit_event_id, actor_id, action, reason, correlation_id,
           policy_version, payload)
        values ($1, $2, 'publication.version_published',
-               'Eligible CandidateRevision published', $3, $4,
-               $5::jsonb)`,
+               'Eligible CandidateRevision published', $3, $4, $5::jsonb)`,
       [
         command.auditId,
         actorId,
@@ -476,8 +420,7 @@ export async function publishCandidateRevision(
       `insert into outbox_events
          (outbox_event_id, aggregate_type, aggregate_id, event_type,
           payload, correlation_id)
-       values ($1, 'Publication', $2, 'PublicationPublished',
-               $3::jsonb, $4)`,
+       values ($1, 'Publication', $2, 'PublicationPublished', $3::jsonb, $4)`,
       [
         command.outboxEventId,
         command.publicationId,
@@ -485,9 +428,7 @@ export async function publishCandidateRevision(
         command.correlationId,
       ],
     );
-    const activation = await client.query<{
-      activation_sequence: string;
-    }>(
+    const activation = await client.query<{ activation_sequence: string }>(
       `insert into publication_activation_history
          (activation_id, publication_id, activation_kind,
           from_publication_version_id, to_publication_version_id,
@@ -542,6 +483,24 @@ export async function publishCandidateRevision(
         throw new Error('PUBLICATION_ACTIVE_POINTER_CONFLICT');
       }
     }
+
+    await client.query(
+      `insert into outbox_events
+         (outbox_event_id, aggregate_type, aggregate_id, event_type,
+          payload, correlation_id)
+       values (gen_random_uuid(), 'publication', $1,
+               'PublicationMonitoringRequested', $2::jsonb, $3)`,
+      [
+        command.publicationId,
+        JSON.stringify({
+          activationId: command.activationId,
+          publicationId: command.publicationId,
+          requestedReason: 'published',
+          schemaVersion: 1,
+        }),
+        command.correlationId,
+      ],
+    );
 
     const result: PublishCandidateRevisionResult = {
       publicationId: command.publicationId,
