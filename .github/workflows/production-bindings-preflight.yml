@@ -1,0 +1,53 @@
+name: Production bindings preflight
+
+on:
+  push:
+    branches:
+      - ops/production-bindings-preflight-20260814
+
+permissions:
+  contents: read
+
+jobs:
+  bindings:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      RAILWAY_PROJECT_ID: ${{ vars.RAILWAY_PROJECT_ID }}
+      RAILWAY_ENVIRONMENT: ${{ vars.RAILWAY_ENVIRONMENT }}
+      RAILWAY_BACKEND_SERVICE: ${{ vars.RAILWAY_BACKEND_SERVICE }}
+      RAILWAY_WORKER_SERVICE: ${{ vars.RAILWAY_WORKER_SERVICE }}
+      RAILWAY_COLLECTOR_SERVICE: ${{ vars.RAILWAY_COLLECTOR_SERVICE }}
+      RAILWAY_GATEWAY_SERVICE: ${{ vars.RAILWAY_GATEWAY_SERVICE }}
+      PRODUCTION_BASE_URL: ${{ vars.PRODUCTION_BASE_URL }}
+
+    steps:
+      - name: Check production bindings without revealing values
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=0
+          for name in \
+            RAILWAY_TOKEN \
+            RAILWAY_PROJECT_ID \
+            RAILWAY_ENVIRONMENT \
+            RAILWAY_BACKEND_SERVICE \
+            RAILWAY_WORKER_SERVICE \
+            RAILWAY_COLLECTOR_SERVICE \
+            RAILWAY_GATEWAY_SERVICE \
+            PRODUCTION_BASE_URL; do
+            if [ -n "${!name:-}" ]; then
+              echo "binding ${name}=present"
+            else
+              echo "binding ${name}=missing"
+              missing=1
+            fi
+          done
+
+          if [ "$missing" -ne 0 ]; then
+            echo "PRODUCTION_BINDINGS_PREFLIGHT=FAIL"
+            exit 1
+          fi
+
+          echo "PRODUCTION_BINDINGS_PREFLIGHT=PASS"
