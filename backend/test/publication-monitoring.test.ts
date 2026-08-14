@@ -43,7 +43,6 @@ const MONITOR_IDS = {
   clearEligibilityInputSnapshotId: '7b000000-0000-4000-8000-000000000009',
   clearEligibilityEvaluationId: '7b000000-0000-4000-8000-000000000010',
   lifecycleSourceOutboxId: '7b000000-0000-4000-8000-000000000011',
-  restoredEligibilitySourceOutboxId: '7b000000-0000-4000-8000-000000000012',
 } as const;
 
 async function seedActivePublication(pool: Pool): Promise<void> {
@@ -309,15 +308,19 @@ test('critical to eligible resolves the critical alert', async () => {
   await pool.end();
 });
 
-test('lifecycle source fails closed without a current eligibility pointer and later eligible source resolves it', async () => {
+test('lifecycle source fails closed when canonical Eligibility is stale and later eligible source resolves it', async () => {
   const pool = await resetDatabase();
   await seedActivePublication(pool);
-  await pool.query(
-    `delete from current_candidate_eligibility_evaluations
-      where candidate_revision_id = $1
-        and eligibility_policy_revision_id = $2`,
-    [CANDIDATE_IDS.candidateRevisionId, GATE_IDS.eligibilityPolicyId],
-  );
+  await recordCandidateModerationDecision(pool, moderationDecisionCommand({
+    correlationId: 'monitoring-lifecycle-stale-moderation',
+    decisionId: MONITOR_IDS.clearModerationDecisionId,
+    evaluatedAt: '2026-08-14T08:05:00.000Z',
+    idempotencyKey: 'monitoring-lifecycle-stale-moderation',
+    inputSnapshotId: MONITOR_IDS.clearModerationInputSnapshotId,
+    outcome: 'clear',
+    reason: 'A newer clear Moderation makes the older Eligibility snapshot stale.',
+  }));
+
   const lifecycleSource = await insertLifecycleSource(pool);
   const warning = await evaluatePublicationMonitoring(pool, {
     sourceOutboxEventId: lifecycleSource,
@@ -325,42 +328,19 @@ test('lifecycle source fails closed without a current eligibility pointer and la
   });
   assert.equal(warning.alertCode, 'ACTIVE_PUBLICATION_REVALIDATION_REQUIRED');
 
-  const evaluation = await pool.query<{ input_hash: string }>(
-    `select input_hash
-       from candidate_eligibility_evaluations
-      where candidate_eligibility_evaluation_id = $1`,
-    [GATE_IDS.eligibilityEvaluationId],
-  );
-  const inputHash = evaluation.rows[0]?.input_hash;
-  assert.ok(inputHash);
-  await pool.query(
-    `insert into current_candidate_eligibility_evaluations
-       (candidate_revision_id, eligibility_policy_revision_id,
-        candidate_id, input_hash, candidate_eligibility_evaluation_id)
-     values ($1, $2, $3, $4, $5)`,
-    [
-      CANDIDATE_IDS.candidateRevisionId,
-      GATE_IDS.eligibilityPolicyId,
-      CANDIDATE_IDS.candidateId,
-      inputHash,
-      GATE_IDS.eligibilityEvaluationId,
-    ],
-  );
-  await pool.query(
-    `insert into outbox_events
-       (outbox_event_id, aggregate_type, aggregate_id, event_type,
-        payload, correlation_id)
-     select $1, aggregate_type, aggregate_id, event_type, payload,
-            'monitoring-restored-eligibility'
-       from outbox_events
-      where event_type = 'CandidateEligibilityEvaluated'
-        and payload ->> 'evaluationId' = $2
-      order by created_at
-      limit 1`,
-    [MONITOR_IDS.restoredEligibilitySourceOutboxId, GATE_IDS.eligibilityEvaluationId],
+  assert.equal(await evaluateEligibility(pool, {
+    correlationId: 'monitoring-lifecycle-restored-eligibility',
+    evaluatedAt: '2026-08-14T08:06:00.000Z',
+    evaluationId: MONITOR_IDS.clearEligibilityEvaluationId,
+    idempotencyKey: 'monitoring-lifecycle-restored-eligibility',
+    inputSnapshotId: MONITOR_IDS.clearEligibilityInputSnapshotId,
+  }), 'eligible');
+  const healthySource = await eligibilityOutboxId(
+    pool,
+    MONITOR_IDS.clearEligibilityEvaluationId,
   );
   const healthy = await evaluatePublicationMonitoring(pool, {
-    sourceOutboxEventId: MONITOR_IDS.restoredEligibilitySourceOutboxId,
+    sourceOutboxEventId: healthySource,
     expectedEventType: 'CandidateEligibilityEvaluated',
   });
   assert.equal(healthy.alertCode, null);
