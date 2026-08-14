@@ -49,7 +49,7 @@ export interface OutboxQueue {
 
 export interface RoutedOutboxQueues {
   eligibility: OutboxQueue;
-  monitoring: OutboxQueue;
+  monitoring?: OutboxQueue;
   normalization: OutboxQueue;
   publication: OutboxQueue;
 }
@@ -121,6 +121,9 @@ function routeEvent(
     return queues.publication;
   }
   if (MONITORING_EVENTS.has(eventType)) {
+    if (!queues.monitoring) {
+      throw new Error('MONITORING_OUTBOX_QUEUE_REQUIRED');
+    }
     return queues.monitoring;
   }
   throw new Error('UNSUPPORTED_OUTBOX_EVENT');
@@ -137,7 +140,7 @@ export async function dispatchOutbox(
         ...NORMALIZATION_EVENT_TYPES,
         ...ELIGIBILITY_EVENT_TYPES,
         ...PUBLICATION_EVENT_TYPES,
-        ...MONITORING_EVENT_TYPES,
+        ...(options.queues.monitoring ? MONITORING_EVENT_TYPES : []),
       ]
     : [...NORMALIZATION_EVENT_TYPES];
   const leaseToken = randomUUID();
