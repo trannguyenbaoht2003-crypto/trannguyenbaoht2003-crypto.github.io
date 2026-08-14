@@ -10,15 +10,19 @@ test('worker owns the durable outbox dispatcher and all routed queues', () => {
   assert.match(worker, /NORMALIZATION_QUEUE_NAME/);
   assert.match(worker, /ELIGIBILITY_QUEUE_NAME/);
   assert.match(worker, /PUBLICATION_QUEUE_NAME/);
+  assert.match(worker, /MONITORING_QUEUE_NAME/);
+  assert.match(worker, /createMonitoringWorker/);
   assert.match(worker, /new Queue/);
+  assert.match(worker, /monitoring:\s*monitoringQueue/);
 });
 
-test('worker uses finite-retry Redis connections for outbox producer queues', () => {
+test('worker uses finite-retry Redis connections for every outbox producer queue', () => {
   assert.match(worker, /createQueueConnection/);
   for (const name of [
     'normalizationQueueConnection',
     'eligibilityQueueConnection',
     'publicationQueueConnection',
+    'monitoringQueueConnection',
   ]) {
     assert.match(
       worker,
@@ -28,11 +32,24 @@ test('worker uses finite-retry Redis connections for outbox producer queues', ()
   }
 });
 
-test('worker aborts dispatcher before closing queue resources', () => {
+test('worker gives monitoring its own worker-compatible Redis connection', () => {
+  assert.match(
+    worker,
+    /const monitoringConnection = createWorkerConnection\(config\.redisUrl\)/,
+  );
+  assert.match(
+    worker,
+    /createMonitoringWorker\(\{\s*connection: monitoringConnection,\s*pool,\s*\}\)/s,
+  );
+});
+
+test('worker aborts dispatcher before closing workers and queue resources', () => {
   const abortIndex = worker.indexOf('dispatcherController.abort()');
-  const queueCloseIndex = worker.indexOf('.close()');
+  const workerCloseIndex = worker.indexOf('monitoringWorker.close()');
+  const queueCloseIndex = worker.indexOf('monitoringQueue.close()');
   assert.ok(abortIndex >= 0, 'dispatcher abort must be wired');
-  assert.ok(queueCloseIndex > abortIndex, 'dispatcher must abort before queue shutdown');
+  assert.ok(workerCloseIndex > abortIndex, 'monitoring worker closes after dispatcher abort');
+  assert.ok(queueCloseIndex > workerCloseIndex, 'monitoring queue closes after workers');
 });
 
 test('worker logs dispatcher failures without environment or payload dumps', () => {
