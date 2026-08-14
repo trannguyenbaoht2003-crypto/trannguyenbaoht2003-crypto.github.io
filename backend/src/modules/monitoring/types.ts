@@ -38,7 +38,7 @@ export interface OpenPublicationMonitoringAlert {
   candidateRevisionId: string;
   alertCode: PublicationMonitoringAlertCode;
   severity: PublicationMonitoringSeverity;
-  eligibilityOutcome: PublicationMonitoringEligibilityOutcome | null;
-  reasonCode: PublicationMonitoringAlertCode;
   evaluatedAt: string;
+  eligibilityOutcome: PublicationMonitoringEligibilityOutcome | null;
+  eligibilityReason: string | null;
 }
