@@ -90,9 +90,9 @@ test('internal reader returns current open monitoring alerts in operator order',
     candidateRevisionId: '62000000-0000-4000-8000-000000000002',
     alertCode: 'ACTIVE_PUBLICATION_REVALIDATION_REQUIRED',
     severity: 'warning',
-    eligibilityOutcome: null,
-    reasonCode: 'ACTIVE_PUBLICATION_REVALIDATION_REQUIRED',
     evaluatedAt: alerts[0]!.evaluatedAt,
+    eligibilityOutcome: null,
+    eligibilityReason: null,
   });
   assert.match(alerts[0]!.evaluatedAt, /^\d{4}-\d{2}-\d{2}T/);
   await pool.end();
