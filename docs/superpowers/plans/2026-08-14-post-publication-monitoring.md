@@ -30,7 +30,7 @@
 
 ### New production files
 
-- `backend/migrations/0011_post_publication_monitoring.sql` — monitoring tables, foreign keys, immutability guards, and worker status extension if required.
+- `backend/migrations/0011_post_publication_monitoring.sql` — monitoring tables, foreign keys, immutability guards, and worker status extension if required by the existing closed constraint.
 - `backend/src/modules/monitoring/types.ts` — closed monitoring domain types and reader result types.
 - `backend/src/modules/monitoring/compute-publication-monitoring.ts` — pure deterministic state computation only.
 - `backend/src/modules/monitoring/evaluate-publication-monitoring.ts` — source validation, PostgreSQL authority reload, replay check, evaluation persistence, alert transitions, audit/outbox writes.
@@ -44,7 +44,7 @@
 
 - `backend/test/publication-monitoring-compute.test.ts` — pure evaluator.
 - `backend/test/publication-monitoring-migration.test.ts` — schema/immutability/relational guards.
-- `backend/test/publication-monitoring.test.ts` — PostgreSQL integration for open/resolve/currentness/lifecycle/stale triggers.
+- `backend/test/publication-monitoring.test.ts` — PostgreSQL integration for open/resolve/currentness/lifecycle/stale triggers and internal reader.
 - `backend/test/monitoring-worker.test.ts` — Redis/BullMQ delivery, tamper rejection, duplicate/lost-ack, terminal delivery effects, backlog behavior.
 - `backend/test/publication-monitoring-concurrency.test.ts` — monitoring versus publish/rollback and stale active-version settlement.
 
@@ -55,8 +55,12 @@
 - `backend/src/queue/names.ts` — add monitoring queue constant.
 - `backend/src/queue/outbox-dispatcher.ts` — route monitoring input/output event types to the new queue.
 - `backend/src/worker.ts` — compose one monitoring consumer and one monitoring producer queue using existing connection/shutdown policy.
+- `backend/test/publication.test.ts` — publish lifecycle request assertions.
+- `backend/test/publication-rollback.test.ts` — rollback lifecycle request assertions.
+- `backend/test/outbox.test.ts` — monitoring route selection and enqueue options.
+- `backend/test/worker-outbox-runtime.test.ts` — monitoring worker/queue composition and finite-retry producer connection.
+- `backend/test/public-publications-integration.test.ts` — re-prove PostgreSQL public reads are independent of Redis/monitoring.
 - `package.json` — add `test:post-publication-monitoring` and include it in root `test`.
-- `.github/workflows/backend-production-foundation.yml` — extend root/runbook contract checks only where required; retain current regression behavior.
 - `backend/README.md` — reference monitoring authority/runbook and alert semantics.
 
 ---
@@ -66,7 +70,6 @@
 **Files:**
 - Create: `backend/migrations/0011_post_publication_monitoring.sql`
 - Create: `backend/test/publication-monitoring-migration.test.ts`
-- Modify: `backend/test/helpers/database.ts` only if the helper has an explicit expected migration list/count.
 
 **Interfaces:**
 - Consumes: existing `publications`, `publication_versions`, `active_publication_versions`, `candidate_eligibility_evaluations`, `audit_events`, `outbox_events`.
@@ -103,8 +106,6 @@ test('monitoring migration creates closed authority tables', async () => {
 Add RED tests that later prove direct UPDATE/DELETE of an evaluation and alert event are rejected, mismatched Publication/PublicationVersion references are rejected, a current alert pointer cannot point to another Publication or alert code, and a delivery effect cannot represent an unrelated alert event.
 
 - [ ] **Step 2: Run the focused test and confirm RED**
-
-Run:
 
 ```bash
 npm --prefix backend exec -- node --import tsx --test --test-concurrency=1 test/publication-monitoring-migration.test.ts
@@ -150,7 +151,7 @@ create table publication_monitoring_evaluations (
 );
 ```
 
-Add the remaining tables with the exact fields from the approved spec. Important constraints:
+Create the remaining four tables with the exact fields and ownership constraints from the approved spec. Closed checks are exactly:
 
 ```sql
 check (severity in ('warning', 'critical'));
@@ -162,7 +163,7 @@ check (event_type in (
 ));
 ```
 
-Use composite uniqueness/foreign keys so current pointers and alert events cannot cross Publication, PublicationVersion, or alert-code ownership. Add append-only UPDATE/DELETE guard triggers for `publication_monitoring_evaluations` and `publication_monitoring_alert_events` following the existing immutable-history database pattern.
+Add composite uniqueness/foreign keys so current pointers and alert events cannot cross Publication, PublicationVersion, or alert-code ownership. Add append-only UPDATE/DELETE guard triggers for `publication_monitoring_evaluations` and `publication_monitoring_alert_events` following the existing immutable-history database pattern.
 
 - [ ] **Step 4: Run focused migration tests to GREEN**
 
@@ -171,8 +172,7 @@ Run the same focused test. Expected: PASS including relational tamper and immuta
 - [ ] **Step 5: Run migration regression subset**
 
 ```bash
-npm --prefix backend exec -- node --import tsx --test --test-concurrency=1 \
-  test/*migration.test.ts
+npm --prefix backend exec -- node --import tsx --test --test-concurrency=1 test/*migration.test.ts
 ```
 
 Expected: all existing migrations plus `0011` pass.
@@ -181,8 +181,7 @@ Expected: all existing migrations plus `0011` pass.
 
 ```bash
 git add backend/migrations/0011_post_publication_monitoring.sql \
-        backend/test/publication-monitoring-migration.test.ts \
-        backend/test/helpers/database.ts
+        backend/test/publication-monitoring-migration.test.ts
 git commit -m "feat: add post-publication monitoring schema"
 ```
 
@@ -196,7 +195,6 @@ git commit -m "feat: add post-publication monitoring schema"
 - Create: `backend/test/publication-monitoring-compute.test.ts`
 
 **Interfaces:**
-- Produces:
 
 ```ts
 export type PublicationMonitoringAlertCode =
@@ -205,7 +203,11 @@ export type PublicationMonitoringAlertCode =
   | 'ACTIVE_PUBLICATION_INELIGIBLE';
 
 export type PublicationMonitoringSeverity = 'warning' | 'critical';
-export type PublicationMonitoringOutcome = 'healthy' | 'warning' | 'critical' | 'not_applicable';
+export type PublicationMonitoringOutcome =
+  | 'healthy'
+  | 'warning'
+  | 'critical'
+  | 'not_applicable';
 
 export interface PublicationMonitoringComputationInput {
   sourceKind: 'eligibility' | 'lifecycle';
@@ -227,8 +229,6 @@ export function computePublicationMonitoring(
 ```
 
 - [ ] **Step 1: Write RED truth-table tests**
-
-Cover exactly:
 
 ```ts
 assert.deepEqual(computePublicationMonitoring({
@@ -255,8 +255,7 @@ Also assert:
 - [ ] **Step 2: Run and confirm RED**
 
 ```bash
-npm --prefix backend exec -- node --import tsx --test \
-  test/publication-monitoring-compute.test.ts
+npm --prefix backend exec -- node --import tsx --test test/publication-monitoring-compute.test.ts
 ```
 
 Expected: FAIL with missing monitoring module/export.
@@ -306,11 +305,10 @@ git commit -m "feat: compute deterministic publication monitoring state"
 **Files:**
 - Create: `backend/src/modules/monitoring/evaluate-publication-monitoring.ts`
 - Create: `backend/test/publication-monitoring.test.ts`
-- Reuse: `backend/src/modules/eligibility/read-candidate-eligibility-status.ts` semantics, but do not call it in a nested transaction; reproduce its currentness logic through an internal `PoolClient` helper in the monitoring module.
-- Reuse: `backend/test/helpers/publication.ts`, `backend/test/helpers/gate.ts`.
+- Reuse semantics from: `backend/src/modules/eligibility/read-candidate-eligibility-status.ts`.
+- Reuse fixtures: `backend/test/helpers/publication.ts`, `backend/test/helpers/gate.ts`.
 
 **Interfaces:**
-- Produces:
 
 ```ts
 export interface EvaluatePublicationMonitoringInput {
@@ -351,15 +349,14 @@ Then add RED tests for:
 - [ ] **Step 2: Run focused tests and confirm RED**
 
 ```bash
-npm --prefix backend exec -- node --import tsx --test --test-concurrency=1 \
-  test/publication-monitoring.test.ts
+npm --prefix backend exec -- node --import tsx --test --test-concurrency=1 test/publication-monitoring.test.ts
 ```
 
 Expected: FAIL with missing evaluator.
 
 - [ ] **Step 3: Implement fail-closed persisted source validation**
 
-For `CandidateEligibilityEvaluated`, require persisted event type and aggregate relation, then load `candidateId` / `candidateRevisionId` from persisted PostgreSQL relationships. Do not trust queued payload.
+For `CandidateEligibilityEvaluated`, require persisted event type and aggregate relation, then load Candidate/CandidateRevision identity from persisted PostgreSQL relationships. Do not trust queued payload.
 
 For `PublicationMonitoringRequested`, require exact payload keys:
 
@@ -372,13 +369,11 @@ const expectedKeys = [
 ].sort();
 ```
 
-Require `schemaVersion === 1`, reason in `published | rolled_back`, aggregate type exactly `publication`, aggregate ID equal persisted `publicationId`, and activation belonging to that Publication.
-
-Return stable non-secret errors such as `INVALID_PUBLICATION_MONITORING_SOURCE_EVENT` for persisted relationship violations.
+Require `schemaVersion === 1`, reason in `published | rolled_back`, aggregate type exactly `publication`, aggregate ID equal persisted `publicationId`, and activation belonging to that Publication. Persisted relationship violations return stable non-secret `INVALID_PUBLICATION_MONITORING_SOURCE_EVENT`.
 
 - [ ] **Step 4: Load current active authority with consistent locks**
 
-For lifecycle source:
+Lifecycle source lock sequence:
 
 ```sql
 select publication_id
@@ -394,11 +389,11 @@ select publication_version_id
 
 Then load the active version's Candidate/CandidateRevision and canonical Eligibility currentness using the same `input_hash === current authority input_hash` rule as `readCandidateEligibilityStatus()`.
 
-For Eligibility source, first resolve Candidate -> Publication; after locking Publication/current pointer, require active version pins the same CandidateRevision or record `not_applicable`.
+For Eligibility source, resolve Candidate -> Publication, then use the same Publication/current-pointer locks and require active version pins the source CandidateRevision or record `not_applicable`.
 
 - [ ] **Step 5: Persist evaluation and minimal transitions atomically**
 
-Inside the same transaction:
+Inside one transaction:
 - replay-check `publication_monitoring_effects` first;
 - insert one evaluation only for applicable active Publication state;
 - lock current monitoring pointers;
@@ -414,7 +409,7 @@ monitoring.publication_alert_opened
 monitoring.publication_alert_resolved
 ```
 
-Output outbox aggregate contract:
+Output outbox contract:
 
 ```ts
 {
@@ -430,19 +425,18 @@ Output outbox aggregate contract:
 }
 ```
 
-- [ ] **Step 6: Add same-code/new-active-version RED then GREEN case**
+- [ ] **Step 6: Add same-code/new-active-version test**
 
-Publish/activate Version A with warning, change active pointer to Version B that also wants the same warning, evaluate lifecycle source, and assert:
+Activate Version A with warning, change active pointer to Version B that also wants the same warning, evaluate lifecycle source, and assert:
 - A warning gets a resolved event;
 - B warning gets a new open event;
 - current pointer references B only;
-- both transitions share the source correlation lineage but have distinct immutable alert event IDs.
+- both transitions have distinct immutable alert event IDs.
 
 - [ ] **Step 7: Run focused tests to GREEN**
 
 ```bash
-npm --prefix backend exec -- node --import tsx --test --test-concurrency=1 \
-  test/publication-monitoring.test.ts
+npm --prefix backend exec -- node --import tsx --test --test-concurrency=1 test/publication-monitoring.test.ts
 npm --prefix backend run typecheck
 ```
 
@@ -462,10 +456,9 @@ git commit -m "feat: persist publication monitoring transitions"
 - Modify: `backend/src/modules/publication/publish-candidate-revision.ts`
 - Modify: `backend/src/modules/publication/rollback-publication.ts`
 - Modify: `backend/test/publication.test.ts`
-- Modify: rollback-focused publication test file if rollback tests live separately; otherwise keep in `publication.test.ts`.
+- Modify: `backend/test/publication-rollback.test.ts`
 
 **Interfaces:**
-- Produces persisted event:
 
 ```ts
 {
@@ -483,30 +476,29 @@ git commit -m "feat: persist publication monitoring transitions"
 
 - [ ] **Step 1: Add RED publish and rollback assertions**
 
-After successful publish, query:
+After successful publish or rollback, query:
 
 ```sql
 select aggregate_type, aggregate_id, event_type, payload, correlation_id
   from outbox_events
- where event_type = 'PublicationMonitoringRequested';
+ where event_type = 'PublicationMonitoringRequested'
+ order by created_at;
 ```
 
-Assert exactly one lifecycle request with `requestedReason='published'` and the exact activation/publication IDs. Add the corresponding rollback assertion with `requestedReason='rolled_back'`.
-
-Also assert failed publish/rollback and idempotent replay do not add extra lifecycle requests.
+Assert publish produces exactly one request with `requestedReason='published'`, rollback adds exactly one with `requestedReason='rolled_back'`, and each row contains the exact activation/publication IDs. Assert failed commands and idempotent command replay do not add extra lifecycle requests.
 
 - [ ] **Step 2: Run publication tests and confirm RED**
 
 ```bash
 npm --prefix backend exec -- node --import tsx --test --test-concurrency=1 \
-  test/publication.test.ts
+  test/publication.test.ts test/publication-rollback.test.ts
 ```
 
 Expected: lifecycle request assertions fail because the event does not exist.
 
-- [ ] **Step 3: Insert lifecycle outbox event in the existing transaction**
+- [ ] **Step 3: Insert lifecycle outbox event in each existing command transaction**
 
-Generate a new internal `randomUUID()` outbox ID after the activation row exists, keeping the user-command `PublicationPublished` / `PublicationRolledBack` outbox event unchanged.
+Generate a new internal `randomUUID()` outbox ID after the activation row exists; preserve the command's existing `PublicationPublished` / `PublicationRolledBack` outbox event unchanged.
 
 Publish payload:
 
@@ -519,15 +511,15 @@ const monitoringPayload = {
 };
 ```
 
-Rollback uses the same shape with `rolled_back`.
-
-Use aggregate type lower-case exactly `publication` for the new monitoring event even though legacy Publication outbox events use their existing aggregate spelling.
+Rollback uses the same shape with `rolled_back`. Use aggregate type lower-case exactly `publication` for the new monitoring event even though legacy Publication outbox events retain existing aggregate spelling.
 
 - [ ] **Step 4: Run publication + monitoring integration tests**
 
 ```bash
 npm --prefix backend exec -- node --import tsx --test --test-concurrency=1 \
-  test/publication.test.ts test/publication-monitoring.test.ts
+  test/publication.test.ts \
+  test/publication-rollback.test.ts \
+  test/publication-monitoring.test.ts
 ```
 
 Expected: PASS, including lifecycle revalidation warning on missing/non-current Eligibility and later resolution when current eligible authority appears.
@@ -537,7 +529,8 @@ Expected: PASS, including lifecycle revalidation warning on missing/non-current 
 ```bash
 git add backend/src/modules/publication/publish-candidate-revision.ts \
         backend/src/modules/publication/rollback-publication.ts \
-        backend/test/publication.test.ts
+        backend/test/publication.test.ts \
+        backend/test/publication-rollback.test.ts
 git commit -m "feat: request monitoring after publication activation"
 ```
 
@@ -549,17 +542,17 @@ git commit -m "feat: request monitoring after publication activation"
 - Modify: `backend/src/queue/names.ts`
 - Modify: `backend/src/queue/outbox-dispatcher.ts`
 - Create: `backend/src/queue/monitoring-worker.ts`
+- Modify: `backend/test/outbox.test.ts`
 - Create: `backend/test/monitoring-worker.test.ts`
-- Modify migration `0011` only if `worker_job_attempts` closed status constraint requires new statuses; do not change earlier migrations.
+- Modify: `backend/migrations/0011_post_publication_monitoring.sql` only to extend `worker_job_attempts` closed status values if monitoring uses a status not already accepted; never modify earlier migrations.
 
 **Interfaces:**
-- Add:
 
 ```ts
 export const MONITORING_QUEUE_NAME = 'hai-dau-monitoring-v1';
 ```
 
-- Extend routed queues:
+Extend routed queues:
 
 ```ts
 export interface RoutedOutboxQueues {
@@ -570,7 +563,7 @@ export interface RoutedOutboxQueues {
 }
 ```
 
-- Monitoring event set is exactly:
+Event set is exactly:
 
 ```ts
 const MONITORING_EVENT_TYPES = [
@@ -581,39 +574,35 @@ const MONITORING_EVENT_TYPES = [
 ] as const;
 ```
 
-- [ ] **Step 1: Write RED dispatcher routing tests**
+- [ ] **Step 1: Write RED dispatcher routing tests in `backend/test/outbox.test.ts`**
 
-Extend the outbox dispatcher test so `CandidateEligibilityEvaluated` and all three monitoring-specific event types enqueue only to the monitoring queue, while existing event routing remains unchanged.
-
-The test must assert `jobId === outboxEventId`, `attempts === 3`, and no event is delivered to two queues.
+Assert all four monitoring event types enqueue only to monitoring queue, existing event routing is unchanged, `jobId === outboxEventId`, `attempts === 3`, and no event is delivered to two queues.
 
 - [ ] **Step 2: Write RED worker envelope/tamper tests**
 
-Create tests for:
-- `job.id` missing -> stable error;
+Cover:
+- missing `job.id` -> stable error;
 - `job.data.outboxEventId !== job.id` -> `OUTBOX_JOB_ID_MISMATCH`;
-- job name differs from persisted outbox event -> reject;
-- tampered payload outcome/reason/Candidate IDs with valid outbox ID -> evaluator reloads PostgreSQL and produces authority-derived state;
-- duplicate source delivery -> `duplicate_noop`;
+- job name differs from persisted event -> reject;
+- tampered queued outcome/reason/IDs with valid outbox ID -> PostgreSQL authority wins;
+- duplicate input -> `duplicate_noop`;
 - terminal alert-output delivery writes one `publication_monitoring_delivery_effects` row;
-- duplicate terminal output -> `duplicate_noop` and no second effect.
+- duplicate terminal output -> `duplicate_noop`.
 
 - [ ] **Step 3: Run focused queue tests and confirm RED**
 
 ```bash
 npm --prefix backend exec -- node --import tsx --test --test-concurrency=1 \
-  test/monitoring-worker.test.ts
+  test/outbox.test.ts test/monitoring-worker.test.ts
 ```
 
 Expected: missing monitoring queue/worker failures.
 
 - [ ] **Step 4: Implement queue routing**
 
-In `dispatchOutbox()`, include monitoring event types in `claimEvents()` and route them only to `queues.monitoring`. Preserve all existing leasing, retry, and delivered-state semantics.
+Include monitoring event types in `claimEvents()` and route them only to `queues.monitoring`. Preserve leasing, retry, delivered-state, job options, and existing queue routing semantics.
 
 - [ ] **Step 5: Implement `createMonitoringWorker()`**
-
-Signature:
 
 ```ts
 export interface CreateMonitoringWorkerOptions {
@@ -627,7 +616,7 @@ export function createMonitoringWorker(
 ): Worker<OutboxJobData>;
 ```
 
-Input job path:
+Input path:
 
 ```ts
 if (
@@ -641,21 +630,17 @@ if (
 }
 ```
 
-Output job path reloads persisted outbox event and matching `publication_monitoring_alert_events`, validates exact event/publication/alert-code/state relation, then inserts one terminal delivery effect. It emits no audit and no outbox event.
+Output path reloads persisted outbox event and matching `publication_monitoring_alert_events`, validates exact event/publication/alert-code/state relation, then inserts one terminal delivery effect. It emits no audit and no outbox event.
 
 - [ ] **Step 6: Add historical backlog test**
 
-Insert a bounded synthetic set of pending historical `CandidateEligibilityEvaluated` outbox rows before routing. Dispatch in the existing default batch size and assert:
-- stale/non-active revisions settle `not_applicable`;
-- active revision uses current PostgreSQL authority;
-- no Publication pointer changes;
-- no destructive migration/delete is used to suppress backlog.
+Insert a bounded synthetic set of pending historical `CandidateEligibilityEvaluated` rows before routing. Dispatch with the existing default batch size and assert stale/non-active revisions settle `not_applicable`, active revision uses current PostgreSQL authority, no active Publication pointer changes, and no old outbox row is deleted to suppress backlog.
 
 - [ ] **Step 7: Run queue tests to GREEN**
 
 ```bash
 npm --prefix backend exec -- node --import tsx --test --test-concurrency=1 \
-  test/monitoring-worker.test.ts
+  test/outbox.test.ts test/monitoring-worker.test.ts
 npm --prefix backend run typecheck
 ```
 
@@ -665,6 +650,7 @@ npm --prefix backend run typecheck
 git add backend/src/queue/names.ts \
         backend/src/queue/outbox-dispatcher.ts \
         backend/src/queue/monitoring-worker.ts \
+        backend/test/outbox.test.ts \
         backend/test/monitoring-worker.test.ts \
         backend/migrations/0011_post_publication_monitoring.sql
 git commit -m "feat: route and process publication monitoring events"
@@ -678,11 +664,11 @@ git commit -m "feat: route and process publication monitoring events"
 - Modify: `backend/src/worker.ts`
 - Create: `backend/src/modules/monitoring/read-open-publication-monitoring-alerts.ts`
 - Modify: `backend/src/modules/monitoring/types.ts`
-- Add/modify: `backend/test/publication-monitoring.test.ts`
-- Add/modify worker source-contract test if an existing `worker-runtime.test.*` file exists; otherwise put composition contract in `tests/post-publication-monitoring.test.mjs` in Task 8.
+- Modify: `backend/test/publication-monitoring.test.ts`
+- Modify: `backend/test/worker-outbox-runtime.test.ts`
+- Modify: `backend/test/public-publications-integration.test.ts`
 
 **Interfaces:**
-- Reader:
 
 ```ts
 export interface OpenPublicationMonitoringAlert {
@@ -703,30 +689,24 @@ export async function readOpenPublicationMonitoringAlerts(
 
 - [ ] **Step 1: Write RED reader tests**
 
-Seed several alerts and assert deterministic ordering:
-1. critical before warning;
-2. then oldest open transition;
-3. then Publication ID.
-
-Also deliberately corrupt/open a pointer whose `publication_version_id` no longer equals `active_publication_versions.publication_version_id` using a fixture transaction permitted by tests, and assert reader fails closed with `PUBLICATION_MONITORING_POINTER_STALE` rather than returning misleading data.
+Seed multiple alerts and assert ordering: critical before warning, then oldest open transition, then Publication ID. Create an inconsistent open pointer in a test transaction and assert `PUBLICATION_MONITORING_POINTER_STALE` instead of returning misleading data.
 
 - [ ] **Step 2: Implement the PostgreSQL-backed reader**
 
 Join current open pointers -> immutable alert event -> monitoring evaluation -> current active Publication pointer. Do not query Redis/BullMQ. Return only bounded structured fields.
 
-- [ ] **Step 3: Write RED worker composition assertions**
+- [ ] **Step 3: Extend `backend/test/worker-outbox-runtime.test.ts` with RED composition assertions**
 
-Assert source contains:
-- one `createWorkerConnection()` for monitoring consumer;
-- one `createQueueConnection()` for monitoring producer;
+Require:
+- `MONITORING_QUEUE_NAME`;
+- `monitoringConnection = createWorkerConnection(config.redisUrl)`;
+- `monitoringQueueConnection = createQueueConnection(config.redisUrl)`;
 - one `createMonitoringWorker()`;
-- one `new Queue(MONITORING_QUEUE_NAME, ...)`;
-- dispatcher receives `monitoring: monitoringQueue`;
-- shutdown closes monitoring worker before queue, then Redis connections before pool.
+- one monitoring `new Queue(...)`;
+- dispatcher contains `monitoring: monitoringQueue`;
+- shutdown aborts dispatcher first, closes monitoring worker with other workers, closes monitoring queue with producer queues, then Redis connections, then pool.
 
 - [ ] **Step 4: Modify `backend/src/worker.ts` minimally**
-
-Follow existing Sprint 6B pattern exactly:
 
 ```ts
 const monitoringConnection = createWorkerConnection(config.redisUrl);
@@ -737,21 +717,21 @@ const monitoringQueue = new Queue(MONITORING_QUEUE_NAME, {
 });
 ```
 
-Add monitoring entries to dispatcher and the existing shutdown `Promise.all()` groups; do not introduce a new process/service.
+Add monitoring entries to dispatcher and existing shutdown groups; do not add another process or Railway service.
 
-- [ ] **Step 5: Re-prove public read independence**
+- [ ] **Step 5: Re-prove public read independence in `backend/test/public-publications-integration.test.ts`**
 
-Run/add a test that closes monitoring worker/Redis or supplies unavailable Redis while reading active Publications directly from PostgreSQL. Expected: Publication reader still returns active immutable payload.
+Use the existing direct PostgreSQL Publication reader test pattern with Redis unavailable/stopped. Expected: active immutable Publication payload is still returned; monitoring tables/worker are irrelevant to the read path.
 
 - [ ] **Step 6: Run focused tests to GREEN**
 
 ```bash
 npm --prefix backend exec -- node --import tsx --test --test-concurrency=1 \
-  test/publication-monitoring.test.ts test/publication-public-read.test.ts
+  test/publication-monitoring.test.ts \
+  test/worker-outbox-runtime.test.ts \
+  test/public-publications-integration.test.ts
 npm --prefix backend run typecheck
 ```
-
-If the existing public-read test filename differs, use the repository's actual Publication read test discovered during implementation; do not create a duplicate public-read authority suite solely for naming.
 
 - [ ] **Step 7: Commit**
 
@@ -759,7 +739,9 @@ If the existing public-read test filename differs, use the repository's actual P
 git add backend/src/worker.ts \
         backend/src/modules/monitoring/read-open-publication-monitoring-alerts.ts \
         backend/src/modules/monitoring/types.ts \
-        backend/test/publication-monitoring.test.ts
+        backend/test/publication-monitoring.test.ts \
+        backend/test/worker-outbox-runtime.test.ts \
+        backend/test/public-publications-integration.test.ts
 git commit -m "feat: expose internal publication monitoring state"
 ```
 
@@ -769,29 +751,22 @@ git commit -m "feat: expose internal publication monitoring state"
 
 **Files:**
 - Create: `backend/test/publication-monitoring-concurrency.test.ts`
-- Modify: `backend/test/publication-monitoring.test.ts` if a shared helper is needed.
-- Never add production synchronization solely to make the test pass without first demonstrating the race/deadlock.
+- Reuse patterns from: `backend/test/publication-concurrency.test.ts`, `backend/test/publication-trust-concurrency.test.ts`.
+- Modify: `backend/src/modules/monitoring/evaluate-publication-monitoring.ts` only if RED concurrency evidence demonstrates a real lock-order/stale-settlement defect.
 
 **Interfaces:**
 - Consumes existing `publishCandidateRevision()`, `rollbackPublication()`, `evaluatePublicationMonitoring()`.
 - Produces no new public API.
 
-- [ ] **Step 1: Write RED/behavior-lock tests for monitoring versus rollback**
+- [ ] **Step 1: Write monitoring-versus-rollback concurrency test**
 
-Run monitoring and rollback concurrently using `Promise.allSettled()` with bounded statement timeout. Assert after both settle:
-- no `40P01` deadlock;
-- active pointer is valid;
-- any open alert references the final active PublicationVersion only;
-- alert history for obsolete version is resolved;
-- PublicationVersion history remains immutable.
+Run monitoring and rollback concurrently using `Promise.allSettled()` with bounded PostgreSQL statement timeout. After both settle assert no `40P01`, active pointer is valid, every open alert references only final active PublicationVersion, obsolete-version alert history is resolved, and PublicationVersion history remains immutable.
 
-- [ ] **Step 2: Add monitoring versus publish test**
+- [ ] **Step 2: Add monitoring-versus-publish test**
 
-Because publish additionally locks Candidate authority/advisory lock before Publication, prove no final stale alert survives even if monitoring observes the old active version first. If an unavoidable lock-order deadlock is reproduced, fix by matching existing Publication lock discipline in the smallest possible shared helper; do not weaken isolation or remove locks.
+Prove no final stale alert survives even if monitoring observes the previous active version first. If RED evidence reproduces a lock-order deadlock, fix by matching existing Publication lock discipline in the smallest monitoring change; do not weaken isolation or remove Publication locks.
 
 - [ ] **Step 3: Add no-public-mutation assertion**
-
-Snapshot counts/pointers before and after monitoring failure/tampered event processing:
 
 ```ts
 const before = await pool.query(
@@ -799,12 +774,16 @@ const before = await pool.query(
      from active_publication_versions
     order by publication_id`,
 );
-// trigger monitoring error
-const after = await pool.query(/* same query */);
+// process a monitoring failure/tampered source
+const after = await pool.query(
+  `select publication_id, publication_version_id
+     from active_publication_versions
+    order by publication_id`,
+);
 assert.deepEqual(after.rows, before.rows);
 ```
 
-Also assert monitoring source files contain no imports of `publish-candidate-revision` or `rollback-publication`.
+Also source-scan monitoring production modules and assert they do not import `publish-candidate-revision` or `rollback-publication`.
 
 - [ ] **Step 4: Run concurrency suite repeatedly**
 
@@ -815,9 +794,9 @@ for i in 1 2 3 4 5; do
 done
 ```
 
-Expected: 5/5 clean runs, no deadlocks, no stale current alerts.
+Expected: 5/5 clean runs, no deadlock, no stale open alert.
 
-- [ ] **Step 5: Run full backend tests**
+- [ ] **Step 5: Run full backend verification**
 
 ```bash
 npm --prefix backend test
@@ -825,13 +804,13 @@ npm --prefix backend run typecheck
 npm --prefix backend run build
 ```
 
-Expected: all existing and new tests pass.
+Expected: all existing and new backend tests pass.
 
 - [ ] **Step 6: Commit**
 
 ```bash
 git add backend/test/publication-monitoring-concurrency.test.ts \
-        backend/src/modules/monitoring
+        backend/src/modules/monitoring/evaluate-publication-monitoring.ts
 git commit -m "test: harden publication monitoring concurrency"
 ```
 
@@ -845,10 +824,8 @@ git commit -m "test: harden publication monitoring concurrency"
 - Create: `tests/post-publication-monitoring.test.mjs`
 - Modify: `package.json`
 - Create: `.github/workflows/sprint-7a-post-publication-monitoring.yml`
-- Modify: `.github/workflows/backend-production-foundation.yml` only for contract discovery/reference if necessary.
 
 **Interfaces:**
-- Root script:
 
 ```json
 "test:post-publication-monitoring": "node --test tests/post-publication-monitoring.test.mjs"
@@ -858,14 +835,14 @@ Add it to root `test` before `build:pages`.
 
 - [ ] **Step 1: Write RED repository/source contract**
 
-`tests/post-publication-monitoring.test.mjs` must assert:
-- plan/runbook mentions all three alert codes;
+`tests/post-publication-monitoring.test.mjs` asserts:
+- runbook mentions all three alert codes;
 - `backend/src/queue/names.ts` exports `hai-dau-monitoring-v1`;
 - `worker.ts` composes monitoring queue/worker;
 - no new public route registers `POST|PUT|PATCH|DELETE` for monitoring/Publications;
 - monitoring production modules do not import publish/rollback commands;
-- no `RAILWAY_TOKEN`, notification token, webhook secret, browser write token, or production connection string is committed by Sprint 7A;
-- `0011_post_publication_monitoring.sql` exists and earlier migrations remain byte-identical relative to base when checked in PR review.
+- no Railway token, notification token, webhook secret, browser write token, or production connection string is committed by Sprint 7A;
+- `0011_post_publication_monitoring.sql` exists.
 
 - [ ] **Step 2: Run contract and confirm RED before docs/workflow**
 
@@ -877,17 +854,7 @@ Expected: FAIL because runbook/workflow/root script do not yet exist.
 
 - [ ] **Step 3: Write the runbook**
 
-Required sections:
-- purpose and advisory-only boundary;
-- alert code table with severity/operator meaning;
-- trigger flow `Eligibility -> monitoring` and `Publication activation -> monitoring`;
-- replay/lost-ack behavior;
-- historical backlog behavior;
-- Redis outage delays monitoring but not public reads;
-- PostgreSQL outage is retryable and commits no partial alert state;
-- no automatic rollback/publish/hide;
-- internal reader usage;
-- `SPRINT_7A_REPO_READY` versus separate production Issue #23.
+Include sections for advisory-only purpose, alert code/severity/operator meaning, trigger flow, replay/lost-ack behavior, historical backlog, Redis outage, PostgreSQL failure, no automatic rollback/publish/hide, internal reader usage, and `SPRINT_7A_REPO_READY` versus Issue #23 production delivery.
 
 - [ ] **Step 4: Add dedicated GitHub Actions gate**
 
@@ -897,9 +864,9 @@ Workflow name:
 name: Sprint 7A post-publication monitoring gate
 ```
 
-Trigger on PR paths covering `backend/**`, monitoring runbook/spec/plan, root monitoring source contract, and the workflow itself. Use Node `22.13.0`, PostgreSQL `17`, Redis `7`, `contents: read`, and no deployment permissions.
+Use Node `22.13.0`, PostgreSQL `17`, Redis `7`, and `permissions: contents: read`. Trigger on PR paths covering `backend/**`, monitoring spec/plan/runbook, root monitoring source contract, `package.json`, and this workflow.
 
-Required steps:
+Required commands:
 
 ```yaml
 - run: npm ci
@@ -916,7 +883,7 @@ Required steps:
 - run: git diff --check
 ```
 
-Also run the existing security/deployment guard used by current regression workflows; do not add Railway CLI or any deploy step.
+Copy the existing security/deployment-guard command from the current regression workflow into this gate; do not add Railway CLI or any deploy command.
 
 - [ ] **Step 5: Run local/root regression commands to GREEN**
 
@@ -944,47 +911,29 @@ git add docs/runbooks/post-publication-monitoring.md \
         backend/README.md \
         tests/post-publication-monitoring.test.mjs \
         package.json \
-        .github/workflows/sprint-7a-post-publication-monitoring.yml \
-        .github/workflows/backend-production-foundation.yml
+        .github/workflows/sprint-7a-post-publication-monitoring.yml
 git commit -m "docs: add Sprint 7A monitoring gate and runbook"
 ```
 
 - [ ] **Step 7: Push/open draft PR and collect exact-head CI evidence**
 
-Open a draft PR titled:
+Open draft PR titled:
 
 ```text
 Sprint 7A: add post-publication monitoring
 ```
 
-PR body must state:
-- exact base SHA;
-- exact head SHA;
-- no production deployment;
-- no automatic Publication mutation;
-- all alert codes;
-- dedicated 7A gate run IDs/conclusions;
-- existing regression gate conclusions;
-- final review result.
+PR body records exact base SHA, exact head SHA, no production deployment, no automatic Publication mutation, all alert codes, dedicated 7A gate run IDs/conclusions, existing regression gate conclusions, and final review result.
 
 - [ ] **Step 8: Perform exact-range review before readiness claim**
 
-Review `bac0e7586c22cae5ecffb16130f082379d79fdcd..HEAD` specifically for:
-- any monitoring path writing Publication authority tables;
-- queue payload trust;
-- missing replay boundary;
-- alert pointer/version mismatch;
-- output event recursion;
-- deadlock/lock-order issues;
-- public mutation/CORS/browser credential expansion;
-- raw community payload leakage;
-- production secret/deploy capability.
+Review `bac0e7586c22cae5ecffb16130f082379d79fdcd..HEAD` specifically for monitoring writes to Publication authority, queue payload trust, replay gaps, alert pointer/version mismatch, output recursion, lock-order issues, public mutation/CORS/browser credential expansion, raw community payload leakage, and production secret/deploy capability.
 
 Fix every Critical or Important finding and rerun exact-head CI.
 
 - [ ] **Step 9: Record repository readiness only after fresh verification**
 
-Only after the exact head has green dedicated + regression checks and no Critical/Important review findings, update the PR body with:
+Only after exact head has green dedicated + regression checks and no Critical/Important review findings, update PR body with:
 
 ```text
 SPRINT_7A_REPO_READY
@@ -997,16 +946,15 @@ Do not merge or deploy merely because this marker exists; integration follows th
 
 ## Plan Self-Review Checklist
 
-Before implementation begins, verify:
-
-- [ ] Every approved spec section 1–20 maps to at least one task above.
-- [ ] No placeholder/TBD/TODO remains in the plan.
-- [ ] Queue constant/event names are identical in Tasks 4–8.
-- [ ] `PublicationMonitoringRequested` aggregate type is lower-case `publication` exactly.
-- [ ] Alert-output aggregate type is exactly `publication_monitoring_alert`.
-- [ ] `publication_monitoring_effects.effect_outcome` contains only `evaluated | not_applicable`; `duplicate_noop` is a returned replay result, never a second stored effect.
-- [ ] Old-version alert resolution happens before applying desired alert state for the new active version.
-- [ ] Public reads remain independent from Redis/monitoring worker.
-- [ ] No task introduces feedback intake, operator mutation UI, notification delivery, AI monitoring, or Railway provisioning.
-- [ ] Dedicated CI uses PostgreSQL 17 / Redis 7 and read-only GitHub permissions.
-- [ ] Repository readiness marker remains distinct from production delivery readiness.
+- [x] Every approved spec section 1–20 maps to at least one task above.
+- [x] No `TBD`, `TODO`, “similar to Task N”, or unresolved file-name placeholder remains.
+- [x] Queue constant/event names are identical across Tasks 4–8.
+- [x] `PublicationMonitoringRequested` aggregate type is lower-case `publication` exactly.
+- [x] Alert-output aggregate type is exactly `publication_monitoring_alert`.
+- [x] `publication_monitoring_effects.effect_outcome` contains only `evaluated | not_applicable`; `duplicate_noop` is returned on replay and is never inserted as a second effect.
+- [x] Old-version alert resolution occurs before desired state is applied to a newly active version.
+- [x] Exact existing regression files are named: `publication-rollback.test.ts`, `outbox.test.ts`, `worker-outbox-runtime.test.ts`, `public-publications-integration.test.ts`.
+- [x] Public reads remain independent from Redis/monitoring worker.
+- [x] No task introduces feedback intake, operator mutation UI, notification delivery, AI monitoring, or Railway provisioning.
+- [x] Dedicated CI uses PostgreSQL 17 / Redis 7 and read-only GitHub permissions.
+- [x] Repository readiness remains distinct from production delivery readiness.
