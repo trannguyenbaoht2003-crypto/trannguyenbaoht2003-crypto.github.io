@@ -19,9 +19,10 @@ interface OpenAlertRow {
   candidate_revision_id: string;
   alert_code: PublicationMonitoringAlertCode;
   severity: PublicationMonitoringSeverity;
-  reason_code: PublicationMonitoringAlertCode | null;
+  monitoring_reason_code: PublicationMonitoringAlertCode | null;
   evaluated_at: Date | string;
   eligibility_outcome: PublicationMonitoringEligibilityOutcome | null;
+  eligibility_reason: string | null;
 }
 
 function parseTimestamp(value: Date | string): string {
@@ -42,9 +43,10 @@ export async function readOpenPublicationMonitoringAlerts(
             evaluation.candidate_revision_id,
             current.alert_code,
             current.severity,
-            evaluation.reason_code,
+            evaluation.reason_code as monitoring_reason_code,
             evaluation.evaluated_at,
-            eligibility.outcome as eligibility_outcome
+            eligibility.outcome as eligibility_outcome,
+            eligibility_reason.reason_code as eligibility_reason
        from current_publication_monitoring_alerts current
        join publication_monitoring_alert_events alert_event
          on alert_event.publication_monitoring_alert_event_id =
@@ -62,6 +64,14 @@ export async function readOpenPublicationMonitoringAlerts(
        left join candidate_eligibility_evaluations eligibility
          on eligibility.candidate_eligibility_evaluation_id =
             evaluation.candidate_eligibility_evaluation_id
+       left join lateral (
+         select reason.reason_code
+           from candidate_eligibility_evaluation_reasons reason
+          where reason.candidate_eligibility_evaluation_id =
+                evaluation.candidate_eligibility_evaluation_id
+          order by reason.ordinal
+          limit 1
+       ) eligibility_reason on true
        left join active_publication_versions active
          on active.publication_id = current.publication_id
       where current.state = 'open'
@@ -74,8 +84,8 @@ export async function readOpenPublicationMonitoringAlerts(
     if (
       row.active_publication_version_id === null
       || row.active_publication_version_id !== row.publication_version_id
-      || row.reason_code === null
-      || row.reason_code !== row.alert_code
+      || row.monitoring_reason_code === null
+      || row.monitoring_reason_code !== row.alert_code
     ) {
       throw new Error('PUBLICATION_MONITORING_POINTER_STALE');
     }
@@ -92,9 +102,9 @@ export async function readOpenPublicationMonitoringAlerts(
         ),
         alertCode: row.alert_code,
         severity: row.severity,
-        eligibilityOutcome: row.eligibility_outcome,
-        reasonCode: row.reason_code,
         evaluatedAt: parseTimestamp(row.evaluated_at),
+        eligibilityOutcome: row.eligibility_outcome,
+        eligibilityReason: row.eligibility_reason,
       };
     } catch (error) {
       if (
