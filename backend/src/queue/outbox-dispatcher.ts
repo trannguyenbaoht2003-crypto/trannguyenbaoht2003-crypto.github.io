@@ -23,9 +23,16 @@ const PUBLICATION_EVENT_TYPES = [
   'PublicationPublished',
   'PublicationRolledBack',
 ] as const;
+const MONITORING_EVENT_TYPES = [
+  'CandidateEligibilityEvaluated',
+  'PublicationMonitoringRequested',
+  'PublicationMonitoringAlertOpened',
+  'PublicationMonitoringAlertResolved',
+] as const;
 const NORMALIZATION_EVENTS = new Set<string>(NORMALIZATION_EVENT_TYPES);
 const ELIGIBILITY_EVENTS = new Set<string>(ELIGIBILITY_EVENT_TYPES);
 const PUBLICATION_EVENTS = new Set<string>(PUBLICATION_EVENT_TYPES);
+const MONITORING_EVENTS = new Set<string>(MONITORING_EVENT_TYPES);
 
 interface ClaimedOutboxEvent {
   aggregate_id: string;
@@ -42,6 +49,7 @@ export interface OutboxQueue {
 
 export interface RoutedOutboxQueues {
   eligibility: OutboxQueue;
+  monitoring: OutboxQueue;
   normalization: OutboxQueue;
   publication: OutboxQueue;
 }
@@ -112,6 +120,9 @@ function routeEvent(
   if (PUBLICATION_EVENTS.has(eventType)) {
     return queues.publication;
   }
+  if (MONITORING_EVENTS.has(eventType)) {
+    return queues.monitoring;
+  }
   throw new Error('UNSUPPORTED_OUTBOX_EVENT');
 }
 
@@ -126,6 +137,7 @@ export async function dispatchOutbox(
         ...NORMALIZATION_EVENT_TYPES,
         ...ELIGIBILITY_EVENT_TYPES,
         ...PUBLICATION_EVENT_TYPES,
+        ...MONITORING_EVENT_TYPES,
       ]
     : [...NORMALIZATION_EVENT_TYPES];
   const leaseToken = randomUUID();
