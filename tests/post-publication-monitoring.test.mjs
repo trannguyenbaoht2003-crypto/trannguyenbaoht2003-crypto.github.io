@@ -88,8 +88,12 @@ test('Sprint 7A repository surface contains no committed production credentials'
     '.github/workflows/sprint-7a-post-publication-monitoring.yml',
   ];
   const text = (await Promise.all(paths.map(read))).join('\n');
-  assert.doesNotMatch(text, /BEGIN (?:RSA|OPENSSH|EC) PRIVATE KEY/);
-  assert.doesNotMatch(text, /postgres(?:ql)?:\/\/[^\s]+:[^\s]+@/i);
-  assert.doesNotMatch(text, /redis:\/\/[^\s]+:[^\s]+@/i);
-  assert.doesNotMatch(text, /Bearer\s+[A-Za-z0-9._-]{20,}/);
+  const withoutKnownLocalTestFixture = text.replaceAll(
+    'postgres://postgres:postgres@127.0.0.1:5432/hai_dau_test',
+    'TEST_DATABASE_URL',
+  );
+  assert.doesNotMatch(withoutKnownLocalTestFixture, /BEGIN (?:RSA|OPENSSH|EC) PRIVATE KEY/);
+  assert.doesNotMatch(withoutKnownLocalTestFixture, /postgres(?:ql)?:\/\/[^\s]+:[^\s]+@/i);
+  assert.doesNotMatch(withoutKnownLocalTestFixture, /redis:\/\/[^\s]+:[^\s]+@/i);
+  assert.doesNotMatch(withoutKnownLocalTestFixture, /Bearer\s+[A-Za-z0-9._-]{20,}/);
 });
