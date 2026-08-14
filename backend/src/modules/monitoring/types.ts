@@ -31,3 +31,14 @@ export interface PublicationMonitoringComputation {
   alertCode: PublicationMonitoringAlertCode | null;
   severity: PublicationMonitoringSeverity | null;
 }
+
+export interface OpenPublicationMonitoringAlert {
+  publicationId: string;
+  publicationVersionId: string;
+  candidateRevisionId: string;
+  alertCode: PublicationMonitoringAlertCode;
+  severity: PublicationMonitoringSeverity;
+  eligibilityOutcome: PublicationMonitoringEligibilityOutcome | null;
+  reasonCode: PublicationMonitoringAlertCode;
+  evaluatedAt: string;
+}
