@@ -150,6 +150,11 @@ create table publication_monitoring_alert_events (
     publication_monitoring_alert_event_id,
     publication_id
   ),
+  unique (
+    outbox_event_id,
+    publication_monitoring_alert_event_id,
+    publication_id
+  ),
   foreign key (
     publication_monitoring_evaluation_id,
     publication_id,
@@ -274,9 +279,11 @@ create table publication_monitoring_delivery_effects (
     ),
   created_at timestamptz not null default clock_timestamp(),
   foreign key (
+    outbox_event_id,
     publication_monitoring_alert_event_id,
     publication_id
   ) references publication_monitoring_alert_events (
+    outbox_event_id,
     publication_monitoring_alert_event_id,
     publication_id
   )
