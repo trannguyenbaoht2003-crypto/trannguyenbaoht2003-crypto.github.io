@@ -1,0 +1,8 @@
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "deploy/production/Dockerfile.collector"
+
+[deploy]
+startCommand = "sh deploy/production/run-community-collector.sh"
+cronSchedule = "0 */6 * * *"
+restartPolicyType = "NEVER"

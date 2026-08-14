@@ -123,6 +123,9 @@ jobs:
       - name: Build production backend image
         run: docker build -f backend/Dockerfile -t loi-meta-backend:${RELEASE_SHA} backend
 
+      - name: Build production collector image
+        run: docker build -f deploy/production/Dockerfile.collector -t loi-meta-collector:${RELEASE_SHA} .
+
       - name: Repository cleanliness
         shell: bash
         run: |
@@ -141,6 +144,8 @@ jobs:
       RAILWAY_PROJECT_ID: ${{ vars.RAILWAY_PROJECT_ID }}
       RAILWAY_ENVIRONMENT: ${{ vars.RAILWAY_ENVIRONMENT }}
       RAILWAY_BACKEND_SERVICE: ${{ vars.RAILWAY_BACKEND_SERVICE }}
+      RAILWAY_WORKER_SERVICE: ${{ vars.RAILWAY_WORKER_SERVICE }}
+      RAILWAY_COLLECTOR_SERVICE: ${{ vars.RAILWAY_COLLECTOR_SERVICE }}
       RAILWAY_GATEWAY_SERVICE: ${{ vars.RAILWAY_GATEWAY_SERVICE }}
       PRODUCTION_BASE_URL: ${{ vars.PRODUCTION_BASE_URL }}
 
@@ -166,7 +171,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for name in RAILWAY_TOKEN RAILWAY_PROJECT_ID RAILWAY_ENVIRONMENT RAILWAY_BACKEND_SERVICE RAILWAY_GATEWAY_SERVICE PRODUCTION_BASE_URL; do
+          for name in RAILWAY_TOKEN RAILWAY_PROJECT_ID RAILWAY_ENVIRONMENT RAILWAY_BACKEND_SERVICE RAILWAY_WORKER_SERVICE RAILWAY_COLLECTOR_SERVICE RAILWAY_GATEWAY_SERVICE PRODUCTION_BASE_URL; do
             if [ -z "${!name:-}" ]; then
               echo "production-release: required Railway/GitHub binding is missing: ${name}" >&2
               exit 1
@@ -197,6 +202,26 @@ jobs:
             --environment "$RAILWAY_ENVIRONMENT" \
             --service "$RAILWAY_BACKEND_SERVICE" \
             --message "release ${RELEASE_SHA} backend"
+
+      - name: Deploy worker from exact tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          railway up --ci \
+            --project "$RAILWAY_PROJECT_ID" \
+            --environment "$RAILWAY_ENVIRONMENT" \
+            --service "$RAILWAY_WORKER_SERVICE" \
+            --message "release ${RELEASE_SHA} worker"
+
+      - name: Deploy collector from exact tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          railway up --ci \
+            --project "$RAILWAY_PROJECT_ID" \
+            --environment "$RAILWAY_ENVIRONMENT" \
+            --service "$RAILWAY_COLLECTOR_SERVICE" \
+            --message "release ${RELEASE_SHA} collector"
 
       - name: Deploy gateway from exact tree
         shell: bash

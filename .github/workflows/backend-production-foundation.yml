@@ -242,6 +242,9 @@ jobs:
       - name: Build production backend image
         run: docker build -f backend/Dockerfile -t loi-meta-backend:pr backend
 
+      - name: Build production collector image
+        run: docker build -f deploy/production/Dockerfile.collector -t loi-meta-collector:pr .
+
       - name: Compose configuration
         run: npm run staging:config
 

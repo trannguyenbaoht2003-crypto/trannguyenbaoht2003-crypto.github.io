@@ -1,11 +1,23 @@
+import { Queue } from 'bullmq';
+
 import { parseConfig } from './config.js';
 import { createPool } from './database/pool.js';
 import {
   registerStoredObservationInTransaction,
 } from './modules/candidate/register-stored-observation.js';
-import { createWorkerConnection } from './queue/connection.js';
+import {
+  createQueueConnection,
+  createWorkerConnection,
+} from './queue/connection.js';
 import { createEligibilityWorker } from './queue/eligibility-worker.js';
+import {
+  ELIGIBILITY_QUEUE_NAME,
+  NORMALIZATION_QUEUE_NAME,
+  PUBLICATION_QUEUE_NAME,
+} from './queue/names.js';
 import { createNormalizationWorker } from './queue/normalization-worker.js';
+import { dispatchOutbox } from './queue/outbox-dispatcher.js';
+import { runOutboxDispatchLoop } from './queue/outbox-dispatch-loop.js';
 import {
   createPublicationProjectionWorker,
 } from './queue/publication-projection-worker.js';
@@ -15,6 +27,10 @@ const pool = createPool(config.databaseUrl);
 const normalizationConnection = createWorkerConnection(config.redisUrl);
 const eligibilityConnection = createWorkerConnection(config.redisUrl);
 const publicationConnection = createWorkerConnection(config.redisUrl);
+const normalizationQueueConnection = createQueueConnection(config.redisUrl);
+const eligibilityQueueConnection = createQueueConnection(config.redisUrl);
+const publicationQueueConnection = createQueueConnection(config.redisUrl);
+
 const normalizationWorker = createNormalizationWorker({
   connection: normalizationConnection,
   normalizeObservation: registerStoredObservationInTransaction,
@@ -29,18 +45,58 @@ const publicationWorker = createPublicationProjectionWorker({
   pool,
 });
 
+const normalizationQueue = new Queue(NORMALIZATION_QUEUE_NAME, {
+  connection: normalizationQueueConnection,
+});
+const eligibilityQueue = new Queue(ELIGIBILITY_QUEUE_NAME, {
+  connection: eligibilityQueueConnection,
+});
+const publicationQueue = new Queue(PUBLICATION_QUEUE_NAME, {
+  connection: publicationQueueConnection,
+});
+
+const dispatcherController = new AbortController();
+const dispatcherPromise = runOutboxDispatchLoop({
+  dispatch: async () => {
+    await dispatchOutbox({
+      pool,
+      queues: {
+        eligibility: eligibilityQueue,
+        normalization: normalizationQueue,
+        publication: publicationQueue,
+      },
+    });
+  },
+  onError: (error) => {
+    const message = error instanceof Error ? error.message : 'UNKNOWN_ERROR';
+    process.stderr.write(`worker: outbox dispatch failed: ${message}\n`);
+  },
+  signal: dispatcherController.signal,
+  sleepMs: 1_000,
+});
+
 let shutdownPromise: Promise<void> | undefined;
 async function shutdown(): Promise<void> {
   shutdownPromise ??= (async () => {
+    dispatcherController.abort();
+    await dispatcherPromise;
     await Promise.all([
       normalizationWorker.close(),
       eligibilityWorker.close(),
       publicationWorker.close(),
     ]);
     await Promise.all([
+      normalizationQueue.close(),
+      eligibilityQueue.close(),
+      publicationQueue.close(),
+    ]);
+    await Promise.all([
       normalizationConnection.quit(),
       eligibilityConnection.quit(),
       publicationConnection.quit(),
+      normalizationQueueConnection.quit(),
+      eligibilityQueueConnection.quit(),
+      publicationQueueConnection.quit(),
     ]);
     await pool.end();
   })();
