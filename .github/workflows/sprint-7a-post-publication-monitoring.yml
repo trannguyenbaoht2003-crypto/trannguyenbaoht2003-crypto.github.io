@@ -8,7 +8,7 @@ on:
       - "tests/post-publication-monitoring.test.mjs"
       - "docs/runbooks/post-publication-monitoring.md"
       - "docs/superpowers/specs/2026-08-14-post-publication-monitoring-design.md"
-      - "docs/superpowers/plans/2026-08-14-post-publication-monitoring.md"
+      - "docs/superpowers/plans/**"
       - "package.json"
       - ".github/workflows/sprint-7a-post-publication-monitoring.yml"
 
