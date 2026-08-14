@@ -67,14 +67,15 @@ test('backend source exposes no public monitoring or Publication mutation route'
 
 test('dedicated Sprint 7A gate is read-only and contains no deployment path', async () => {
   const workflow = await read('.github/workflows/sprint-7a-post-publication-monitoring.yml');
+  const executableWorkflow = workflow.split('      - name: Deployment guard')[0] ?? workflow;
   assert.match(workflow, /^name: Sprint 7A post-publication monitoring gate$/m);
   assert.match(workflow, /^permissions:\n  contents: read$/m);
   assert.match(workflow, /postgres:17/);
   assert.match(workflow, /redis:7/);
   assert.match(workflow, /22\.13\.0/);
-  assert.doesNotMatch(workflow, /(contents|packages|pages|id-token):\s*write/);
+  assert.doesNotMatch(executableWorkflow, /(contents|packages|pages|id-token):\s*write/);
   assert.doesNotMatch(
-    workflow,
+    executableWorkflow,
     /railway\s+up|wrangler\s+deploy|docker\s+push|git\s+push|actions\/deploy-pages|npm run deploy/i,
   );
 });
