@@ -2,87 +2,57 @@
 
 **Status:** self-approved under standing project delegation  
 **Base:** `main@44e4bd18b6dd604af17e3bbce4383a9e91b0b73f`  
-**Scope:** anonymous, structured feedback about an immutable published guide version  
+**Scope:** anonymous structured feedback about an immutable published guide version  
 **Production delivery:** explicitly out of scope
 
 ## 1. Purpose
 
-Sprint 7B adds a narrow public-write boundary so readers can report likely problems in a published guide without weakening the existing trust and Publication invariants.
+Sprint 7B adds a narrow public-write boundary so readers can report likely problems in a published guide without weakening existing trust and Publication invariants.
 
-The feature collects **community signal only**. A feedback submission is never Evidence, never a HumanReview, never a Moderation decision, never an Eligibility decision, never a Publication command, and never a post-publication monitoring alert by itself.
+Feedback is **community signal only**. A feedback receipt is never Evidence, HumanReview, Moderation, Eligibility, Publication, rollback, retraction, or a Sprint 7A monitoring alert by itself.
 
-The authority boundary remains:
+Authority remains:
 
-`Public reader -> validated/rate-limited feedback intake -> immutable PostgreSQL feedback record -> internal operator read boundary -> future human triage`
+`Public reader -> validated feedback intake -> replay-aware abuse gate -> immutable PostgreSQL feedback receipt -> internal operator read boundary -> future human triage`
 
-Any later change to trust or Publication state must still go through the existing Evidence / HumanReview / Moderation / Eligibility / Publication authorities.
+Any later trust or Publication change must still use the existing Evidence / HumanReview / Moderation / Eligibility / Publication authorities.
 
-## 2. Context and constraints
+## 2. Context
 
-The production gateway already serves the frontend and reverse-proxies `/api/v1/*` to the backend on the same origin. Sprint 7B therefore does not need browser CORS expansion.
+The production gateway already serves the frontend and reverse-proxies `/api/v1/*` to the private backend on the same origin. Sprint 7B therefore does not add CORS.
 
-The public Publication API already exposes both `publicationId` and `publicationVersionId`. Feedback can therefore pin the exact immutable PublicationVersion the reader saw.
+The public Publication API already exposes both `publicationId` and `publicationVersionId`, so feedback can pin the exact immutable version the reader saw.
 
-The backend already owns PostgreSQL and Redis connections. PostgreSQL remains the durable authority. Redis may be used only for short-lived abuse controls; Redis state must never decide or mutate Publication/trust authority.
+The backend already owns PostgreSQL and Redis connections. PostgreSQL remains durable authority. Redis is limited to short-lived abuse/replay-control state and cannot mutate domain authority.
 
-Sprint 7A monitoring remains advisory and independent. Feedback does not open or resolve monitoring alerts in Sprint 7B.
+Sprint 7A monitoring remains advisory and independent. Feedback cannot open or resolve monitoring alerts in Sprint 7B.
 
-## 3. Approaches considered
+## 3. Approach selection
 
-### A. Anonymous structured feedback — selected
+### Selected: anonymous structured feedback
 
-Any reader may submit a bounded structured report without creating an account. Same-origin JSON requests are rate-limited and duplicate-suppressed. PostgreSQL stores the immutable report; Redis stores only short-lived keyed abuse state.
+Any reader may submit a bounded report without an account. Same-origin JSON requests are replay-safe, rate-limited and duplicate-suppressed. PostgreSQL stores the immutable report; Redis stores only expiring keyed abuse state.
 
-Benefits:
-- lowest contribution friction;
-- useful community signal immediately;
-- no account/auth subsystem;
-- keeps public write scope narrow;
-- compatible with static frontend + same-origin production gateway.
-
-Cost:
-- requires explicit abuse/rate-limit controls;
-- feedback must remain untrusted and isolated from trust authority.
-
-### B. Authenticated reviewer-only feedback — rejected for 7B
-
-Safer, but it does not collect community signal and duplicates existing reviewer/operator workflows.
-
-### C. Hybrid anonymous reason + authenticated free text — rejected for 7B
-
-Adds an authentication boundary before there is enough value to justify it. The selected design keeps optional free text highly bounded instead.
+This is preferred over reviewer-only feedback because it actually collects community signal, and preferred over a hybrid authenticated design because an auth subsystem is unnecessary for the initial value.
 
 ## 4. Goals
 
 1. Accept anonymous public feedback for an existing PublicationVersion.
-2. Pin every submission to both `publication_id` and `publication_version_id`.
-3. Use a client-generated UUID submission ID for replay-safe idempotency.
-4. Reject an idempotency key reused with a different normalized payload.
-5. Apply short-lived abuse control before accepting new anonymous submissions.
-6. Never persist raw IP addresses, user-agent strings, cookies, authorization headers, or the abuse fingerprint in PostgreSQL.
-7. Keep optional detail text plain, short, non-HTML, non-link-bearing, and operator-only.
-8. Keep feedback outside the Evidence / Review / Moderation / Eligibility / Publication / Monitoring state machines.
-9. Preserve public-read availability when feedback intake is unavailable.
-10. Provide an internal PostgreSQL-backed reader for feedback summaries and recent bounded samples.
-11. Provide a minimal public frontend interaction for submitting feedback.
-12. Add a dedicated CI/repository contract for the new public-write boundary.
+2. Pin every receipt to both `publication_id` and `publication_version_id`.
+3. Use a client-generated UUID `submissionId` for replay-safe retries.
+4. Reject reuse of a submission ID with a different canonical request.
+5. Enforce short-lived abuse controls without making Redis domain authority.
+6. Never durably store raw IP, IP fingerprint, user-agent, cookies, authorization headers, session identifiers, email, or account identifiers.
+7. Keep optional detail text plain, bounded, non-link-bearing, operator-only data.
+8. Keep feedback outside all trust/Publication/monitoring state machines.
+9. Preserve public GET availability if feedback intake is disabled or unavailable.
+10. Provide an internal PostgreSQL-backed feedback signal reader.
+11. Provide a minimal public `Báo lỗi nội dung` interaction.
+12. Add dedicated CI and repository security contracts.
 
 ## 5. Non-goals
 
-Sprint 7B does **not** add:
-
-- user accounts or login;
-- CAPTCHA or a third-party anti-abuse vendor;
-- voting, likes, comments, public discussion, or public feedback history;
-- attachments, screenshots, URLs, Markdown, or rich text;
-- email addresses or contact fields;
-- automatic Evidence creation;
-- automatic Moderation, Eligibility, Publication, rollback, hide, or retraction;
-- automatic Sprint 7A monitoring alerts from feedback;
-- operator mutation UI;
-- notifications;
-- machine-learning classification;
-- production secret provisioning or production deployment.
+Sprint 7B does not add accounts, login, CAPTCHA/vendor integration, public comments/history/counts, attachments, screenshots, URLs, Markdown/rich text, reporter contact fields, automatic Evidence creation, automatic trust decisions, automatic Publication mutation, automatic monitoring alerts, operator mutation UI, notifications, ML classification, production secret provisioning, or production deployment.
 
 ## 6. Public HTTP contract
 
@@ -90,16 +60,14 @@ Sprint 7B does **not** add:
 
 `POST /api/v1/publications/:publicationId/feedback`
 
-The production gateway already proxies `/api/v1/*`; no Caddy routing expansion is required.
+The existing gateway `/api/v1/*` reverse proxy is reused.
 
-### Request headers
-
-Required:
+### Required request headers
 
 - `Content-Type: application/json`
 - `X-Hai-Dau-Feedback: web-v1`
 
-The custom header intentionally makes ordinary cross-site browser form submission insufficient. No CORS headers are added.
+The custom header prevents ordinary cross-site HTML form submission from satisfying the contract. No CORS headers are introduced.
 
 ### Body
 
@@ -113,8 +81,6 @@ The custom header intentionally makes ordinary cross-site browser form submissio
 }
 ```
 
-`details` is optional except for `OTHER`.
-
 Allowed `reasonCode` values are exactly:
 
 - `OUTDATED`
@@ -126,46 +92,41 @@ Allowed `reasonCode` values are exactly:
 
 Unknown properties are rejected.
 
-### Payload limits
+### Detail normalization
 
-- route body limit: 2 KiB;
-- `details`: 1–280 Unicode characters after normalization;
-- `OTHER` requires non-empty `details`;
-- other reasons may omit `details`;
-- details are Unicode-NFC normalized, trimmed, and internal whitespace collapsed;
-- ASCII control characters are rejected;
-- URL-like content (`http://`, `https://`, `www.`) is rejected;
-- details are always treated as plain text and are never rendered as HTML.
+- request body limit: 2 KiB;
+- `details`: 1–280 Unicode characters after normalization when present;
+- `OTHER` requires non-empty details;
+- NFC normalize, trim, collapse internal whitespace;
+- reject ASCII control characters;
+- reject URL-like content containing `http://`, `https://`, or `www.` case-insensitively;
+- always treat details as plain text; never render as HTML.
 
-### Publication validation
+### Publication relationship validation
 
-The backend reloads PostgreSQL authority and requires:
+The backend reloads PostgreSQL and requires that the supplied Publication exists and that the supplied PublicationVersion belongs to it.
 
-- `publicationId` exists;
-- `publicationVersionId` exists;
-- that PublicationVersion belongs to the supplied Publication.
+The version need not remain active at acceptance time. A reader may submit moments after a concurrent publish/rollback. Historical immutable versions remain valid feedback targets.
 
-The version does **not** have to remain active at transaction time. A reader may legitimately submit feedback moments after a concurrent publish/rollback changed the active pointer. The immutable version remains a valid historical target.
-
-The record stores whether the version was active when the backend accepted the submission so operators can distinguish current-version signals from raced/historical signals.
+The row records `was_active_at_submission` so operators can distinguish current-version feedback from raced/historical feedback.
 
 ### Responses
 
 - `202` — accepted or exact idempotent replay;
-- `400` — malformed UUID/header/schema/body;
-- `404` — Publication or PublicationVersion relationship not found;
-- `409` — `submissionId` already exists with a different normalized request hash;
-- `413` — body exceeds 2 KiB;
-- `429` — anonymous abuse limit exceeded, with bounded `Retry-After`;
-- `503` — feedback intake disabled/misconfigured or Redis/PostgreSQL intake dependency unavailable.
+- `400` — invalid header/content type/UUID/schema/body;
+- `404` — Publication or PublicationVersion ownership relationship not found;
+- `409` — same `submissionId` with a different canonical request hash;
+- `413` — payload exceeds 2 KiB;
+- `429` — abuse limit exceeded, with bounded `Retry-After`;
+- `503` — enabled intake cannot safely complete its Redis/PostgreSQL dependency work.
 
-A successful response does not expose the server feedback row ID or any abuse-control metadata.
+Successful responses expose neither internal feedback row IDs nor abuse metadata.
 
-## 7. Idempotency contract
+## 7. Idempotency and replay order
 
 `submissionId` is generated by the browser with `crypto.randomUUID()` and reused for retries of the same user action.
 
-The backend computes a canonical request hash from:
+The canonical request hash covers:
 
 - schemaVersion;
 - publicationId;
@@ -173,61 +134,107 @@ The backend computes a canonical request hash from:
 - reasonCode;
 - normalized details or null.
 
-PostgreSQL has a unique constraint on `client_submission_id`.
+PostgreSQL has a unique constraint on `client_submission_id` and remains the final idempotency authority.
 
 Behavior:
 
-1. unseen ID + valid request -> insert once;
-2. same ID + same canonical hash -> return the original accepted semantic result without another row;
-3. same ID + different canonical hash -> `409 IDEMPOTENCY_CONFLICT`.
+1. unseen ID + valid request -> one insert;
+2. same ID + same canonical hash -> semantic replay, one row total;
+3. same ID + different hash -> `409 IDEMPOTENCY_CONFLICT`.
 
-Redis is not the idempotency authority.
+### Redis replay marker
 
-## 8. Abuse and privacy boundary
+The abuse limiter also receives `submissionId` and keeps an expiring keyed replay marker for `fingerprint + submissionId`.
 
-### Fingerprint
+- first allowed attempt atomically consumes quota and sets the replay marker;
+- a retry with the same marker returns `replay_pass` and does **not** consume burst/daily/duplicate-signal quota again;
+- PostgreSQL still decides whether that retry is an exact replay, a first durable insert after a prior PostgreSQL failure, or an idempotency conflict;
+- the replay marker is not evidence that a PostgreSQL receipt exists.
 
-For rate limiting only, the backend computes:
+This prevents lost-response retries from punishing the user while keeping Redis non-authoritative.
 
-`HMAC-SHA256(FEEDBACK_FINGERPRINT_SECRET, normalized request.ip)`
+## 8. Trusted client network identity
 
-Rules:
+The backend must not trust arbitrary browser-supplied `X-Forwarded-For` or `X-Hai-Dau-Client-IP` values.
 
-- raw IP is never written to PostgreSQL;
-- fingerprint is never written to PostgreSQL;
-- user-agent is not part of durable data;
-- logs must not contain raw IP, fingerprint, request body details, cookies, authorization, or the fingerprint secret;
-- Redis keys contain only the keyed HMAC digest and bounded identifiers;
-- all feedback abuse keys have TTLs;
-- rotating the fingerprint secret may reset abuse counters; that is acceptable.
+### Gateway rule
 
-### Required server secret
+Both production and staging Caddy reverse-proxy blocks for `/api/v1/*` overwrite a private application header:
 
-`FEEDBACK_FINGERPRINT_SECRET` is required only when public feedback intake is enabled.
+`X-Hai-Dau-Client-IP: {remote_host}`
 
-`FEEDBACK_INTAKE_ENABLED` defaults to `false` so merging the code cannot accidentally expose an unaudited public-write route in an existing environment. Staging/CI explicitly exercise enabled mode. Production enablement and secret provisioning remain a separate production gate.
+The gateway **replaces**, rather than forwards, any incoming value for this header.
+
+The public backend topology remains private behind the gateway. Feedback intake may be enabled only in this topology.
+
+### Backend rule
+
+The enabled feedback route requires the gateway-provided `X-Hai-Dau-Client-IP` value to parse as a valid IPv4 or IPv6 address. It does not derive anonymous identity from arbitrary forwarding headers.
+
+The backend computes only:
+
+`HMAC-SHA256(FEEDBACK_FINGERPRINT_SECRET, canonical_ip)`
+
+The raw address is discarded after fingerprint creation.
+
+## 9. Abuse and privacy boundary
+
+### Secret
+
+`FEEDBACK_FINGERPRINT_SECRET` is server-only and required only when feedback intake is enabled. It must contain at least 32 bytes of unpredictable secret material after decoding/normalization by the configuration parser.
+
+`FEEDBACK_INTAKE_ENABLED` defaults to `false`. Existing environments therefore do not gain a public-write route merely by merging Sprint 7B.
 
 ### Rate limits
 
-For a new anonymous submission:
+For a **new** anonymous signal:
 
-- burst: max 5 accepted attempts per fingerprint per rolling 10 minutes;
-- daily: max 20 accepted attempts per fingerprint per rolling 24 hours;
+- burst: max 5 allowed attempts per fingerprint per rolling 10 minutes;
+- daily: max 20 allowed attempts per fingerprint per rolling 24 hours;
 - duplicate signal: same fingerprint + PublicationVersion + reasonCode at most once per 30 minutes.
 
-Exact idempotent retries of the same `submissionId` remain replay-safe in PostgreSQL. The limiter implementation must avoid using Redis as a source of domain truth.
+Exact replay-marker retries do not increment these counters.
+
+The limiter uses one atomic Redis script/transaction so concurrent requests cannot exceed a limit by racing.
+
+### Redis key material
+
+Redis keys contain only:
+
+- a versioned feedback prefix;
+- the keyed HMAC fingerprint;
+- bounded UUID/reason-code components where required.
+
+Every abuse/replay key has a TTL. No raw IP appears in a Redis key/value.
+
+### Logging
+
+Application logging must redact or avoid:
+
+- `req.headers.authorization`;
+- `req.headers.cookie`;
+- `req.headers.x-hai-dau-client-ip`;
+- request socket/remote-address network identity where the logger exposes it;
+- feedback `details`;
+- HMAC fingerprint;
+- `FEEDBACK_FINGERPRINT_SECRET`;
+- database/redis credentials and existing token/API-key paths.
+
+Feedback logs may contain bounded IDs, reason codes, HTTP/domain error codes, and retry-after seconds only.
 
 ### Redis failure
 
-Feedback intake fails closed with `503` if the abuse-control operation cannot be completed. Public Publication GET routes remain independent and continue to work from PostgreSQL/public projection semantics.
+Feedback POST fails closed with `503` if abuse control cannot complete. Existing Publication GET routes stay independent.
 
-## 9. PostgreSQL model
+## 10. PostgreSQL model
 
-One forward-only migration follows `0012_post_publication_monitoring.sql`.
+Add forward-only migration:
+
+`0013_publication_feedback_intake.sql`
 
 ### `publication_feedback_submissions`
 
-Append-only table:
+Append-only columns:
 
 - `id uuid primary key`
 - `client_submission_id uuid not null unique`
@@ -240,223 +247,213 @@ Append-only table:
 - `received_at timestamptz not null`
 - `created_at timestamptz not null default now()`
 
-Constraints:
+Database constraints:
 
 - composite FK proves `(publication_version_id, publication_id)` ownership against PublicationVersion authority;
-- reason code check permits only the six 7B codes;
-- details length check is `1..280` when non-null;
-- `OTHER` requires details;
+- reason code check permits exactly the six 7B codes;
+- details length is `1..280` when non-null;
+- `OTHER` requires non-null details;
 - append-only trigger rejects UPDATE and DELETE;
-- no IP, fingerprint, user-agent, cookie, auth token, session ID, email, or account field exists.
+- schema contains no raw-IP/fingerprint/user-agent/cookie/auth/session/email/account field.
 
-The immutable row is the feedback receipt/audit record. Sprint 7B does not emit trust-domain audit/outbox events for anonymous feedback.
+The immutable row itself is the feedback receipt. Sprint 7B emits no trust-domain audit/outbox event from anonymous feedback.
 
-## 10. Backend components
+## 11. Backend components
 
 ### `modules/feedback/types.ts`
 
-Defines the six reason codes, normalized command/result types, and internal read types.
+Defines reason codes, normalized command/result types, rate-limit results, and internal read models.
 
 ### `modules/feedback/normalize-feedback-input.ts`
 
-Pure function that:
+Pure input normalization/validation and canonical request-hash input construction. No I/O.
 
-- validates/normalizes reason and details;
-- rejects control characters and URL-like details;
-- computes canonical representation boundaries but performs no I/O.
+### `modules/feedback/feedback-fingerprint.ts`
 
-### `modules/feedback/submit-publication-feedback.ts`
-
-PostgreSQL authority function that:
-
-- reloads Publication/PublicationVersion ownership;
-- computes active-at-submission state;
-- performs idempotency conflict detection;
-- inserts exactly one immutable row;
-- returns accepted/replayed/conflict/not-found domain outcomes;
-- never imports or calls Publication, Trust, Moderation, Eligibility, or Monitoring mutation functions.
+Pure/isolated helper that canonicalizes a validated gateway IP and returns only the keyed HMAC digest. The raw IP never crosses into durable persistence APIs.
 
 ### `modules/feedback/feedback-rate-limiter.ts`
 
-Redis-backed abuse boundary that:
+Redis-only abuse component that accepts the fingerprint, `submissionId`, PublicationVersion ID and reason code. One atomic operation enforces replay marker, burst, daily and duplicate-signal windows. It has no PostgreSQL or domain mutation authority.
 
-- receives only a keyed HMAC fingerprint and bounded identifiers;
-- uses an atomic Redis script/transaction to enforce burst, daily, and duplicate-signal windows;
-- returns allow/deny/retry-after;
-- has no PostgreSQL/domain mutation authority.
+### `modules/feedback/submit-publication-feedback.ts`
+
+PostgreSQL authority that:
+
+- validates Publication/PublicationVersion ownership from PostgreSQL;
+- reads active state in the same transaction;
+- performs unique-ID/hash idempotency resolution;
+- inserts one immutable row;
+- returns accepted/replayed/conflict/not-found outcomes;
+- never imports Publication, Trust, Moderation, Eligibility, or Monitoring mutation commands.
 
 ### `modules/feedback/read-publication-feedback-signals.ts`
 
-Internal PostgreSQL reader only; no public GET route.
+Internal PostgreSQL reader only. It returns bounded aggregates and a small bounded sample of recent plain-text details. There is no public feedback GET endpoint.
 
-Returns bounded operator data such as:
+## 12. HTTP/application ordering
 
-- Publication/PublicationVersion IDs;
-- current-active flag;
-- counts by reason in a bounded recent window;
-- newest receipt time;
-- a small bounded list of recent plain-text details where present.
+`buildApp()` receives an optional enabled feedback-intake dependency. Disabled mode registers no POST route.
 
-Default ordering prioritizes currently active versions, then highest recent report count, then newest receipt.
+For an enabled request:
 
-## 11. HTTP/application composition
+1. validate custom header, JSON content type, route UUID and body schema;
+2. normalize feedback and compute canonical request hash;
+3. validate gateway client-IP header and derive the HMAC fingerprint;
+4. execute replay-aware atomic Redis abuse gate;
+5. if denied -> `429`;
+6. if allowed or replay-pass -> call PostgreSQL submission authority;
+7. map domain outcome to `202`, `404`, `409`, or `503`;
+8. never log detail text, raw IP or fingerprint.
 
-`buildApp()` receives an optional feedback intake dependency.
+A prior PostgreSQL failure after the Redis first-pass is safe: the retry marker lets the same submission bypass additional quota, and PostgreSQL can perform the first durable insert.
 
-If feedback intake is disabled, the POST route is not registered.
+Existing Publication GET routes retain their existing reader and do not depend on feedback limiter/service health.
 
-If enabled:
+## 13. Frontend interaction
 
-1. route validates header/content type/UUID/schema/body;
-2. route derives the HMAC fingerprint from `request.ip` through an injected fingerprint function;
-3. abuse limiter executes;
-4. if allowed, normalized domain command is sent to PostgreSQL submission authority;
-5. route maps domain outcome to bounded HTTP response;
-6. logs use IDs/error codes only and never include detail text or fingerprint.
+For guides backed by live public Publication IDs, add a compact `Báo lỗi nội dung` action.
 
-The existing public Publication GET reader remains unchanged and does not depend on the feedback service.
+Flow:
 
-## 12. Frontend interaction
-
-The public guide experience adds a small `Báo lỗi nội dung` action for a guide with a live `publicationId` + `publicationVersionId`.
-
-Interaction:
-
-1. open a compact feedback panel/modal;
-2. choose one reason code;
-3. optional details field, max 280 characters; required for `OTHER`;
-4. frontend creates one `submissionId` for the submit attempt and reuses it for retry;
+1. open panel/modal;
+2. select one reason;
+3. enter optional details up to 280 chars; `OTHER` requires details;
+4. create one `submissionId` and retain it while retrying that user action;
 5. POST same-origin JSON with `X-Hai-Dau-Feedback: web-v1`;
-6. on `202`, show a neutral acknowledgement and close/reset;
-7. on `429`, show a bounded retry-later message;
-8. on offline/503, show that feedback is temporarily unavailable without affecting guide reading.
+6. `202`: neutral acknowledgement and reset;
+7. `429`: retry-later state;
+8. network/`503`: temporarily unavailable state without affecting guide content.
 
-No feedback count, user identity, comments, or moderation state is displayed publicly.
+No feedback count, reporter identity, public comment text, or internal triage state is shown publicly.
 
-The frontend must escape all user-entered text by normal React rendering; it never uses `dangerouslySetInnerHTML` for feedback.
+React renders user text normally; feedback code never uses `dangerouslySetInnerHTML`.
 
-## 13. Trust isolation invariants
+## 14. Trust-isolation invariants
 
-Sprint 7B has explicit source-level and integration tests proving:
+Dedicated tests must prove:
 
-- feedback modules do not import `publishCandidateRevision` or `rollbackPublication`;
-- feedback modules do not call Evidence, HumanReview, Moderation, Eligibility, or Monitoring mutation authority;
-- no `FeedbackSubmitted` event is routed into eligibility/monitoring/publication queues;
-- no feedback table is joined into public Publication projection/read selection;
-- feedback cannot hide, retract, replace, or mutate an active PublicationVersion;
+- feedback modules do not import/call Publication mutation commands;
+- feedback modules do not import/call Evidence/HumanReview/Moderation/Eligibility/Monitoring mutation authority;
+- no anonymous feedback event is routed into eligibility, monitoring or publication queues;
+- public Publication projection/read SQL does not join the feedback table;
+- feedback cannot hide, retract, replace or mutate an active PublicationVersion;
 - feedback counts alone cannot become Evidence.
 
-## 14. Failure behavior
+## 15. Failure behavior
 
 ### PostgreSQL unavailable
 
-POST returns `503`; public GET behavior remains governed by the existing public-read path.
+Feedback POST returns `503`. Existing public GET remains governed by the current public-read path.
 
 ### Redis unavailable
 
-POST returns `503` fail-closed; no un-rate-limited write occurs.
+Feedback POST returns `503` before a new un-rate-limited write can occur.
 
-### Fingerprint secret missing while enabled
+### Feature enabled with missing/weak secret
 
-Backend startup/config validation fails for the enabled intake dependency. Existing environments remain safe because intake defaults disabled.
+Configuration/startup fails closed for the feedback dependency.
+
+### Missing/invalid gateway client IP
+
+Feedback request is rejected/fails closed; backend never falls back to untrusted browser forwarding headers.
 
 ### Duplicate/lost response
 
-Client retry with the same submission ID produces an exact replay, not a second row.
+Same submission ID reuses the Redis replay marker without consuming quota and PostgreSQL returns exact replay semantics.
 
-### Publication activation changes during submit
+### Concurrent Publication activation change
 
-The immutable target version remains valid. `was_active_at_submission` reflects the authority state observed by the submission transaction.
+The immutable target version remains valid. `was_active_at_submission` records the state observed by the database transaction.
 
-### Malicious detail text
-
-Oversized, URL-bearing, control-character, or invalid `OTHER` payloads are rejected before persistence.
-
-## 15. Security requirements
+## 16. Security requirements
 
 1. No CORS expansion.
-2. JSON-only POST with custom feedback header.
-3. Route-specific 2 KiB body limit.
-4. Strict schema with `additionalProperties: false`.
-5. No raw IP/fingerprint/user-agent/auth/cookie persistence.
-6. HMAC secret never logged or returned.
-7. Feedback detail text never logged.
-8. Redis keys contain no raw IP.
-9. Append-only feedback rows.
-10. Composite FK pins feedback to the exact PublicationVersion/Publication pair.
-11. Public read path remains independent.
-12. No automatic trust/publication/monitoring mutation.
-13. Repository security contract scans for forbidden feedback-to-authority imports and unsafe logging.
+2. JSON-only route plus custom feedback header.
+3. Route-specific 2 KiB payload limit.
+4. Strict body schema with no unknown properties.
+5. Gateway overwrites a dedicated client-IP header.
+6. Backend does not trust arbitrary forwarding headers for fingerprinting.
+7. No durable raw-IP/fingerprint/user-agent/auth/cookie/session/contact data.
+8. Secret and fingerprint never logged/returned.
+9. Feedback details never logged.
+10. Redis abuse keys contain only HMAC identity and bounded components with TTL.
+11. Append-only PostgreSQL receipts.
+12. Composite FK pins exact Publication/PublicationVersion ownership.
+13. Public reads remain independent.
+14. No automatic trust/publication/monitoring mutation.
+15. Repository contract scans forbidden feedback-to-authority imports, unsafe logging, CORS expansion, and untrusted-IP fallback.
 
-## 16. Required tests
+## 17. Required tests
 
 1. migration creates feedback table and append-only guard;
-2. database rejects cross-Publication PublicationVersion ownership;
-3. exact reason-code/details constraints hold;
+2. DB rejects cross-Publication version ownership;
+3. DB reason/details constraints hold;
 4. normalization accepts bounded Vietnamese/Unicode plain text;
-5. normalization rejects URL/control/oversized detail;
-6. `OTHER` requires detail;
-7. first submission inserts one row;
-8. exact replay returns accepted semantic result with one row;
-9. same submission ID + different payload returns conflict;
-10. historical/non-current PublicationVersion can still receive a valid report;
+5. normalization rejects URLs/control/oversized details;
+6. `OTHER` requires details;
+7. first PostgreSQL submission inserts once;
+8. exact PostgreSQL replay returns accepted semantics with one row;
+9. same submission ID + different hash conflicts;
+10. historical PublicationVersion is valid;
 11. `was_active_at_submission` is correct;
-12. unknown Publication/version relationship returns not-found;
-13. Redis burst limit is atomic;
-14. daily limit is atomic;
-15. duplicate-signal window is enforced;
-16. Redis failure fails POST closed;
-17. route requires JSON + custom header;
-18. route body size is bounded;
-19. malformed UUID/schema fails without persistence;
-20. no raw IP/fingerprint/details appear in application logs;
-21. disabled mode registers no public POST route;
-22. enabled mode requires fingerprint secret;
-23. feedback cannot mutate Publication/trust/monitoring authority;
-24. public Publication GET remains available if feedback limiter is unavailable;
-25. internal reader aggregates bounded reason counts and samples;
-26. frontend sends exact PublicationVersion ID and stable submission ID;
-27. frontend handles 202/429/503 without affecting guide rendering;
-28. XSS regression: feedback detail is never interpreted as HTML;
-29. existing frontend/backend regression remains green;
-30. dedicated Sprint 7B CI/repository contract passes.
+12. unknown ownership returns not-found;
+13. fingerprint is deterministic keyed HMAC and never raw IP;
+14. malformed gateway IP is rejected;
+15. Redis burst limit is atomic;
+16. Redis daily limit is atomic;
+17. duplicate-signal window is atomic;
+18. same submission replay marker does not consume quota twice;
+19. Redis failure fails feedback closed;
+20. route requires JSON + custom header;
+21. body is bounded to 2 KiB;
+22. malformed schema/UUID fails without persistence;
+23. no raw IP/header/fingerprint/details appear in logs;
+24. disabled mode registers no POST route;
+25. enabled mode requires strong fingerprint secret;
+26. gateway overwrites `X-Hai-Dau-Client-IP` in staging and production configs;
+27. feedback cannot mutate Publication/trust/monitoring authority;
+28. public GET works if feedback limiter is unavailable;
+29. internal reader returns bounded aggregates/samples;
+30. frontend sends exact PublicationVersion and stable submission ID;
+31. frontend handles 202/429/503 without hiding guide content;
+32. XSS regression proves details are never interpreted as HTML;
+33. existing frontend/backend regression stays green;
+34. dedicated Sprint 7B CI/repository contract passes.
 
-## 17. Rollout and deployment boundary
+## 18. Rollout boundary
 
-Repository integration may merge once exact-head CI is green.
+Repository integration may merge after exact-head CI is green.
 
-Production enablement is separate because it requires a new server secret/binding:
+Real production enablement is separate and requires, at minimum:
 
-- `FEEDBACK_INTAKE_ENABLED=true`
-- `FEEDBACK_FINGERPRINT_SECRET=<server-only secret>`
+- private backend remains reachable only through the gateway topology;
+- gateway client-IP overwrite is deployed;
+- `FEEDBACK_INTAKE_ENABLED=true`;
+- server-only `FEEDBACK_FINGERPRINT_SECRET` is provisioned securely;
+- production smoke/abuse checks are explicitly authorized.
 
-No production secret is committed, printed, requested in chat, or created by Sprint 7B repository implementation.
+Sprint 7B does not create, request in chat, print, commit, or deploy any real production secret.
 
-The existing production bootstrap/delivery gate must be updated before real deployment so the new secret requirement is explicit and fail-closed.
+The existing production release gate is **not** changed to require a ninth global secret while feedback remains disabled by default. A later production rollout change may add conditional binding checks when the feature is intentionally enabled.
 
-## 18. Acceptance criteria
+## 19. Acceptance criteria
 
-Sprint 7B is repository-ready when:
+Repository-ready means:
 
-- a reader can submit one bounded anonymous report for an exact PublicationVersion;
-- replay is idempotent and conflict-safe;
-- anonymous abuse controls are atomic and fail closed;
-- no raw network identity is durably stored;
-- feedback remains completely outside trust/Publication/monitoring authority;
-- the public guide remains readable when feedback intake is disabled or unavailable;
-- internal code can read bounded feedback signals for later human triage;
+- one bounded anonymous report can be submitted for an exact PublicationVersion;
+- retries are idempotent and do not double-charge abuse quota;
+- conflicting idempotency reuse is rejected;
+- abuse controls are atomic and fail closed;
+- trusted network identity comes only from the gateway-overwritten header;
+- no raw network identity is durably stored or logged;
+- feedback remains outside trust/Publication/monitoring authority;
+- guide GET/read rendering survives disabled/unavailable feedback intake;
+- internal code can read bounded feedback signals for human triage;
 - frontend offers a minimal usable report flow;
-- exact-head dedicated + inherited regression/staging/release/dry-run CI is green;
-- no production deployment occurs as part of the Sprint 7B merge.
+- dedicated and inherited exact-head CI is green;
+- no production deployment occurs as part of merge.
 
-## 19. Deferred work
+## 20. Deferred work
 
-Potential later work, requiring a separate design/spec:
-
-- operator feedback triage UI;
-- authenticated reporter reputation;
-- CAPTCHA/vendor anti-abuse integration if needed;
-- notification workflows;
-- feedback-derived candidate investigation suggestions;
-- carefully governed conversion of a human-verified report into Evidence;
-- production rollout and live abuse tuning.
+Separate future design/specs may cover operator triage UI, authenticated reporter reputation, CAPTCHA/vendor integration if abuse warrants it, notifications, feedback-derived investigation suggestions, human-governed conversion of a verified report into Evidence, and production rollout/live abuse tuning.
