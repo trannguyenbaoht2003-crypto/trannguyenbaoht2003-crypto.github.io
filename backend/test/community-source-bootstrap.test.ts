@@ -14,9 +14,26 @@ test('community source bootstrap is idempotent and leaves one governed active po
   const second = await bootstrapCommunitySource(pool);
 
   assert.deepEqual(second, first);
-  assert.equal(await tableCount(pool, 'sources'), 1);
-  assert.equal(await tableCount(pool, 'source_policy_revisions'), 1);
-  assert.equal(await tableCount(pool, 'active_source_policies'), 1);
+
+  const governed = await pool.query<{
+    active_count: number;
+    policy_count: number;
+    source_count: number;
+  }>(`
+    select
+      count(distinct s.source_id)::int as source_count,
+      count(distinct spr.source_policy_revision_id)::int as policy_count,
+      count(distinct asp.source_id)::int as active_count
+      from sources s
+      left join source_policy_revisions spr on spr.source_id = s.source_id
+      left join active_source_policies asp on asp.source_id = s.source_id
+     where s.source_key = 'community-collector-v1'
+  `);
+  assert.deepEqual(governed.rows[0], {
+    active_count: 1,
+    policy_count: 1,
+    source_count: 1,
+  });
   assert.equal(await tableCount(pool, 'audit_events'), 1);
   assert.equal(await tableCount(pool, 'outbox_events'), 1);
 

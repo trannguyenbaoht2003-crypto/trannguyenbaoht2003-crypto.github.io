@@ -19,6 +19,9 @@ const expectedTables = [
   'active_eligibility_policy_revision',
   'active_publication_versions',
   'active_source_policies',
+  'ai_candidate_materializations',
+  'ai_candidate_proposals',
+  'ai_discovery_runs',
   'audit_events',
   'candidate_claim_set_seals',
   'candidate_claims',
@@ -216,7 +219,9 @@ test('transaction helper rolls back every write after an error', async () => {
     }),
     /boom/,
   );
-  const result = await pool.query<{ count: string }>('select count(*) from sources');
+  const result = await pool.query<{ count: string }>(
+    `select count(*) from sources where source_key = 'rollback-test'`,
+  );
   assert.equal(result.rows[0]?.count, '0');
   await pool.end();
 });
