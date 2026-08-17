@@ -196,7 +196,9 @@ test('provider execution caps retryable failure at three total attempts and reco
   const result = await executeAiDiscoveryProviderRun(pool, commandFixture(provider), {
     recordRun: recorded.fn,
     now: () => '2026-08-17T10:00:05.000Z',
-    sleep: async (milliseconds) => sleeps.push(milliseconds),
+    sleep: async (milliseconds) => {
+      sleeps.push(milliseconds);
+    },
   });
 
   assert.equal(provider.calls, 3);
