@@ -78,12 +78,17 @@ test('operator snapshot route applies exact defaults', async () => {
 
   const response = await app.inject({ method: 'GET', url: '/api/operator/v1/snapshot' });
   assert.equal(response.statusCode, 200);
-  assert.deepEqual(observedOptions, {
-    sinceHours: 168,
-    limit: 50,
-    detailSampleLimit: 3,
-    now: assert.match.any,
-  });
+  assert.ok(observedOptions && typeof observedOptions === 'object');
+  const defaults = observedOptions as {
+    sinceHours: number;
+    limit: number;
+    detailSampleLimit: number;
+    now: unknown;
+  };
+  assert.equal(defaults.sinceHours, 168);
+  assert.equal(defaults.limit, 50);
+  assert.equal(defaults.detailSampleLimit, 3);
+  assert.ok(defaults.now instanceof Date);
   await app.close();
 });
 
