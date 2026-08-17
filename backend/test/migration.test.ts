@@ -61,6 +61,7 @@ const expectedTables = [
   'patch_lifecycle_events',
   'patches',
   'publication_activation_history',
+  'publication_feedback_submissions',
   'publication_monitoring_alert_events',
   'publication_monitoring_delivery_effects',
   'publication_monitoring_effects',
