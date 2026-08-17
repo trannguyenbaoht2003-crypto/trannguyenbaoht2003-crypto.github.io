@@ -24,6 +24,20 @@ function normalizedFixture() {
   });
 }
 
+function collectSchemaKeywords(value: unknown, keywords = new Set<string>()): Set<string> {
+  if (Array.isArray(value)) {
+    for (const entry of value) collectSchemaKeywords(entry, keywords);
+    return keywords;
+  }
+  if (value !== null && typeof value === 'object') {
+    for (const [key, entry] of Object.entries(value)) {
+      keywords.add(key);
+      collectSchemaKeywords(entry, keywords);
+    }
+  }
+  return keywords;
+}
+
 test('provider request uses stable versioned prompt metadata and deterministic messages', () => {
   const normalized = normalizedFixture();
   const first = buildAiProviderRequest(normalized);
@@ -53,7 +67,6 @@ test('provider request exposes a strict closed structured-output schema', () => 
 
   const proposals = schema.properties.proposals;
   assert.equal(proposals.type, 'array');
-  assert.equal(proposals.maxItems, 64);
   assert.equal(proposals.items.type, 'object');
   assert.equal(proposals.items.additionalProperties, false);
   assert.deepEqual(proposals.items.required, [
@@ -68,7 +81,23 @@ test('provider request exposes a strict closed structured-output schema', () => 
     'itemExternalIds',
     'rationale',
   ]);
-  assert.equal(proposals.items.properties.rationale.maxLength, 2_000);
+});
+
+test('provider schema leaves quantitative and uniqueness constraints to local server validation', () => {
+  const keywords = collectSchemaKeywords(buildAiProviderRequest(normalizedFixture()).responseSchema);
+  for (const unsupportedOrModelSpecific of [
+    'minLength',
+    'maxLength',
+    'minItems',
+    'maxItems',
+    'uniqueItems',
+  ]) {
+    assert.equal(
+      keywords.has(unsupportedOrModelSpecific),
+      false,
+      `provider schema must not depend on ${unsupportedOrModelSpecific}`,
+    );
+  }
 });
 
 test('provider request contains no credential-bearing or publication-authority fields', () => {
