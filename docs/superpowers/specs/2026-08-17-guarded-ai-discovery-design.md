@@ -42,13 +42,13 @@ This preserves all existing Candidate Registry checks and event/audit behavior.
 
 ## 4. Reserved system source
 
-Migration `0014_guarded_ai_discovery.sql` creates or reuses a reserved source:
+Migration `0014_guarded_ai_discovery.sql` creates the reserved source when absent:
 
 - `source_key = 'ai-discovery'`
 - display name `AI Discovery`
 - status `active`
 
-It creates source-policy revision 1 only if absent:
+It creates source-policy revision 1 when absent:
 
 - `storage_permission = 'aggregate_only'`
 - `collector_enabled = false`
@@ -56,6 +56,8 @@ It creates source-policy revision 1 only if absent:
 - created_by `system:migration:0014`
 
 It activates that policy for the reserved source.
+
+If `source_key='ai-discovery'`, revision 1, or the active policy already exists with any conflicting identity or unsafe values, migration/verification fails closed rather than adopting it. A later revision is not silently overwritten.
 
 The source cannot be used as a network collector. It exists only so Candidate Registry provenance continues through the existing raw-observation graph.
 
@@ -112,6 +114,21 @@ Uniqueness:
 - `(ai_discovery_run_id, proposal_hash)` unique.
 
 Selection arrays use the same canonical constraints as CandidateSelectionPayload v1: bounded strings, unique values and canonical ascending order. Rationale is untrusted text, bounded to 2000 characters, and never used as Evidence.
+
+`proposal_hash` is computed server-side from exactly this canonical tuple and no other fields:
+
+```json
+{
+  "schemaVersion": 1,
+  "patchKey": "...",
+  "gameModeExternalId": "aram_mayhem",
+  "subjectExternalId": "...",
+  "augmentExternalIds": ["..."],
+  "itemExternalIds": ["..."]
+}
+```
+
+UUIDs, ordinal, rationale, provider/model metadata and timestamps are deliberately excluded from `proposal_hash`. Changing explanatory rationale therefore does not create a different candidate-selection identity, while a selection change always changes the hash.
 
 ### 5.3 `ai_candidate_materializations`
 
@@ -173,7 +190,7 @@ Rules:
 
 - failed runs must contain zero proposals;
 - completed runs may contain zero or more proposals;
-- proposal hash is computed server-side from the canonical proposal tuple, never trusted from the caller;
+- proposal hash is computed server-side from the exact canonical selection tuple in §5.2, never trusted from the caller;
 - `outputHash` remains provider/output provenance and is not used as Evidence;
 - input validation occurs before transaction work;
 - idempotency scope is `ai.discovery.run.record`;
@@ -206,11 +223,13 @@ Command:
 }
 ```
 
+Idempotency scope is `ai.candidate.proposal.materialize`.
+
 Transaction rules:
 
 1. lock the proposal and parent run;
 2. require parent run status `completed`;
-3. replay an existing materialization only if it refers to the same proposal and canonical proposal content;
+3. replay an existing materialization only if it refers to the same proposal and canonical proposal hash;
 4. load reserved `ai-discovery` source + active policy and require `collector_enabled=false` and `storage_permission='aggregate_only'`;
 5. insert synthetic raw observation:
    - `adapter_version='ai-discovery-proposal-v1'`;
@@ -337,7 +356,7 @@ No public frontend route, operator route, Caddy/Railway configuration or product
 1. migration creates immutable run/proposal/materialization authority and reserved safe AI source;
 2. completed run with canonical proposals records atomically;
 3. failed run rejects proposals;
-4. proposal hashes are deterministic and independent of UUIDs/rationale ordering noise;
+4. proposal hashes are deterministic and independent of UUIDs, ordinal, rationale and timestamps;
 5. exact replay is duplicate-noop;
 6. idempotency/run-key conflict fails closed;
 7. proposal selection arrays reject duplicates/non-canonical order/invalid bounds;
