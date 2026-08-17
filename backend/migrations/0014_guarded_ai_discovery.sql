@@ -254,15 +254,15 @@ create table ai_candidate_materializations (
   ai_candidate_materialization_id uuid primary key,
   ai_candidate_proposal_id uuid not null unique
     references ai_candidate_proposals(ai_candidate_proposal_id),
-  raw_observation_id uuid not null unique
+  raw_observation_id uuid not null
     references raw_observations(raw_observation_id),
-  normalized_observation_id uuid not null unique
+  normalized_observation_id uuid not null
     references normalized_observations(normalized_observation_id),
   candidate_id uuid not null
     references candidates(candidate_id),
   candidate_revision_id uuid not null
     references candidate_revisions(candidate_revision_id),
-  candidate_provenance_id uuid not null unique
+  candidate_provenance_id uuid not null
     references candidate_provenance(candidate_provenance_id),
   actor_id text not null
     check (char_length(btrim(actor_id)) between 1 and 256),
@@ -274,6 +274,10 @@ create table ai_candidate_materializations (
   created_at timestamptz not null default clock_timestamp()
 );
 
+create index ai_candidate_materializations_graph_idx
+  on ai_candidate_materializations
+     (raw_observation_id, normalized_observation_id, candidate_provenance_id);
+
 create or replace function enforce_ai_candidate_materialization_graph()
 returns trigger
 language plpgsql
@@ -282,19 +286,36 @@ declare
   graph_matches boolean;
 begin
   select (
-           no.raw_observation_id = new.raw_observation_id
+           source.source_key = 'ai-discovery'
+           and policy.storage_permission = 'aggregate_only'
+           and policy.collector_enabled is false
+           and active.source_policy_revision_id = raw.source_policy_revision_id
+           and raw.adapter_version = 'ai-discovery-proposal-v1'
+           and raw.content_hash = proposal.proposal_hash
+           and no.raw_observation_id = new.raw_observation_id
            and cp.normalized_observation_id = new.normalized_observation_id
            and cp.candidate_revision_id = new.candidate_revision_id
            and cp.origin = 'ai_generated'
            and cr.candidate_id = new.candidate_id
          )
     into graph_matches
-    from normalized_observations no
+    from ai_candidate_proposals proposal
+    join raw_observations raw
+      on raw.raw_observation_id = new.raw_observation_id
+    join sources source
+      on source.source_id = raw.source_id
+    join source_policy_revisions policy
+      on policy.source_policy_revision_id = raw.source_policy_revision_id
+     and policy.source_id = source.source_id
+    join active_source_policies active
+      on active.source_id = source.source_id
+    join normalized_observations no
+      on no.normalized_observation_id = new.normalized_observation_id
     join candidate_provenance cp
       on cp.candidate_provenance_id = new.candidate_provenance_id
     join candidate_revisions cr
       on cr.candidate_revision_id = new.candidate_revision_id
-   where no.normalized_observation_id = new.normalized_observation_id;
+   where proposal.ai_candidate_proposal_id = new.ai_candidate_proposal_id;
 
   if graph_matches is distinct from true then
     raise exception 'AI_DISCOVERY_MATERIALIZATION_GRAPH_MISMATCH'
