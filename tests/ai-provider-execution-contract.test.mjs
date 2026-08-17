@@ -136,3 +136,33 @@ test('Sprint 8B runbook locks private invocation, logging, authority and product
     assert.match(runbook, new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'));
   }
 });
+
+test('Sprint 8B CI gate verifies provider execution without secrets or deployment authority', async () => {
+  const path = '.github/workflows/sprint-8b-ai-provider-execution.yml';
+  assert.equal(existsSync(new URL(path, ROOT)), true, `missing ${path}`);
+  const workflow = await read(path);
+
+  for (const required of [
+    'name: Sprint 8B AI provider execution gate',
+    'contents: read',
+    'node-version: 22.13.0',
+    'image: postgres:17',
+    'image: redis:7',
+    'persist-credentials: false',
+    'npm ci',
+    'npm --prefix backend ci',
+    'npm run test:ai-provider-execution',
+    'npm run lint',
+    'npm --prefix backend run typecheck',
+    'npm --prefix backend test',
+    'npm --prefix backend run build',
+    'Repository cleanliness',
+    'Deployment and secret guard',
+  ]) {
+    assert.match(workflow, new RegExp(required.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'));
+  }
+
+  assert.doesNotMatch(workflow, /secrets\.OPENAI_API_KEY|OPENAI_API_KEY\s*:/i);
+  assert.doesNotMatch(workflow, /ai-discovery:run|api\.openai\.com\/v1\/responses|curl\s+.*openai|wget\s+.*openai/i);
+  assert.doesNotMatch(workflow, /(contents|packages|pages|id-token):\s*write/i);
+});
