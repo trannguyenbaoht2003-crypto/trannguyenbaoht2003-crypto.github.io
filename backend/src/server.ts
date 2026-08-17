@@ -37,7 +37,7 @@ async function main(): Promise<void> {
   const app = buildApp({
     publications: createPublicPublicationReader(pool),
     resources: createResourceHealth(pool, redis),
-    feedback,
+    ...(feedback ? { feedback } : {}),
   });
 
   const shutdown = async (signal: NodeJS.Signals) => {
