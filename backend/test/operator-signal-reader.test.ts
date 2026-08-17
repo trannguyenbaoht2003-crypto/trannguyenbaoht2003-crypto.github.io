@@ -153,16 +153,19 @@ test('operator signal reader joins exact versions, ranks deterministically, and 
   ]);
 
   const critical = snapshot.signals[0];
+  assert.ok(critical);
   assert.equal(critical.publicationVersionId, VERSION_A1);
   assert.equal(critical.isActiveVersion, true);
   assert.equal(critical.monitoringAlert?.severity, 'critical');
   assert.equal(critical.feedback?.totalCount, 4);
 
   const warning = snapshot.signals[1];
+  assert.ok(warning);
   assert.equal(warning.publicationId, PUBLICATION_B);
   assert.equal(warning.feedback, null);
 
   const historicalFeedback = snapshot.signals[2];
+  assert.ok(historicalFeedback);
   assert.equal(historicalFeedback.publicationVersionId, VERSION_A2);
   assert.equal(historicalFeedback.isActiveVersion, false);
   assert.equal(historicalFeedback.monitoringAlert, null);
@@ -183,10 +186,14 @@ test('operator signal reader never cross-joins feedback from another version of 
   );
 
   assert.equal(snapshot.signals.length, 2);
-  assert.equal(snapshot.signals[0].publicationVersionId, VERSION_A1);
-  assert.equal(snapshot.signals[0].feedback, null);
-  assert.equal(snapshot.signals[1].publicationVersionId, VERSION_A2);
-  assert.equal(snapshot.signals[1].monitoringAlert, null);
+  const monitoringOnly = snapshot.signals[0];
+  const feedbackOnly = snapshot.signals[1];
+  assert.ok(monitoringOnly);
+  assert.ok(feedbackOnly);
+  assert.equal(monitoringOnly.publicationVersionId, VERSION_A1);
+  assert.equal(monitoringOnly.feedback, null);
+  assert.equal(feedbackOnly.publicationVersionId, VERSION_A2);
+  assert.equal(feedbackOnly.monitoringAlert, null);
 });
 
 test('operator signal reader rolls back and releases the transaction client when a source reader fails', async () => {
