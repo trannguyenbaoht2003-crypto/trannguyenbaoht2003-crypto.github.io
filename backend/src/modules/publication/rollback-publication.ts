@@ -99,10 +99,7 @@ function normalizeCommand(
         permissions: ['publisher'],
       },
       auditId: requireUuid(input.auditId, 'auditId'),
-      outboxEventId: requireUuid(
-        input.outboxEventId,
-        'outboxEventId',
-      ),
+      outboxEventId: requireUuid(input.outboxEventId, 'outboxEventId'),
       correlationId: requireBoundedText(
         input.correlationId,
         'correlationId',
@@ -168,9 +165,7 @@ export async function rollbackPublication(
       throw new Error('PUBLICATION_NOT_FOUND');
     }
 
-    const active = await client.query<{
-      publication_version_id: string;
-    }>(
+    const active = await client.query<{ publication_version_id: string }>(
       `select publication_version_id
          from active_publication_versions
         where publication_id = $1
@@ -182,9 +177,7 @@ export async function rollbackPublication(
       throw new Error('PUBLICATION_NOT_FOUND');
     }
 
-    const replay = await beginIdempotentCommand<
-      RollbackPublicationResult
-    >(
+    const replay = await beginIdempotentCommand<RollbackPublicationResult>(
       client,
       'publication_rollback',
       command.idempotencyKey,
@@ -194,9 +187,7 @@ export async function rollbackPublication(
       return { ...replay, replayed: true };
     }
 
-    if (
-      currentActive !== command.expectedActivePublicationVersionId
-    ) {
+    if (currentActive !== command.expectedActivePublicationVersionId) {
       throw new Error('PUBLICATION_ACTIVE_POINTER_CONFLICT');
     }
     if (currentActive === command.targetPublicationVersionId) {
@@ -228,10 +219,8 @@ export async function rollbackPublication(
       activationId: command.activationId,
       candidateId: targetVersion.candidate_id,
       candidateRevisionId: targetVersion.candidate_revision_id,
-      eligibilityEvaluationId:
-        targetVersion.candidate_eligibility_evaluation_id,
-      eligibilityPolicyRevisionId:
-        targetVersion.eligibility_policy_revision_id,
+      eligibilityEvaluationId: targetVersion.candidate_eligibility_evaluation_id,
+      eligibilityPolicyRevisionId: targetVersion.eligibility_policy_revision_id,
       payloadHash: targetVersion.payload_hash,
       previousActivePublicationVersionId: currentActive,
       publicationId: command.publicationId,
@@ -243,8 +232,7 @@ export async function rollbackPublication(
          (audit_event_id, actor_id, action, reason, correlation_id,
           policy_version, payload)
        values ($1, $2, 'publication.version_rolled_back',
-               'Publication active version rolled back', $3, $4,
-               $5::jsonb)`,
+               'Publication active version rolled back', $3, $4, $5::jsonb)`,
       [
         command.auditId,
         actorId,
@@ -257,8 +245,7 @@ export async function rollbackPublication(
       `insert into outbox_events
          (outbox_event_id, aggregate_type, aggregate_id, event_type,
           payload, correlation_id)
-       values ($1, 'Publication', $2, 'PublicationRolledBack',
-               $3::jsonb, $4)`,
+       values ($1, 'Publication', $2, 'PublicationRolledBack', $3::jsonb, $4)`,
       [
         command.outboxEventId,
         command.publicationId,
@@ -266,9 +253,7 @@ export async function rollbackPublication(
         command.correlationId,
       ],
     );
-    const activation = await client.query<{
-      activation_sequence: string;
-    }>(
+    const activation = await client.query<{ activation_sequence: string }>(
       `insert into publication_activation_history
          (activation_id, publication_id, activation_kind,
           from_publication_version_id, to_publication_version_id,
@@ -307,6 +292,24 @@ export async function rollbackPublication(
     if (updated.rowCount !== 1) {
       throw new Error('PUBLICATION_ACTIVE_POINTER_CONFLICT');
     }
+
+    await client.query(
+      `insert into outbox_events
+         (outbox_event_id, aggregate_type, aggregate_id, event_type,
+          payload, correlation_id)
+       values (gen_random_uuid(), 'publication', $1,
+               'PublicationMonitoringRequested', $2::jsonb, $3)`,
+      [
+        command.publicationId,
+        JSON.stringify({
+          activationId: command.activationId,
+          publicationId: command.publicationId,
+          requestedReason: 'rolled_back',
+          schemaVersion: 1,
+        }),
+        command.correlationId,
+      ],
+    );
 
     const result: RollbackPublicationResult = {
       publicationId: command.publicationId,
