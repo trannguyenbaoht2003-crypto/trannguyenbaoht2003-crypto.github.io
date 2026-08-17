@@ -11,6 +11,9 @@ const DEVELOPER_INSTRUCTION = [
   'Return zero or more proposals matching the required structured-output schema.',
 ].join(' ');
 
+// Keep the provider-facing schema structural-only. Quantitative bounds and
+// uniqueness are enforced again by local server validation so runtime model
+// choice cannot weaken or make the provider schema incompatible.
 const RESPONSE_SCHEMA = {
   type: 'object',
   additionalProperties: false,
@@ -18,7 +21,6 @@ const RESPONSE_SCHEMA = {
   properties: {
     proposals: {
       type: 'array',
-      maxItems: 64,
       items: {
         type: 'object',
         additionalProperties: false,
@@ -31,32 +33,21 @@ const RESPONSE_SCHEMA = {
         properties: {
           subjectExternalId: {
             type: 'string',
-            minLength: 1,
-            maxLength: 128,
           },
           augmentExternalIds: {
             type: 'array',
-            maxItems: 128,
-            uniqueItems: true,
             items: {
               type: 'string',
-              minLength: 1,
-              maxLength: 128,
             },
           },
           itemExternalIds: {
             type: 'array',
-            maxItems: 128,
-            uniqueItems: true,
             items: {
               type: 'string',
-              minLength: 1,
-              maxLength: 128,
             },
           },
           rationale: {
             type: ['string', 'null'],
-            maxLength: 2_000,
           },
         },
       },
