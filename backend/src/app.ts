@@ -1,6 +1,10 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 
 import {
+  registerPublicFeedbackRoute,
+  type PublicFeedbackIntake,
+} from './http/public-feedback.js';
+import {
   registerPublicPublicationRoutes,
 } from './http/public-publications.js';
 import type {
@@ -13,10 +17,14 @@ const loggerOptions = {
     paths: [
       'req.headers.authorization',
       'req.headers.cookie',
+      'req.headers.x-hai-dau-client-ip',
+      'req.remoteAddress',
+      'req.ip',
       'databaseUrl',
       'redisUrl',
       '*.apiKey',
       '*.token',
+      '*.feedbackFingerprintSecret',
     ],
     censor: '[REDACTED]',
   },
@@ -25,6 +33,7 @@ const loggerOptions = {
 export interface BuildAppOptions {
   resources: ResourceHealth;
   publications: PublicPublicationReader;
+  feedback?: PublicFeedbackIntake;
   logger?: boolean;
 }
 
@@ -49,6 +58,9 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
   });
 
   registerPublicPublicationRoutes(app, options.publications);
+  if (options.feedback) {
+    registerPublicFeedbackRoute(app, options.feedback);
+  }
 
   return app;
 }
