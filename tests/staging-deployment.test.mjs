@@ -40,6 +40,7 @@ test("staging topology is same-origin, private by default, and deployment-free",
   assert.match(caddy, /handle \/api\/v1\/\*/);
   assert.match(caddy, /handle \/health\/\*/);
   assert.match(caddy, /reverse_proxy backend:3001/);
+  assert.match(caddy, /header_up X-Hai-Dau-Client-IP \{remote_host\}/);
   assert.match(caddy, /try_files \{path\} \{path\}\/ \/index\.html/);
   assert.match(caddy, /Cache-Control "no-store"/);
 
@@ -55,6 +56,8 @@ test("staging topology is same-origin, private by default, and deployment-free",
   assert.match(exampleEnv, /POSTGRES_DB=/);
   assert.match(exampleEnv, /POSTGRES_USER=/);
   assert.match(exampleEnv, /POSTGRES_PASSWORD=/);
+  assert.match(exampleEnv, /^FEEDBACK_INTAKE_ENABLED=false$/m);
+  assert.doesNotMatch(exampleEnv, /FEEDBACK_FINGERPRINT_SECRET\s*=\s*\S+/);
   assert.doesNotMatch(exampleEnv, /https?:\/\/(?!127\.0\.0\.1|localhost)/);
 
   assert.match(dockerignore, /node_modules/);
@@ -66,6 +69,24 @@ test("staging topology is same-origin, private by default, and deployment-free",
   assert.doesNotMatch(deploymentSource, /access-control-allow-origin|cors/i);
   assert.doesNotMatch(deploymentSource, /docker\s+(?:login|push)|gh-pages|pages deploy|kubectl|terraform|pulumi|aws |gcloud|az login/i);
   assert.doesNotMatch(deploymentSource, /BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY/);
+});
+
+test("feedback gateway identity is overwritten in staging and production and remains disabled by default", async () => {
+  const [stagingCaddy, productionCaddy, stagingEnv, productionEnv] = await Promise.all([
+    read("deploy/staging/Caddyfile"),
+    read("deploy/production/Caddyfile"),
+    read("deploy/staging/.env.example"),
+    read("deploy/production/production.env.example"),
+  ]);
+
+  for (const caddy of [stagingCaddy, productionCaddy]) {
+    assert.match(caddy, /handle \/api\/v1\/\*[\s\S]*header_up X-Hai-Dau-Client-IP \{remote_host\}/);
+    assert.doesNotMatch(caddy, /Access-Control-Allow-Origin/i);
+  }
+  for (const env of [stagingEnv, productionEnv]) {
+    assert.match(env, /^FEEDBACK_INTAKE_ENABLED=false$/m);
+    assert.doesNotMatch(env, /FEEDBACK_FINGERPRINT_SECRET\s*=\s*\S+/);
+  }
 });
 
 test("staging smoke checks normal, outage, recovery, and the absent mutation route", async () => {
