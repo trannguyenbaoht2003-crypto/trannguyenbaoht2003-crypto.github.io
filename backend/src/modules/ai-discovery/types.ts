@@ -61,13 +61,8 @@ export interface MaterializeAiCandidateProposalCommand {
   actorId: string;
   aiCandidateMaterializationId: string;
   aiCandidateProposalId: string;
-  candidateId: string;
-  candidateRevisionId: string;
-  candidateProvenanceId: string;
   correlationId: string;
   idempotencyKey: string;
-  normalizedObservationId: string;
-  rawObservationId: string;
   reason: string;
   materializedAt: string;
 }
@@ -80,6 +75,7 @@ export interface MaterializeAiCandidateProposalResult {
   candidateProvenanceId: string;
   normalizedObservationId: string;
   rawObservationId: string;
+  reusedCanonicalGraph: boolean;
   replayed: boolean;
 }
 
