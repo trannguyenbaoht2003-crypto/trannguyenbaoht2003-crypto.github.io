@@ -51,7 +51,12 @@ function createIntake() {
 }
 
 function appWith(feedback?: PublicFeedbackIntake) {
-  return buildApp({ logger: false, resources, publications, feedback });
+  return buildApp({
+    logger: false,
+    resources,
+    publications,
+    ...(feedback ? { feedback } : {}),
+  });
 }
 
 function validRequest() {
