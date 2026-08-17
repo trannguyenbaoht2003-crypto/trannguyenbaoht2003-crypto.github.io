@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import type { OutgoingHttpHeaders } from 'node:http';
 import test from 'node:test';
 
 import {
@@ -17,7 +18,7 @@ const EMPTY_SNAPSHOT: OperatorSnapshot = {
   signals: [],
 };
 
-function expectedSecurityHeaders(headers: Record<string, string | string[] | undefined>) {
+function expectedSecurityHeaders(headers: OutgoingHttpHeaders) {
   assert.equal(headers['cache-control'], 'no-store');
   assert.equal(headers['x-content-type-options'], 'nosniff');
   assert.equal(headers['referrer-policy'], 'no-referrer');
