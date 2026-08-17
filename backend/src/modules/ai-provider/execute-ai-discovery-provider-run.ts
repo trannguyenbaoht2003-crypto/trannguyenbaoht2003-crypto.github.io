@@ -2,6 +2,10 @@ import { createHash } from 'node:crypto';
 
 import type { Pool } from 'pg';
 
+import {
+  readAiDiscoveryRunReplay,
+  type AiDiscoveryRunReplayIdentity,
+} from '../ai-discovery/read-ai-discovery-run-replay.js';
 import { recordAiDiscoveryRun } from '../ai-discovery/record-ai-discovery-run.js';
 import type {
   RecordAiDiscoveryRunCommand,
@@ -61,12 +65,18 @@ export interface ExecuteAiDiscoveryProviderRunCommand {
   startedAt: string;
 }
 
+type ReadReplay = (
+  pool: Pool,
+  identity: AiDiscoveryRunReplayIdentity,
+) => Promise<RecordAiDiscoveryRunResult | null>;
+
 type RecordRun = (
   pool: Pool,
   command: RecordAiDiscoveryRunCommand,
 ) => Promise<RecordAiDiscoveryRunResult>;
 
 export interface ExecuteAiDiscoveryProviderRunDependencies {
+  readReplay?: ReadReplay;
   recordRun?: RecordRun;
   now?: () => string;
   sleep?: (milliseconds: number) => Promise<void>;
@@ -272,6 +282,26 @@ export async function executeAiDiscoveryProviderRun(
   validateCommand(command);
   const normalizedInput = normalizeAiProviderExecutionInput(command.input);
   const inputHash = hashNormalizedAiProviderExecutionInput(normalizedInput);
+  const readReplay = dependencies.readReplay
+    ?? (dependencies.recordRun === undefined ? readAiDiscoveryRunReplay : null);
+  if (readReplay) {
+    const replay = await readReplay(pool, {
+      actorId: command.actorId,
+      aiDiscoveryRunId: command.aiDiscoveryRunId,
+      correlationId: command.correlationId,
+      idempotencyKey: command.idempotencyKey,
+      runKey: normalizedInput.runKey,
+      providerKey: command.provider.providerKey,
+      modelKey: command.modelKey,
+      modelRevision: command.modelRevision,
+      promptTemplateKey: AI_DISCOVERY_PROMPT_TEMPLATE_KEY,
+      promptTemplateVersion: AI_DISCOVERY_PROMPT_TEMPLATE_VERSION,
+      inputHash,
+      startedAt: command.startedAt,
+    });
+    if (replay) return replay;
+  }
+
   const request = buildAiProviderRequest(normalizedInput);
   const recordRun = dependencies.recordRun ?? recordAiDiscoveryRun;
   const now = dependencies.now ?? defaultNow;
