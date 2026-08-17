@@ -2,6 +2,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { PublicFeedbackPanel } from "./PublicFeedbackPanel.tsx";
 import {
   ChampionGuide,
   CommunityBuild,
@@ -303,6 +304,12 @@ function GuideDrawer({
                 </div>
                 <div className="build-tags"><span>{champion.role}</span><span>{champion.coreAugments.length} lõi chính</span><span>{champion.items.length} món gợi ý</span></div>
                 {champion.publicPublication && <small className="publication-meta">Phiên bản {champion.publicPublication.versionNumber} · Xuất bản {formatSourceDate(champion.publicPublication.publishedAt)}</small>}
+                {champion.publicPublication && (
+                  <PublicFeedbackPanel
+                    publicationId={champion.publicPublication.publicationId}
+                    publicationVersionId={champion.publicPublication.publicationVersionId}
+                  />
+                )}
                 <p className="build-summary">{champion.summary}</p>
                 <div className="build-assets">
                   <div className="augment-groups">
@@ -338,7 +345,7 @@ function GuideDrawer({
             </section>
 
             <section id="notes" className="detail-section">
-              <div className="detail-section-heading"><span>◇</span><div><h3>Cách chơi</h3><p>Tương tác nên tận dụng và bẫy cần tránh</p></div></div>
+              <div className="detail-section-heading"><span>◇</span><div><h3>Cách chơi</h3><p>Tương tác đáng dùng và bẫy cần tránh</p></div></div>
               <div className="notes-grid">
                 <article className="note-card good"><span><CheckIcon /></span><div><h4>Nên tận dụng</h4>{champion.tips.map((tip) => <p key={tip}>{tip}</p>)}</div></article>
                 <article className="note-card warning"><span><AlertIcon /></span><div><h4>Cần tránh</h4>{champion.traps.map((trap) => <p key={trap}>{trap}</p>)}</div></article>
