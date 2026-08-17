@@ -1,0 +1,118 @@
+.trigger {
+  margin-top: .7rem;
+  border: 1px solid color-mix(in srgb, currentColor 24%, transparent);
+  border-radius: 999px;
+  padding: .48rem .78rem;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.panel {
+  margin-top: .75rem;
+  padding: .85rem;
+  border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, Canvas 94%, transparent);
+  color: CanvasText;
+}
+
+.heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: .75rem;
+}
+
+.heading div {
+  display: grid;
+  gap: .2rem;
+}
+
+.heading small,
+.field small {
+  opacity: .72;
+}
+
+.close {
+  width: 2rem;
+  height: 2rem;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 8%, transparent);
+  color: inherit;
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+.field {
+  display: grid;
+  gap: .35rem;
+  margin-top: .75rem;
+}
+
+.field > span {
+  font-weight: 650;
+}
+
+.field select,
+.field textarea {
+  width: 100%;
+  border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+  border-radius: 10px;
+  padding: .62rem .7rem;
+  background: Canvas;
+  color: CanvasText;
+  font: inherit;
+}
+
+.field textarea {
+  resize: vertical;
+  min-height: 5rem;
+}
+
+.field small {
+  justify-self: end;
+}
+
+.status {
+  margin: .7rem 0 0;
+  padding: .55rem .65rem;
+  border-radius: 10px;
+  background: color-mix(in srgb, currentColor 7%, transparent);
+}
+
+.success {
+  font-weight: 650;
+}
+
+.error {
+  font-weight: 600;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: .5rem;
+  margin-top: .8rem;
+}
+
+.actions button {
+  border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+  border-radius: 10px;
+  padding: .52rem .75rem;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.actions button:last-child {
+  font-weight: 700;
+}
+
+.actions button:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
