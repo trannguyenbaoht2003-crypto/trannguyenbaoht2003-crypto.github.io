@@ -59,6 +59,7 @@ function parseFeedbackSecret(
 
 export function parseConfig(env: NodeJS.ProcessEnv): AppConfig {
   const feedbackIntakeEnabled = parseFeedbackEnabled(env.FEEDBACK_INTAKE_ENABLED);
+  const feedbackFingerprintSecret = parseFeedbackSecret(env, feedbackIntakeEnabled);
   return {
     nodeEnv: parseNodeEnv(env.NODE_ENV),
     host: env.HOST?.trim() || '127.0.0.1',
@@ -66,6 +67,6 @@ export function parseConfig(env: NodeJS.ProcessEnv): AppConfig {
     databaseUrl: required(env, 'DATABASE_URL'),
     redisUrl: required(env, 'REDIS_URL'),
     feedbackIntakeEnabled,
-    feedbackFingerprintSecret: parseFeedbackSecret(env, feedbackIntakeEnabled),
+    ...(feedbackFingerprintSecret ? { feedbackFingerprintSecret } : {}),
   };
 }
