@@ -40,7 +40,7 @@ export function registerPublicFeedbackRoute(
       if (request.headers['x-hai-dau-feedback'] !== 'web-v1') {
         return reply.code(400).send(errorBody('INVALID_FEEDBACK_HEADER', 'Invalid feedback request'));
       }
-      if (!request.isMultipart() && !request.headers['content-type']?.toLowerCase().startsWith('application/json')) {
+      if (!request.headers['content-type']?.toLowerCase().startsWith('application/json')) {
         return reply.code(400).send(errorBody('INVALID_CONTENT_TYPE', 'Feedback requires JSON'));
       }
 
