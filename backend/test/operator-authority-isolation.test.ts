@@ -24,24 +24,16 @@ function importSpecifiers(source: string): string[] {
   return [...source.matchAll(/\bfrom\s+['"]([^'"]+)['"]/g)].map((match) => match[1] ?? '');
 }
 
+const FORBIDDEN_IMPORT = new RegExp(
+  '(?:^|/)(?:publish-candidate-revision|rollback-publication|submit-publication-feedback|evaluate-publication-monitoring|evidence(?:/|-)|human-review|moderation(?:/|-)|eligibility(?:/|-)|queue(?:/|-))(?:$|\\.|/)',
+);
+
 test('operator production modules import only read-side PostgreSQL boundaries', async () => {
   const productionFiles = [
     'src/operator-server.ts',
     ...await collectTypeScript('src/operator/'),
     ...await collectTypeScript('src/modules/operator/'),
   ];
-
-  const forbiddenImport = /(?:^|\/)(?:
-    publish-candidate-revision|
-    rollback-publication|
-    submit-publication-feedback|
-    evaluate-publication-monitoring|
-    evidence(?:\/|-)|
-    human-review|
-    moderation(?:\/|-)|
-    eligibility(?:\/|-)|
-    queue(?:\/|-)
-  )(?:$|\.|\/)/x;
 
   for (const relativePath of productionFiles) {
     const source = await readFile(new URL(relativePath, BACKEND_ROOT), 'utf8');
@@ -50,7 +42,7 @@ test('operator production modules import only read-side PostgreSQL boundaries', 
     for (const specifier of imports) {
       assert.doesNotMatch(
         specifier,
-        forbiddenImport,
+        FORBIDDEN_IMPORT,
         `${relativePath} must not import mutation/queue authority: ${specifier}`,
       );
       assert.doesNotMatch(
