@@ -113,3 +113,26 @@ test('Sprint 8B root test orchestration includes the dedicated provider executio
   );
   assert.match(rootPackage.scripts.test, /test:ai-provider-execution/);
 });
+
+test('Sprint 8B runbook locks private invocation, logging, authority and production boundaries', async () => {
+  const path = 'docs/runbooks/ai-provider-execution.md';
+  assert.equal(existsSync(new URL(path, ROOT)), true, `missing ${path}`);
+  const runbook = await read(path);
+  for (const phrase of [
+    'No public route',
+    'AI output is not Evidence',
+    'No automatic materialization',
+    'No automatic publication',
+    'No production credential provisioning',
+    'Raw prompts and raw provider output are not logged',
+    'Production deployment is out of scope',
+    'Issue #23',
+    'DATABASE_URL',
+    'AI_DISCOVERY_PROVIDER',
+    'OPENAI_API_KEY',
+    'AI_DISCOVERY_OPENAI_MODEL',
+    'AI_DISCOVERY_RUN_FAILED',
+  ]) {
+    assert.match(runbook, new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'));
+  }
+});
