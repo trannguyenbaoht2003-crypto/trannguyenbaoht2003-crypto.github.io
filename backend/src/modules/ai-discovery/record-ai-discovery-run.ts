@@ -181,13 +181,13 @@ export async function recordAiDiscoveryRun(
     await client.query(
       `insert into outbox_events
          (outbox_event_id, aggregate_type, aggregate_id, event_type,
-          payload, occurred_at)
+          payload, correlation_id)
        values ($1,'ai_discovery_run',$2,'AiDiscoveryRunRecorded',$3::jsonb,$4)`,
       [
         randomUUID(),
         command.aiDiscoveryRunId,
         JSON.stringify(eventPayload),
-        command.completedAt,
+        command.correlationId,
       ],
     );
 
