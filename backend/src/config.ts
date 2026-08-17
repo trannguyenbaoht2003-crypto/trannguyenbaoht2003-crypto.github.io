@@ -4,6 +4,8 @@ export interface AppConfig {
   port: number;
   databaseUrl: string;
   redisUrl: string;
+  feedbackIntakeEnabled: boolean;
+  feedbackFingerprintSecret?: string;
 }
 
 function required(env: NodeJS.ProcessEnv, name: 'DATABASE_URL' | 'REDIS_URL'): string {
@@ -36,12 +38,34 @@ function parseNodeEnv(value: string | undefined): AppConfig['nodeEnv'] {
   throw new Error('NODE_ENV must be development, test, or production');
 }
 
+function parseFeedbackEnabled(value: string | undefined): boolean {
+  if (value === undefined || value === 'false') return false;
+  if (value === 'true') return true;
+  throw new Error('FEEDBACK_INTAKE_ENABLED must be true or false');
+}
+
+function parseFeedbackSecret(
+  env: NodeJS.ProcessEnv,
+  enabled: boolean,
+): string | undefined {
+  const value = env.FEEDBACK_FINGERPRINT_SECRET?.trim();
+  if (!enabled) return undefined;
+  if (!value) throw new Error('FEEDBACK_FINGERPRINT_SECRET is required when feedback intake is enabled');
+  if (Buffer.byteLength(value, 'utf8') < 32) {
+    throw new Error('FEEDBACK_FINGERPRINT_SECRET must contain at least 32 bytes');
+  }
+  return value;
+}
+
 export function parseConfig(env: NodeJS.ProcessEnv): AppConfig {
+  const feedbackIntakeEnabled = parseFeedbackEnabled(env.FEEDBACK_INTAKE_ENABLED);
   return {
     nodeEnv: parseNodeEnv(env.NODE_ENV),
     host: env.HOST?.trim() || '127.0.0.1',
     port: parsePort(env.PORT),
     databaseUrl: required(env, 'DATABASE_URL'),
     redisUrl: required(env, 'REDIS_URL'),
+    feedbackIntakeEnabled,
+    feedbackFingerprintSecret: parseFeedbackSecret(env, feedbackIntakeEnabled),
   };
 }
