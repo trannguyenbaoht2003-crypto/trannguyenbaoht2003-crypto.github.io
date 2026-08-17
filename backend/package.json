@@ -13,7 +13,9 @@
     "migrate": "node dist/src/migrate-cli.js",
     "community:import": "node dist/src/community-import-cli.js",
     "start": "node dist/src/server.js",
-    "start:worker": "node dist/src/worker.js"
+    "start:worker": "node dist/src/worker.js",
+    "operator:dev": "node --import tsx src/operator-server.ts",
+    "operator": "node dist/src/operator-server.js"
   },
   "dependencies": {
     "bullmq": "5.80.11",

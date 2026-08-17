@@ -1,4 +1,4 @@
-import type { Pool } from 'pg';
+import type { PgQueryable } from '../../database/queryable.js';
 
 import {
   FEEDBACK_REASON_CODES,
@@ -34,7 +34,7 @@ function reasonCode(value: string): FeedbackReasonCode {
 }
 
 export async function readPublicationFeedbackSignals(
-  pool: Pool,
+  database: PgQueryable,
   options: ReadPublicationFeedbackSignalOptions = {},
 ): Promise<PublicationFeedbackSignal[]> {
   const sinceHours = boundedInteger(options.sinceHours, 168, 1, 720);
@@ -43,7 +43,7 @@ export async function readPublicationFeedbackSignals(
   const now = options.now ?? new Date();
   const since = new Date(now.getTime() - sinceHours * 60 * 60 * 1000);
 
-  const groups = await pool.query<{
+  const groups = await database.query<{
     publication_id: string;
     publication_version_id: string;
     is_active: boolean;
@@ -75,7 +75,7 @@ export async function readPublicationFeedbackSignals(
 
   const signals: PublicationFeedbackSignal[] = [];
   for (const group of groups.rows) {
-    const counts = await pool.query<{ reason_code: string; reason_count: string }>(
+    const counts = await database.query<{ reason_code: string; reason_count: string }>(
       `select reason_code, count(*)::text as reason_count
          from publication_feedback_submissions
         where publication_id = $1
@@ -94,7 +94,7 @@ export async function readPublicationFeedbackSignals(
 
     const recentDetails = detailSampleLimit === 0
       ? { rows: [] as Array<{ reason_code: string; details: string; received_at: Date }> }
-      : await pool.query<{ reason_code: string; details: string; received_at: Date }>(
+      : await database.query<{ reason_code: string; details: string; received_at: Date }>(
           `select reason_code, details, received_at
              from publication_feedback_submissions
             where publication_id = $1
