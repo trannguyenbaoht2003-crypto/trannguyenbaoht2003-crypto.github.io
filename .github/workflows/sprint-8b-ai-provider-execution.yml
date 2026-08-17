@@ -11,6 +11,8 @@ on:
       - "backend/test/build-provider-request.test.ts"
       - "backend/test/openai-responses-provider.test.ts"
       - "backend/test/execute-ai-discovery-provider-run.test.ts"
+      - "backend/test/execute-ai-discovery-provider-replay-preflight.test.ts"
+      - "backend/test/read-ai-discovery-run-replay.test.ts"
       - "backend/test/ai-discovery-run-cli.test.ts"
       - "backend/package.json"
       - "backend/package-lock.json"
