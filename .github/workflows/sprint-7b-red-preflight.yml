@@ -1,0 +1,23 @@
+name: Sprint 7B RED preflight
+
+on:
+  pull_request:
+    paths:
+      - 'tests/feedback-client.test.ts'
+      - 'tests/feedback-intake-contract.test.mjs'
+      - 'app/public-data/feedback-client.ts'
+      - '.github/workflows/sprint-7b-red-preflight.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  red-preflight:
+    name: verify expected Sprint 7B RED
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.0
+      - run: npm run test:feedback-intake
