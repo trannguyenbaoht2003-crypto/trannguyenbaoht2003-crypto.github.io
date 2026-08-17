@@ -4,7 +4,9 @@
 
   handle /api/v1/* {
     header Cache-Control "no-store"
-    reverse_proxy {$BACKEND_ORIGIN}
+    reverse_proxy {$BACKEND_ORIGIN} {
+      header_up X-Hai-Dau-Client-IP {remote_host}
+    }
   }
 
   handle /health/* {
