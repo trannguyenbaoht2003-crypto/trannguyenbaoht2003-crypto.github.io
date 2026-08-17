@@ -207,6 +207,31 @@ test('provider execution caps retryable failure at three total attempts and reco
   assert.equal(recorded.commands[0]!.failureCode, 'PROVIDER_TIMEOUT');
 });
 
+test('provider execution propagates Sprint 8A authority failures unchanged without retry or fallback write', async () => {
+  const provider = providerFromSteps([successResult()]);
+  const authorityError = new Error('IDEMPOTENCY_PAYLOAD_CONFLICT');
+  let recordCalls = 0;
+  const sleeps: number[] = [];
+
+  await assert.rejects(
+    executeAiDiscoveryProviderRun(pool, commandFixture(provider), {
+      recordRun: async () => {
+        recordCalls += 1;
+        throw authorityError;
+      },
+      now: () => '2026-08-17T10:00:05.000Z',
+      sleep: async (milliseconds) => {
+        sleeps.push(milliseconds);
+      },
+    }),
+    (error: unknown) => error === authorityError,
+  );
+
+  assert.equal(provider.calls, 1);
+  assert.equal(recordCalls, 1);
+  assert.deepEqual(sleeps, []);
+});
+
 test('provider execution produces the same authority command for exact stable replay despite raw provider text differences', async () => {
   const provider = providerFromSteps([
     successResult('first raw transport text'),
