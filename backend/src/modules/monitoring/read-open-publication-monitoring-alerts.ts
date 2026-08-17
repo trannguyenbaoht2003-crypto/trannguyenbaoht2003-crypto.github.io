@@ -1,4 +1,4 @@
-import type { Pool } from 'pg';
+import type { PgQueryable } from '../../database/queryable.js';
 
 import {
   requireUuid,
@@ -34,9 +34,9 @@ function parseTimestamp(value: Date | string): string {
 }
 
 export async function readOpenPublicationMonitoringAlerts(
-  pool: Pool,
+  database: PgQueryable,
 ): Promise<OpenPublicationMonitoringAlert[]> {
-  const result = await pool.query<OpenAlertRow>(
+  const result = await database.query<OpenAlertRow>(
     `select current.publication_id,
             current.publication_version_id,
             active.publication_version_id as active_publication_version_id,
