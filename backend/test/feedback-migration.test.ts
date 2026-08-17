@@ -5,10 +5,17 @@ import { createPool } from '../src/database/pool.js';
 import { migrate } from '../src/database/migrate.js';
 import { withTransaction } from '../src/database/transaction.js';
 import {
+  publishCandidateRevision,
+} from '../src/modules/publication/publish-candidate-revision.js';
+import { GATE_IDS } from './helpers/gate.js';
+import {
   PUBLICATION_IDS,
+  SECOND_PUBLICATION_CONTEXT_IDS,
   insertDirectPublicationGraph,
   seedEligiblePublicationContext,
+  seedSecondEligiblePublicationContext,
 } from './helpers/publication.js';
+import { CROSS_PATCH_IDS } from './helpers/trust.js';
 
 function testDatabaseUrl(): string {
   const value = process.env.TEST_DATABASE_URL;
@@ -125,15 +132,28 @@ test('feedback receipt composite foreign key rejects a version paired with anoth
   try {
     await seedEligiblePublicationContext(pool);
     await withTransaction(pool, (client) => insertDirectPublicationGraph(client));
-
-    const otherPublicationId = '7b100000-0000-4000-8000-000000000005';
-    await pool.query(
-      `insert into publications (publication_id, candidate_id, created_by)
-       select $1, candidate_id, 'feedback-fk-test'
-         from publications
-        where publication_id = $2`,
-      [otherPublicationId, PUBLICATION_IDS.publicationId],
-    );
+    await seedSecondEligiblePublicationContext(pool);
+    await publishCandidateRevision(pool, {
+      publicationId: SECOND_PUBLICATION_CONTEXT_IDS.publicationId,
+      publicationVersionId: SECOND_PUBLICATION_CONTEXT_IDS.publicationVersionId,
+      activationId: SECOND_PUBLICATION_CONTEXT_IDS.activationId,
+      candidateRevisionId: CROSS_PATCH_IDS.candidateRevisionId,
+      expectedActiveEligibilityPolicyRevisionId: GATE_IDS.eligibilityPolicyId,
+      expectedEligibilityEvaluationId:
+        SECOND_PUBLICATION_CONTEXT_IDS.eligibilityEvaluationId,
+      expectedModerationDecisionId:
+        SECOND_PUBLICATION_CONTEXT_IDS.moderationDecisionId,
+      expectedActivePublicationVersionId: null,
+      authorization: {
+        actorId: 'feedback-fk-test',
+        permissions: ['publisher'],
+      },
+      auditId: SECOND_PUBLICATION_CONTEXT_IDS.auditId,
+      outboxEventId: SECOND_PUBLICATION_CONTEXT_IDS.outboxEventId,
+      correlationId: 'feedback-fk-second-publication',
+      idempotencyKey: 'feedback-fk-second-publication',
+      occurredAt: '2026-08-17T01:00:00.000Z',
+    });
 
     await assert.rejects(
       pool.query(
@@ -145,7 +165,11 @@ test('feedback receipt composite foreign key rejects a version paired with anoth
            ('7b100000-0000-4000-8000-000000000006',
             '7b100000-0000-4000-8000-000000000007',
             $1,$2,$3,'OUTDATED',null,false,clock_timestamp())`,
-        ['c'.repeat(64), otherPublicationId, PUBLICATION_IDS.publicationVersionId],
+        [
+          'c'.repeat(64),
+          SECOND_PUBLICATION_CONTEXT_IDS.publicationId,
+          PUBLICATION_IDS.publicationVersionId,
+        ],
       ),
       /foreign key|violates foreign key/i,
     );
