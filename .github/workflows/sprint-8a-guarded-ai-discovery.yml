@@ -1,0 +1,125 @@
+name: Sprint 8A guarded AI discovery gate
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "backend/migrations/0014_guarded_ai_discovery.sql"
+      - "backend/src/modules/ai-discovery/**"
+      - "backend/src/modules/candidate/types.ts"
+      - "backend/src/modules/candidate/normalize-observation.ts"
+      - "backend/src/modules/candidate/register-normalized-observation.ts"
+      - "backend/test/ai-discovery-*.test.ts"
+      - "backend/test/materialize-ai-candidate-proposal.test.ts"
+      - "backend/test/read-ai-discovery-proposals.test.ts"
+      - "backend/test/record-ai-discovery-run.test.ts"
+      - "backend/test/community-source-bootstrap.test.ts"
+      - "backend/test/source-policy.test.ts"
+      - "backend/test/migration.test.ts"
+      - "backend/package.json"
+      - "backend/package-lock.json"
+      - "tests/guarded-ai-discovery-contract.test.mjs"
+      - "docs/runbooks/guarded-ai-discovery.md"
+      - "docs/superpowers/specs/2026-08-17-guarded-ai-discovery*.md"
+      - "docs/superpowers/plans/2026-08-17-guarded-ai-discovery*.md"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/sprint-8a-guarded-ai-discovery.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sprint-8a-guarded-ai-discovery-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: verify guarded AI discovery authority
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: hai_dau_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d hai_dau_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      NODE_ENV: test
+      TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/hai_dau_test
+      TEST_REDIS_URL: redis://127.0.0.1:6379
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.0
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            backend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci --cache /tmp/aram-root-npm-cache
+
+      - name: Install backend dependencies
+        run: npm --prefix backend ci --cache /tmp/aram-backend-npm-cache
+
+      - name: Sprint 8A repository contract
+        run: npm run test:guarded-ai-discovery
+
+      - name: Frontend lint
+        run: npm run lint
+
+      - name: Backend typecheck
+        run: npm --prefix backend run typecheck
+
+      - name: Backend tests
+        run: npm --prefix backend test
+
+      - name: Backend build
+        run: npm --prefix backend run build
+
+      - name: Repository cleanliness
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          status="$(git status --short)"
+          if [[ -n "$status" ]]; then
+            echo "Generated files changed the checkout:"
+            echo "$status"
+            exit 1
+          fi
+
+      - name: Deployment guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          workflow=".github/workflows/sprint-8a-guarded-ai-discovery.yml"
+          executable="$RUNNER_TEMP/sprint-8a-before-guard.yml"
+          sed '/- name: Deployment guard/,$d' "$workflow" > "$executable"
+          ! grep -Eq '(contents|packages|pages|id-token):[[:space:]]*write' "$executable"
+          ! grep -Eqi 'railway[[:space:]]+up|git[[:space:]]+push|docker[[:space:]]+(login|push)|wrangler[[:space:]]+deploy|npm run deploy|actions/deploy-pages|kubectl|terraform|pulumi' "$executable"
+          ! grep -Eqi '(RAILWAY_TOKEN|CLOUDFLARE_API_TOKEN|OPENAI_API_KEY|ANTHROPIC_API_KEY|GEMINI_API_KEY|AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY|GOOGLE_APPLICATION_CREDENTIALS|BEGIN (RSA|OPENSSH|EC) PRIVATE KEY)' "$executable"
