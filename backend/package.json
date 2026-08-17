@@ -12,6 +12,7 @@
     "test": "node --import tsx --test --test-concurrency=1 test/**/*.test.ts",
     "migrate": "node dist/src/migrate-cli.js",
     "community:import": "node dist/src/community-import-cli.js",
+    "ai-discovery:run": "node dist/src/ai-discovery-run-cli.js",
     "start": "node dist/src/server.js",
     "start:worker": "node dist/src/worker.js",
     "operator:dev": "node --import tsx src/operator-server.ts",
