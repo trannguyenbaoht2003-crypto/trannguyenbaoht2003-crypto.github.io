@@ -149,6 +149,8 @@ test('Sprint 8B CI gate verifies provider execution without secrets or deploymen
     'image: postgres:17',
     'image: redis:7',
     'persist-credentials: false',
+    'backend/test/execute-ai-discovery-provider-replay-preflight.test.ts',
+    'backend/test/read-ai-discovery-run-replay.test.ts',
     'npm ci',
     'npm --prefix backend ci',
     'npm run test:ai-provider-execution',
