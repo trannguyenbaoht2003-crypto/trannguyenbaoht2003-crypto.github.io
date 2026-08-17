@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 
+import styles from "./public-feedback.module.css";
 import {
   submitPublicFeedback,
   type PublicFeedbackReasonCode,
@@ -93,7 +94,7 @@ export function PublicFeedbackPanel({
   if (!open) {
     return (
       <button
-        className="public-feedback-trigger"
+        className={styles.trigger}
         type="button"
         onClick={() => {
           setOpen(true);
@@ -106,15 +107,15 @@ export function PublicFeedbackPanel({
   }
 
   return (
-    <section className="public-feedback-panel" aria-label="Báo lỗi nội dung">
-      <div className="public-feedback-heading">
+    <section className={styles.panel} aria-label="Báo lỗi nội dung">
+      <div className={styles.heading}>
         <div>
           <strong>Báo lỗi nội dung</strong>
           <small>Phản hồi chỉ là tín hiệu cộng đồng và sẽ được kiểm tra trước khi có thay đổi.</small>
         </div>
         <button
           type="button"
-          className="public-feedback-close"
+          className={styles.close}
           aria-label="Đóng báo lỗi"
           onClick={() => setOpen(false)}
         >
@@ -122,7 +123,7 @@ export function PublicFeedbackPanel({
         </button>
       </div>
 
-      <label className="public-feedback-field">
+      <label className={styles.field}>
         <span>Loại lỗi</span>
         <select
           value={reasonCode}
@@ -137,7 +138,7 @@ export function PublicFeedbackPanel({
         </select>
       </label>
 
-      <label className="public-feedback-field">
+      <label className={styles.field}>
         <span>Mô tả ngắn {reasonCode === "OTHER" ? "(bắt buộc)" : "(không bắt buộc)"}</span>
         <textarea
           value={details}
@@ -153,22 +154,22 @@ export function PublicFeedbackPanel({
       </label>
 
       {status.kind === "accepted" && (
-        <p className="public-feedback-status success" role="status">Đã ghi nhận phản hồi. Cảm ơn bạn.</p>
+        <p className={`${styles.status} ${styles.success}`} role="status">Đã ghi nhận phản hồi. Cảm ơn bạn.</p>
       )}
       {status.kind === "invalid" && (
-        <p className="public-feedback-status error" role="status">Phản hồi không còn hợp lệ. Vui lòng kiểm tra lại nội dung.</p>
+        <p className={`${styles.status} ${styles.error}`} role="status">Phản hồi không còn hợp lệ. Vui lòng kiểm tra lại nội dung.</p>
       )}
       {status.kind === "rate_limited" && (
-        <p className="public-feedback-status error" role="status">
+        <p className={`${styles.status} ${styles.error}`} role="status">
           Bạn đã gửi nhiều phản hồi gần đây. Vui lòng thử lại sau
           {status.retryAfterSeconds ? ` khoảng ${status.retryAfterSeconds} giây` : ""}.
         </p>
       )}
       {status.kind === "unavailable" && (
-        <p className="public-feedback-status error" role="status">Kênh phản hồi đang tạm thời không khả dụng. Bạn có thể thử lại mà không mất nội dung.</p>
+        <p className={`${styles.status} ${styles.error}`} role="status">Kênh phản hồi đang tạm thời không khả dụng. Bạn có thể thử lại mà không mất nội dung.</p>
       )}
 
-      <div className="public-feedback-actions">
+      <div className={styles.actions}>
         <button type="button" onClick={() => setOpen(false)}>Hủy</button>
         <button type="button" disabled={!canSubmit} onClick={() => void submit()}>
           {status.kind === "sending" ? "Đang gửi…" : status.kind === "unavailable" ? "Thử lại" : "Gửi phản hồi"}
