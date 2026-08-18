@@ -88,22 +88,22 @@ jobs:
         run: npm --prefix backend run typecheck
 
       - name: Sprint 8C migration tests
-        run: npm --prefix backend exec -- node --import tsx --test --test-concurrency=1 test/ai-operations-migration.test.ts
+        run: cd backend && node --import tsx --test --test-concurrency=1 test/ai-operations-migration.test.ts
 
       - name: Sprint 8C policy tests
-        run: npm --prefix backend exec -- node --import tsx --test --test-concurrency=1 test/ai-operations-policy.test.ts
+        run: cd backend && node --import tsx --test --test-concurrency=1 test/ai-operations-policy.test.ts
 
       - name: Sprint 8C budget tests
-        run: npm --prefix backend exec -- node --import tsx --test --test-concurrency=1 test/ai-operations-budget.test.ts
+        run: cd backend && node --import tsx --test --test-concurrency=1 test/ai-operations-budget.test.ts
 
       - name: Sprint 8C reader tests
-        run: npm --prefix backend exec -- node --import tsx --test --test-concurrency=1 test/ai-operations-reader.test.ts
+        run: cd backend && node --import tsx --test --test-concurrency=1 test/ai-operations-reader.test.ts
 
       - name: Sprint 8C governed execution tests
-        run: npm --prefix backend exec -- node --import tsx --test --test-concurrency=1 test/execute-policy-governed-ai-discovery-run.test.ts
+        run: cd backend && node --import tsx --test --test-concurrency=1 test/execute-policy-governed-ai-discovery-run.test.ts
 
       - name: Sprint 8C private CLI tests
-        run: npm --prefix backend exec -- node --import tsx --test --test-concurrency=1 test/ai-operations-policy-cli.test.ts test/ai-operations-tick-cli.test.ts test/ai-discovery-materialize-cli.test.ts
+        run: cd backend && node --import tsx --test --test-concurrency=1 test/ai-operations-policy-cli.test.ts test/ai-operations-tick-cli.test.ts test/ai-discovery-materialize-cli.test.ts
 
       - name: Backend tests
         run: npm --prefix backend test
