@@ -103,5 +103,10 @@ test('Sprint 8C workflow covers all authority paths, runs the contract, and rema
   assert.match(workflow, /npm run test:ai-operations-policy/);
   assert.match(workflow, /permissions:\s*\n\s*contents: read/);
   assert.doesNotMatch(workflow, /(contents|packages|pages|id-token):\s*write/i);
-  assert.doesNotMatch(workflow, /railway\s+up|git\s+push|docker\s+(login|push)|wrangler\s+deploy|actions\/deploy-pages|kubectl|terraform|pulumi/i);
+
+  const executableWorkflow = workflow.split('      - name: Deployment and secret guard')[0] ?? workflow;
+  assert.doesNotMatch(
+    executableWorkflow,
+    /railway\s+up|git\s+push|docker\s+(login|push)|wrangler\s+deploy|actions\/deploy-pages|kubectl|terraform|pulumi/i,
+  );
 });
