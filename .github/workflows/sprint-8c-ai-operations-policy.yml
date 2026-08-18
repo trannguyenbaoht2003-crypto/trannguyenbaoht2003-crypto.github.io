@@ -13,8 +13,12 @@ on:
       - "backend/test/execute-policy-governed-ai-discovery-run.test.ts"
       - "backend/package.json"
       - "backend/package-lock.json"
+      - "tests/ai-operations-policy-contract.test.mjs"
+      - "docs/runbooks/ai-operations-policy.md"
       - "docs/superpowers/specs/2026-08-18-ai-operations-policy*.md"
       - "docs/superpowers/plans/2026-08-18-ai-operations-policy*.md"
+      - "package.json"
+      - "package-lock.json"
       - ".github/workflows/sprint-8c-ai-operations-policy.yml"
 
 permissions:
@@ -76,6 +80,9 @@ jobs:
 
       - name: Install backend dependencies
         run: npm --prefix backend ci --cache /tmp/aram-backend-npm-cache
+
+      - name: Sprint 8C repository contract
+        run: npm run test:ai-operations-policy
 
       - name: Backend typecheck
         run: npm --prefix backend run typecheck
