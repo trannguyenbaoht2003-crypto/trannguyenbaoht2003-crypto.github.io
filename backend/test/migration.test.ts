@@ -15,6 +15,7 @@ function testDatabaseUrl(): string {
 }
 
 const expectedTables = [
+  'active_ai_operations_policy_revision',
   'active_catalog_revisions',
   'active_eligibility_policy_revision',
   'active_publication_versions',
@@ -22,6 +23,8 @@ const expectedTables = [
   'ai_candidate_materializations',
   'ai_candidate_proposals',
   'ai_discovery_runs',
+  'ai_operations_policy_revisions',
+  'ai_operations_run_budget_reservations',
   'audit_events',
   'candidate_claim_set_seals',
   'candidate_claims',
