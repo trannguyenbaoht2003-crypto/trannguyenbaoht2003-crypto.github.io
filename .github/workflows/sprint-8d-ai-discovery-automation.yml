@@ -1,0 +1,143 @@
+name: Sprint 8D AI discovery automation gate
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "backend/migrations/0016_ai_discovery_automation.sql"
+      - "backend/src/modules/ai-automation/**"
+      - "backend/src/modules/ai-operations/**"
+      - "backend/src/queue/ai-discovery-*"
+      - "backend/src/queue/names.ts"
+      - "backend/src/ai-automation-*"
+      - "backend/test/ai-discovery-automation-*.test.ts"
+      - "backend/test/ai-operations-*.test.ts"
+      - "backend/test/execute-policy-governed-ai-discovery-run.test.ts"
+      - "backend/package.json"
+      - "backend/package-lock.json"
+      - "tests/ai-discovery-automation-contract.test.mjs"
+      - "docs/runbooks/ai-discovery-automation.md"
+      - "docs/superpowers/specs/2026-08-19-ai-discovery-automation-design.md"
+      - "docs/superpowers/plans/2026-08-19-ai-discovery-automation.md"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/sprint-8d-ai-discovery-automation.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sprint-8d-ai-discovery-automation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: verify guarded hourly AI automation
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: hai_dau_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d hai_dau_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      NODE_ENV: test
+      TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/hai_dau_test
+      TEST_REDIS_URL: redis://127.0.0.1:6379
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.0
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            backend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci --cache /tmp/aram-root-npm-cache
+
+      - name: Install backend dependencies
+        run: npm --prefix backend ci --cache /tmp/aram-backend-npm-cache
+
+      - name: Sprint 8D repository contract
+        run: npm run test:ai-discovery-automation
+
+      - name: Backend typecheck
+        run: npm --prefix backend run typecheck
+
+      - name: Sprint 8D focused tests
+        run: cd backend && node --import tsx --test --test-concurrency=1 test/ai-discovery-automation-*.test.ts
+
+      - name: Backend full tests
+        run: npm --prefix backend test
+
+      - name: Sprint 8C policy and budget contract
+        run: npm run test:ai-operations-policy
+
+      - name: Sprint 8B provider execution contract
+        run: npm run test:ai-provider-execution
+
+      - name: Sprint 8A guarded AI discovery contract
+        run: npm run test:guarded-ai-discovery
+
+      - name: Frontend lint
+        run: npm run lint
+
+      - name: Backend build
+        run: npm --prefix backend run build
+
+      - name: Repository cleanliness
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          status="$(git status --short)"
+          if [[ -n "$status" ]]; then
+            echo "Generated files changed the checkout:"
+            echo "$status"
+            exit 1
+          fi
+
+      - name: Deployment and secret guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          workflow=".github/workflows/sprint-8d-ai-discovery-automation.yml"
+          executable="$RUNNER_TEMP/sprint-8d-before-guard.yml"
+          sed '/- name: Deployment and secret guard/,$d' "$workflow" > "$executable"
+          ! grep -Eq '(contents|packages|pages|id-token):[[:space:]]*write' "$executable"
+          for token in \
+            "railway"" up" \
+            "wrangler"" deploy" \
+            "docker"" push" \
+            "kube""ctl" \
+            "terra""form" \
+            "pu""lumi"; do
+            ! grep -Fqi "$token" "$executable"
+          done
+          provider_secret="OPENAI_""API_KEY"
+          ! grep -Fq "$provider_secret" "$executable"
