@@ -83,6 +83,7 @@ const expectedTables = [
   'review_policy_revisions',
   'review_quorum_evaluation_reviews',
   'review_quorum_evaluations',
+  'scheduled_ai_discovery_ticks',
   'schema_migrations',
   'source_policy_revisions',
   'sources',
