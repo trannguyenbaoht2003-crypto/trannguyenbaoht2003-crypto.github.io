@@ -44,6 +44,10 @@ export interface ReserveAiOperationsRunBudgetCommand {
   gameModeExternalId: 'aram_mayhem';
 }
 
+export interface ReserveAiOperationsRunBudgetOptions {
+  minimumIntervalFloorSeconds: number;
+}
+
 export interface ReserveAiOperationsRunBudgetResult {
   aiOperationsRunBudgetReservationId: string;
   aiDiscoveryRunId: string;

@@ -10,15 +10,16 @@ import {
 import {
   hashCanonicalTupleV1,
   requireBoundedText,
-  requireUuid,
 } from '../trust/normalize-trust-input.js';
 import type {
   ReserveAiOperationsRunBudgetCommand,
+  ReserveAiOperationsRunBudgetOptions,
   ReserveAiOperationsRunBudgetResult,
 } from './types.js';
 
 export type {
   ReserveAiOperationsRunBudgetCommand,
+  ReserveAiOperationsRunBudgetOptions,
   ReserveAiOperationsRunBudgetResult,
 } from './types.js';
 
@@ -31,6 +32,7 @@ const COMMAND_KEYS = [
   'gameModeExternalId',
 ] as const;
 const PRINTABLE_IDENTIFIER = /^[!-~]+$/u;
+const AI_DISCOVERY_RUN_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[45][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const RESERVATION_REASON = 'policy-governed AI provider run budget reservation';
 
 interface ActivePolicyRow {
@@ -62,6 +64,11 @@ function trimmedText(value: string, field: string, maxBytes: number): string {
   return result;
 }
 
+function requireAiDiscoveryRunUuid(value: string): string {
+  if (typeof value !== 'string' || !AI_DISCOVERY_RUN_UUID.test(value)) return failInput();
+  return value;
+}
+
 function normalizeCommand(
   input: ReserveAiOperationsRunBudgetCommand,
 ): ReserveAiOperationsRunBudgetCommand {
@@ -79,7 +86,7 @@ function normalizeCommand(
       actorId: trimmedText(input.actorId, 'actorId', 256),
       correlationId: trimmedText(input.correlationId, 'correlationId', 256),
       idempotencyKey: trimmedText(input.idempotencyKey, 'idempotencyKey', 256),
-      aiDiscoveryRunId: requireUuid(input.aiDiscoveryRunId, 'aiDiscoveryRunId'),
+      aiDiscoveryRunId: requireAiDiscoveryRunUuid(input.aiDiscoveryRunId),
       runKey,
       gameModeExternalId: 'aram_mayhem',
     };
@@ -88,24 +95,41 @@ function normalizeCommand(
   }
 }
 
+function normalizeFloor(options: ReserveAiOperationsRunBudgetOptions): number {
+  const floor = options?.minimumIntervalFloorSeconds;
+  if (!Number.isSafeInteger(floor) || floor < 0 || floor > 86_400) return failInput();
+  return floor;
+}
+
 function dateText(value: unknown): string {
   if (typeof value === 'string') return value;
   if (value instanceof Date) return value.toISOString().slice(0, 10);
   throw new Error('AI_OPERATIONS_BUDGET_DATE_INVALID');
 }
 
-export async function reserveAiOperationsRunBudget(
+export async function reserveAiOperationsRunBudgetWithFloor(
   pool: Pool,
   input: ReserveAiOperationsRunBudgetCommand,
+  options: ReserveAiOperationsRunBudgetOptions,
 ): Promise<ReserveAiOperationsRunBudgetResult> {
   const command = normalizeCommand(input);
-  const payloadHash = hashCanonicalTupleV1([
-    'ReserveAiOperationsRunBudgetCommandV1',
-    command.aiDiscoveryRunId,
-    command.runKey,
-    command.gameModeExternalId,
-    command.actorId,
-  ]);
+  const minimumIntervalFloorSeconds = normalizeFloor(options);
+  const payloadHash = minimumIntervalFloorSeconds === 0
+    ? hashCanonicalTupleV1([
+        'ReserveAiOperationsRunBudgetCommandV1',
+        command.aiDiscoveryRunId,
+        command.runKey,
+        command.gameModeExternalId,
+        command.actorId,
+      ])
+    : hashCanonicalTupleV1([
+        'ReserveAiOperationsRunBudgetWithFloorCommandV1',
+        command.aiDiscoveryRunId,
+        command.runKey,
+        command.gameModeExternalId,
+        command.actorId,
+        String(minimumIntervalFloorSeconds),
+      ]);
 
   try {
     return await withTransaction(pool, async (client) => {
@@ -171,11 +195,18 @@ export async function reserveAiOperationsRunBudget(
       if (budget.used_runs >= policy.max_runs_per_utc_day) {
         throw new Error('AI_OPERATIONS_DAILY_BUDGET_EXHAUSTED');
       }
-      if (
-        budget.seconds_since_last !== null
-        && Number(budget.seconds_since_last) < policy.min_interval_seconds
-      ) {
-        throw new Error('AI_OPERATIONS_MIN_INTERVAL_NOT_ELAPSED');
+      if (budget.seconds_since_last !== null) {
+        const secondsSinceLast = Number(budget.seconds_since_last);
+        if (secondsSinceLast < policy.min_interval_seconds) {
+          throw new Error('AI_OPERATIONS_MIN_INTERVAL_NOT_ELAPSED');
+        }
+        const effectiveMinimum = Math.max(
+          policy.min_interval_seconds,
+          minimumIntervalFloorSeconds,
+        );
+        if (secondsSinceLast < effectiveMinimum) {
+          throw new Error('AI_OPERATIONS_SCHEDULED_CADENCE_NOT_ELAPSED');
+        }
       }
 
       const reservationId = randomUUID();
@@ -249,4 +280,13 @@ export async function reserveAiOperationsRunBudget(
     }
     throw error;
   }
+}
+
+export async function reserveAiOperationsRunBudget(
+  pool: Pool,
+  input: ReserveAiOperationsRunBudgetCommand,
+): Promise<ReserveAiOperationsRunBudgetResult> {
+  return reserveAiOperationsRunBudgetWithFloor(pool, input, {
+    minimumIntervalFloorSeconds: 0,
+  });
 }
