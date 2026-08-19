@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-08-19-ai-discovery-automation-design.md`
 
-## Global Constraints
+## Global constraints
 
 - Scheduler cadence is exactly one hour; dynamic cadence configuration is out of scope.
 - Scheduler identity is exactly `ai-discovery-hourly-v1`.
@@ -31,9 +31,9 @@
 - Scheduled execution must not import/call `materializeAiCandidateProposal()`, Human Review mutation, Moderation mutation, Eligibility mutation, Evidence mutation, or Publication mutation.
 - No production deployment, production credential provisioning, or production scheduler activation is part of this plan.
 - CI uses fake/injected providers and performs zero real OpenAI requests.
-- The **first implementation-stage commit is RED-only**: tests/contracts are committed before any production implementation, matching the approved spec.
+- The **first implementation-stage commit is RED-only**: tests/contracts are committed before any production implementation.
 
-## File Structure
+## File structure
 
 ### New production files
 
@@ -72,15 +72,11 @@
 
 ---
 
-### Task 0: Establish the Sprint 8D RED-only contract commit
+## Task 0: Establish the Sprint 8D RED-only contract commit
 
-**Files:**
-- Create: all seven Sprint 8D test/contract files listed above.
-- No production files may be created or modified in this task.
+**Files:** Create all seven Sprint 8D test/contract files listed above. No production file is changed in this task.
 
-- [ ] **Step 1: Add failing migration contract**
-
-`backend/test/ai-discovery-automation-migration.test.ts` should call `resetDatabase()` and assert the expected new table exists. It must fail because migration `0016` does not exist yet.
+- [ ] Add the migration RED test:
 
 ```ts
 import assert from 'node:assert/strict';
@@ -97,64 +93,44 @@ test('Sprint 8D adds durable scheduled AI discovery ticks', async () => {
 });
 ```
 
-- [ ] **Step 2: Add failing module contracts**
+- [ ] Create budget/input/tick/queue/reader tests importing their final approved module paths. Each contains at least one smallest approved behavioral assertion. Missing production modules must make these tests RED by module resolution, not by syntax error.
 
-Create the budget/input/tick/queue/reader tests with imports from their final approved module paths. The tests should express one smallest approved behavior each, for example:
+- [ ] Create `tests/ai-discovery-automation-contract.test.mjs` asserting the future dedicated worker, workflow, runbook, package scripts, scheduler constant, and authority-isolation files exist.
 
-```ts
-import { buildScheduledAiDiscoveryInput } from '../src/modules/ai-automation/build-scheduled-ai-discovery-input.js';
-```
-
-Because the production modules do not exist yet, the focused 8D suite must fail at module resolution.
-
-- [ ] **Step 3: Add failing root repository contract**
-
-`tests/ai-discovery-automation-contract.test.mjs` initially asserts that the dedicated worker, workflow, runbook, package scripts, scheduler constant, and authority-isolation source files exist. It must fail before implementation.
-
-- [ ] **Step 4: Verify the RED state**
-
-Run:
+- [ ] Run:
 
 ```bash
 cd backend && node --import tsx --test --test-concurrency=1 test/ai-discovery-automation-*.test.ts
 cd .. && node --test tests/ai-discovery-automation-contract.test.mjs
 ```
 
-Expected: FAIL for missing Sprint 8D migration/modules/runtime/workflow. The failure must be attributable to missing 8D implementation, not syntax errors in the tests.
+Expected: FAIL only because Sprint 8D production artifacts do not exist yet.
 
-- [ ] **Step 5: Commit RED-only tests/contracts**
+- [ ] Commit tests only:
 
 ```bash
 git add backend/test/ai-discovery-automation-*.test.ts tests/ai-discovery-automation-contract.test.mjs
 git commit -m "test: define Sprint 8D automation RED contracts"
 ```
 
-**Checkpoint:** inspect `git show --stat HEAD` and confirm no file under `backend/src`, `backend/migrations`, `.github/workflows`, or `docs/runbooks` was added/modified in this first implementation commit.
+- [ ] Verify `git show --stat HEAD` contains no `backend/src`, `backend/migrations`, `.github/workflows`, or `docs/runbooks` production change.
 
-### Task 1: Add the durable scheduled tick ledger
+## Task 1: Add the durable scheduled tick ledger
 
 **Files:**
-- Create: `backend/migrations/0016_ai_discovery_automation.sql`
-- Modify: `backend/test/ai-discovery-automation-migration.test.ts`
-- Modify: `backend/test/migration.test.ts`
+- Create `backend/migrations/0016_ai_discovery_automation.sql`
+- Modify `backend/test/ai-discovery-automation-migration.test.ts`
+- Modify `backend/test/migration.test.ts`
 
-- [ ] **Step 1: Expand migration tests before implementation**
+- [ ] Expand RED tests for exact columns, unique `(scheduler_key, utc_hour)`, UTC-hour normalization, status vocabulary, controlled `PROCESSING` metadata enrichment, terminal finalization, delete rejection, and terminal immutability.
 
-Test exact columns, unique `(scheduler_key, utc_hour)`, UTC-hour normalization, allowed statuses, delete rejection, terminal immutability, and the single legal `PROCESSING -> terminal` transition.
-
-- [ ] **Step 2: Verify focused migration tests still RED**
-
-Run:
+- [ ] Verify RED:
 
 ```bash
 cd backend && node --import tsx --test --test-concurrency=1 test/ai-discovery-automation-migration.test.ts
 ```
 
-Expected: FAIL because table/migration is absent.
-
-- [ ] **Step 3: Implement migration `0016_ai_discovery_automation.sql`**
-
-Create the table:
+- [ ] Create the table:
 
 ```sql
 create table scheduled_ai_discovery_ticks (
@@ -182,11 +158,12 @@ create table scheduled_ai_discovery_ticks (
     or (status <> 'PROCESSING' and completed_at is not null)
   )
 );
+
+create index scheduled_ai_discovery_ticks_recent_idx
+  on scheduled_ai_discovery_ticks (utc_hour desc, scheduled_ai_discovery_tick_id);
 ```
 
-Add an index on `(utc_hour desc, scheduled_ai_discovery_tick_id)`.
-
-Define the exact transition guard; no placeholder trigger function:
+- [ ] Add the exact transition guard. It must permit **one-way enrichment while still `PROCESSING`** because the approved design persists `scheduled_content_hash` + `ai_discovery_run_id` before provider orchestration; it must then permit terminal finalization and reject later changes.
 
 ```sql
 create function enforce_scheduled_ai_discovery_tick_transition()
@@ -195,15 +172,11 @@ language plpgsql
 as $$
 begin
   if tg_op = 'DELETE' then
-    raise exception 'scheduled AI discovery ticks are append/finalize only';
+    raise exception 'scheduled AI discovery ticks cannot be deleted';
   end if;
 
   if old.status <> 'PROCESSING' then
     raise exception 'terminal scheduled AI discovery ticks are immutable';
-  end if;
-
-  if new.status = 'PROCESSING' or new.completed_at is null then
-    raise exception 'scheduled AI discovery tick must finalize once';
   end if;
 
   if new.scheduled_ai_discovery_tick_id <> old.scheduled_ai_discovery_tick_id
@@ -211,6 +184,37 @@ begin
      or new.utc_hour <> old.utc_hour
      or new.created_at <> old.created_at then
     raise exception 'scheduled AI discovery tick identity is immutable';
+  end if;
+
+  if old.scheduled_content_hash is not null
+     and new.scheduled_content_hash is distinct from old.scheduled_content_hash then
+    raise exception 'scheduled content hash cannot change once set';
+  end if;
+
+  if old.ai_discovery_run_id is not null
+     and new.ai_discovery_run_id is distinct from old.ai_discovery_run_id then
+    raise exception 'AI discovery run id cannot change once set';
+  end if;
+
+  if old.ai_operations_policy_revision_id is not null
+     and new.ai_operations_policy_revision_id is distinct from old.ai_operations_policy_revision_id then
+    raise exception 'policy revision id cannot change once set';
+  end if;
+
+  if old.ai_operations_run_budget_reservation_id is not null
+     and new.ai_operations_run_budget_reservation_id is distinct from old.ai_operations_run_budget_reservation_id then
+    raise exception 'budget reservation id cannot change once set';
+  end if;
+
+  if new.status = 'PROCESSING' then
+    if new.completed_at is not null then
+      raise exception 'processing tick cannot have completed_at';
+    end if;
+    return new;
+  end if;
+
+  if new.completed_at is null then
+    raise exception 'terminal tick requires completed_at';
   end if;
 
   return new;
@@ -222,55 +226,45 @@ before update or delete on scheduled_ai_discovery_ticks
 for each row execute function enforce_scheduled_ai_discovery_tick_transition();
 ```
 
-This permits exactly one finalization update while preventing terminal mutation/deletion.
+This allows `PROCESSING(null ids) -> PROCESSING(hash/run id) -> terminal`, while every non-null durable linkage becomes one-way and every terminal row becomes immutable.
 
-- [ ] **Step 4: Update inherited migration table expectation**
+- [ ] Add only `scheduled_ai_discovery_ticks` to `backend/test/migration.test.ts` expected tables.
 
-Add only `scheduled_ai_discovery_ticks` to the expected table set in `backend/test/migration.test.ts`.
-
-- [ ] **Step 5: Run migration tests GREEN**
+- [ ] Run GREEN:
 
 ```bash
 cd backend && node --import tsx --test --test-concurrency=1 test/ai-discovery-automation-migration.test.ts test/migration.test.ts
 ```
 
-Expected: PASS.
-
-- [ ] **Step 6: Commit Task 1**
+- [ ] Commit:
 
 ```bash
 git add backend/migrations/0016_ai_discovery_automation.sql backend/test/ai-discovery-automation-migration.test.ts backend/test/migration.test.ts
 git commit -m "feat: add durable AI automation tick ledger"
 ```
 
-### Task 2: Extend Sprint 8C budget authority with a scheduled interval floor
+## Task 2: Extend Sprint 8C budget authority with a scheduled interval floor
 
 **Files:**
-- Modify: `backend/src/modules/ai-operations/types.ts`
-- Modify: `backend/src/modules/ai-operations/reserve-ai-operations-run-budget.ts`
-- Modify: `backend/test/ai-discovery-automation-budget.test.ts`
-- Test unchanged regression: `backend/test/ai-operations-budget.test.ts`
-- Test unchanged regression: `backend/test/execute-policy-governed-ai-discovery-run.test.ts`
+- Modify `backend/src/modules/ai-operations/types.ts`
+- Modify `backend/src/modules/ai-operations/reserve-ai-operations-run-budget.ts`
+- Modify `backend/test/ai-discovery-automation-budget.test.ts`
+- Regression: `backend/test/ai-operations-budget.test.ts`
+- Regression: `backend/test/execute-policy-governed-ai-discovery-run.test.ts`
 
-- [ ] **Step 1: Expand RED tests**
+- [ ] Add RED cases:
+  - policy interval `0`, previous reservation <3600s => `AI_OPERATIONS_SCHEDULED_CADENCE_NOT_ELAPSED`;
+  - policy interval `7200`, previous reservation <7200s => existing `AI_OPERATIONS_MIN_INTERVAL_NOT_ELAPSED`;
+  - concurrent scheduled calls cannot bypass shared advisory lock;
+  - manual/private 8C behavior remains unchanged.
 
-Add cases proving:
-- active policy interval `0`, prior reservation <3600 seconds => `AI_OPERATIONS_SCHEDULED_CADENCE_NOT_ELAPSED`;
-- active policy interval `7200`, prior reservation <7200 seconds => existing `AI_OPERATIONS_MIN_INTERVAL_NOT_ELAPSED`;
-- concurrent scheduled calls share the existing advisory lock and cannot both reserve;
-- manual 8C callers remain unchanged.
-
-- [ ] **Step 2: Verify RED**
+- [ ] Verify RED:
 
 ```bash
 cd backend && node --import tsx --test --test-concurrency=1 test/ai-discovery-automation-budget.test.ts
 ```
 
-Expected: FAIL because floor-aware reservation does not exist.
-
-- [ ] **Step 3: Extract a shared floor-aware reservation implementation**
-
-Add:
+- [ ] Add:
 
 ```ts
 export interface ReserveAiOperationsRunBudgetOptions {
@@ -284,7 +278,7 @@ export async function reserveAiOperationsRunBudgetWithFloor(
 ): Promise<ReserveAiOperationsRunBudgetResult>;
 ```
 
-Keep existing public behavior by delegating:
+Preserve existing caller behavior:
 
 ```ts
 export async function reserveAiOperationsRunBudget(pool, input) {
@@ -294,18 +288,18 @@ export async function reserveAiOperationsRunBudget(pool, input) {
 }
 ```
 
-Within the same existing transaction/advisory lock:
-1. preserve replay/idempotency handling;
+Inside the existing transaction and `ai_operations_provider_budget:v1` advisory lock:
+1. preserve replay/idempotency;
 2. load exactly one active policy;
-3. enforce disabled and UTC daily budget exactly as 8C does now;
-4. calculate elapsed seconds from the newest reservation across revisions;
-5. if elapsed < `policy.min_interval_seconds`, throw `AI_OPERATIONS_MIN_INTERVAL_NOT_ELAPSED`;
-6. otherwise if elapsed < `max(policy.min_interval_seconds, floor)`, throw `AI_OPERATIONS_SCHEDULED_CADENCE_NOT_ELAPSED`;
-7. insert the same `ai_operations_run_budget_reservations` row/audit event.
+3. preserve disabled + UTC-day cap checks;
+4. calculate elapsed seconds from latest reservation across policy revisions;
+5. if elapsed < policy interval, throw existing policy interval error;
+6. otherwise if elapsed < `max(policy interval, floor)`, throw scheduled cadence error;
+7. insert the same reservation row and same safe audit event.
 
-Do not create a second budget table or Redis cost state.
+No second budget table and no Redis cost state.
 
-- [ ] **Step 4: Run new and inherited tests GREEN**
+- [ ] Run GREEN regressions:
 
 ```bash
 cd backend && node --import tsx --test --test-concurrency=1 \
@@ -314,46 +308,31 @@ cd backend && node --import tsx --test --test-concurrency=1 \
   test/execute-policy-governed-ai-discovery-run.test.ts
 ```
 
-Expected: PASS.
-
-- [ ] **Step 5: Commit Task 2**
+- [ ] Commit:
 
 ```bash
 git add backend/src/modules/ai-operations/types.ts backend/src/modules/ai-operations/reserve-ai-operations-run-budget.ts backend/test/ai-discovery-automation-budget.test.ts
 git commit -m "refactor: add scheduled AI budget interval floor"
 ```
 
-### Task 3: Build deterministic scheduled content and run identity
+## Task 3: Build deterministic scheduled content and run identity
 
 **Files:**
-- Create: `backend/src/modules/ai-automation/types.ts`
-- Create: `backend/src/modules/ai-automation/build-scheduled-ai-discovery-input.ts`
-- Create: `backend/src/modules/ai-automation/scheduled-run-identity.ts`
-- Modify: `backend/test/ai-discovery-automation-input.test.ts`
-- Regression test: `backend/test/normalize-provider-execution-input.test.ts`
+- Create `backend/src/modules/ai-automation/types.ts`
+- Create `backend/src/modules/ai-automation/build-scheduled-ai-discovery-input.ts`
+- Create `backend/src/modules/ai-automation/scheduled-run-identity.ts`
+- Modify `backend/test/ai-discovery-automation-input.test.ts`
+- Regression: `backend/test/normalize-provider-execution-input.test.ts`
 
-- [ ] **Step 1: Expand deterministic builder tests**
+- [ ] Add RED fixtures for active patch/catalog, eligible origins (`collector_detected`, `community_submitted`, `editorial`), excluded `ai_generated`, deterministic time/UUID ties, caps, mismatched catalog IDs, structured serialization, and identical/changed content identity.
 
-Seed exact active patch/catalog data plus eligible `collector_detected`, `community_submitted`, `editorial`, and excluded `ai_generated` provenance. Test:
-- active patch/exact catalog only;
-- 8 subjects max;
-- 4 observations/subject max;
-- subject order by newest eligible observation desc then ASCII external ID;
-- observation order by `created_at desc, normalized_observation_id asc`;
-- deterministic structured JSON only;
-- allow-lists equal the sorted union of selected observed IDs and revalidate against the exact catalog;
-- invalid/oversized serialization is skipped, never truncated;
-- identical selected content => identical hash/run identity.
-
-- [ ] **Step 2: Verify RED**
+- [ ] Verify RED:
 
 ```bash
 cd backend && node --import tsx --test --test-concurrency=1 test/ai-discovery-automation-input.test.ts
 ```
 
-Expected: FAIL because builder/identity modules are absent.
-
-- [ ] **Step 3: Implement scheduled content types and structured serialization**
+- [ ] Define:
 
 ```ts
 export interface ScheduledAiDiscoveryContentV1 {
@@ -368,7 +347,7 @@ export interface ScheduledAiDiscoveryContentV1 {
 }
 ```
 
-Serialize each eligible normalized observation with fixed key insertion order:
+- [ ] Serialize observations using fixed key insertion order:
 
 ```ts
 JSON.stringify({
@@ -379,11 +358,9 @@ JSON.stringify({
 });
 ```
 
-Never include source URL/blob, raw text, usernames, prompts, Evidence, or Publication state.
+Never include source URLs/blobs, raw/free-form text, usernames, prompts, Evidence, or Publication state.
 
-- [ ] **Step 4: Query and rank deterministic PostgreSQL authorities**
-
-The builder must read one active `aram_mayhem` catalog authority and join:
+- [ ] Query exactly one active `aram_mayhem` catalog authority and join:
 
 ```text
 normalized_observations
@@ -392,11 +369,11 @@ normalized_observations
   -> game_entities
 ```
 
-Exclude `candidate_provenance.origin = 'ai_generated'`. Fail closed if active authority is unavailable/ambiguous. Revalidate the selected IDs against the exact active catalog revision before provider normalization.
+Exclude `ai_generated`; fail closed for missing/ambiguous active authority. Rank subjects by newest eligible observation descending then ASCII subject external ID. Rank observations by `created_at desc, normalized_observation_id asc`. Select max 8 subjects × 4 observations. Revalidate selected IDs against the exact active catalog revision; allow-lists are the ASCII-sorted union of IDs from selected observations only.
 
-- [ ] **Step 5: Implement exact non-circular hash and UUIDv5-style identity**
+- [ ] Use existing Sprint 8B observation validation. Invalid/oversized structured serialization is skipped, never truncated.
 
-Use:
+- [ ] Implement non-circular hash:
 
 ```ts
 scheduledContentHash = hashCanonicalJson({ patchKey, gameModeExternalId, subjects });
@@ -404,34 +381,23 @@ runKey = `scheduled:v1:${scheduledContentHash}`;
 idempotencyKey = `ai-discovery-scheduled:v1:${scheduledContentHash}`;
 ```
 
-Lock the Sprint 8D namespace UUID to:
+- [ ] Lock namespace UUID:
 
 ```text
 3d0f4c4e-5b7a-5c4d-8f5e-7cc2f6968d01
 ```
 
-Implement deterministic UUID with exact RFC-4122-v5 bit semantics:
-1. parse namespace UUID to 16 raw bytes;
+Implement deterministic UUID with exact v5 semantics:
+1. parse namespace UUID into 16 bytes;
 2. SHA-1 over `namespaceBytes || utf8(scheduledContentHash)`;
 3. take first 16 digest bytes;
-4. set byte 6: `(byte6 & 0x0f) | 0x50`;
-5. set byte 8: `(byte8 & 0x3f) | 0x80`;
-6. format lowercase UUID string.
+4. byte 6 = `(byte6 & 0x0f) | 0x50`;
+5. byte 8 = `(byte8 & 0x3f) | 0x80`;
+6. lowercase UUID formatting.
 
-This removes implementation ambiguity while remaining repository-local and deterministic.
+- [ ] Normalize final provider input with existing `normalizeAiProviderExecutionInput({ ...content, runKey })`; do not change Sprint 8B full provider-input hashing semantics.
 
-- [ ] **Step 6: Normalize final provider input through existing Sprint 8B validation**
-
-```ts
-const input = normalizeAiProviderExecutionInput({
-  ...content,
-  runKey: identity.runKey,
-});
-```
-
-Do not change Sprint 8B hashing/validation semantics.
-
-- [ ] **Step 7: Run Task 3 GREEN**
+- [ ] Run GREEN:
 
 ```bash
 cd backend && node --import tsx --test --test-concurrency=1 \
@@ -439,38 +405,30 @@ cd backend && node --import tsx --test --test-concurrency=1 \
   test/normalize-provider-execution-input.test.ts
 ```
 
-Expected: PASS.
-
-- [ ] **Step 8: Commit Task 3**
+- [ ] Commit:
 
 ```bash
 git add backend/src/modules/ai-automation backend/test/ai-discovery-automation-input.test.ts
 git commit -m "feat: build deterministic scheduled AI discovery input"
 ```
 
-### Task 4: Add PostgreSQL-owned scheduled tick execution
+## Task 4: Add PostgreSQL-owned scheduled tick execution
 
 **Files:**
-- Create: `backend/src/modules/ai-automation/process-scheduled-ai-discovery-tick.ts`
-- Modify: `backend/test/ai-discovery-automation-tick.test.ts`
-- Regression test: `backend/test/execute-policy-governed-ai-discovery-run.test.ts`
-- Regression test: `backend/test/execute-ai-discovery-provider-run.test.ts`
+- Create `backend/src/modules/ai-automation/process-scheduled-ai-discovery-tick.ts`
+- Modify `backend/test/ai-discovery-automation-tick.test.ts`
+- Regression: `backend/test/execute-policy-governed-ai-discovery-run.test.ts`
+- Regression: `backend/test/execute-ai-discovery-provider-run.test.ts`
 
-- [ ] **Step 1: Expand RED concurrency/no-new-input tests**
+- [ ] Add RED tests for two simultaneous processors in same DB UTC hour, one owner/provider path only, consumed same hash, pre-reservation-blocked same hash, provider failure, and crash after reservation.
 
-Test two simultaneous processors in the same DB UTC hour: exactly one owns the tick and only the owner may reach provider execution. Add cases for consumed same hash, policy-blocked same hash, provider failure, and crash after reservation.
-
-- [ ] **Step 2: Verify RED**
+- [ ] Verify RED:
 
 ```bash
 cd backend && node --import tsx --test --test-concurrency=1 test/ai-discovery-automation-tick.test.ts
 ```
 
-Expected: FAIL because processor is absent.
-
-- [ ] **Step 3: Claim one DB-owned UTC-hour tick**
-
-Use PostgreSQL clock, not job timestamp:
+- [ ] Claim using PostgreSQL clock:
 
 ```sql
 insert into scheduled_ai_discovery_ticks
@@ -481,15 +439,11 @@ on conflict (scheduler_key, utc_hour) do nothing
 returning scheduled_ai_discovery_tick_id, utc_hour;
 ```
 
-Zero returned rows => duplicate/no-op before building input or calling provider authority.
+Zero rows => duplicate/no-op before input/provider work.
 
-- [ ] **Step 4: Persist deterministic hash/run ID before provider orchestration**
+- [ ] Build content, derive identity, then perform the legal controlled `PROCESSING -> PROCESSING` enrichment setting `scheduled_content_hash` and `ai_discovery_run_id` before budget/provider execution.
 
-After building content and deriving identity, update the owned `PROCESSING` row with `scheduled_content_hash` and `ai_discovery_run_id` before budget/provider execution.
-
-- [ ] **Step 5: Enforce authoritative consumed-input gate**
-
-Use the approved crash-safe join:
+- [ ] Consumed-input query:
 
 ```sql
 select 1
@@ -501,9 +455,9 @@ select 1
  limit 1;
 ```
 
-Existing reservation => finalize current tick `NO_NEW_INPUT`, with zero new reservation/provider call. A prior tick without reservation does not consume the content.
+Prior reservation => current tick `NO_NEW_INPUT`, zero new reservation/provider call. Prior tick without reservation does not consume content.
 
-- [ ] **Step 6: Call existing Sprint 8C governed execution with floor-aware reservation dependency**
+- [ ] Call existing Sprint 8C executor via existing `reserveBudget` dependency:
 
 ```ts
 await executePolicyGovernedAiDiscoveryRun(pool, command, {
@@ -516,13 +470,11 @@ await executePolicyGovernedAiDiscoveryRun(pool, command, {
 });
 ```
 
-Map exact known budget errors to approved safe terminal outcomes. Unknown/ambiguous errors must not be converted into an automatic retry instruction.
+Map only known budget errors to approved safe terminal outcomes. Unknown/ambiguous errors do not generate automatic retry instructions.
 
-- [ ] **Step 7: Finalize safe metadata only**
+- [ ] Terminal finalization writes only status, safe policy/budget linkage, and `completed_at`. Never persist provider request/response, structured observations, prompt, rationale, or secret.
 
-Terminal update may write only status, policy revision ID, budget reservation ID, and `completed_at`; provider input/output/prompt/rationale/secrets are never written to the tick ledger.
-
-- [ ] **Step 8: Run Task 4 GREEN**
+- [ ] Run GREEN:
 
 ```bash
 cd backend && node --import tsx --test --test-concurrency=1 \
@@ -531,46 +483,31 @@ cd backend && node --import tsx --test --test-concurrency=1 \
   test/execute-ai-discovery-provider-run.test.ts
 ```
 
-Expected: PASS.
-
-- [ ] **Step 9: Commit Task 4**
+- [ ] Commit:
 
 ```bash
 git add backend/src/modules/ai-automation/process-scheduled-ai-discovery-tick.ts backend/test/ai-discovery-automation-tick.test.ts
 git commit -m "feat: execute guarded scheduled AI discovery ticks"
 ```
 
-### Task 5: Add BullMQ scheduler reconciliation, queue consumer, and automation-only config
+## Task 5: Add BullMQ scheduler reconciliation, queue consumer, and automation-only config
 
 **Files:**
-- Modify: `backend/src/queue/names.ts`
-- Create: `backend/src/queue/ai-discovery-scheduler.ts`
-- Create: `backend/src/queue/ai-discovery-automation-worker.ts`
-- Create: `backend/src/ai-automation-config.ts`
-- Modify: `backend/test/ai-discovery-automation-queue.test.ts`
+- Modify `backend/src/queue/names.ts`
+- Create `backend/src/queue/ai-discovery-scheduler.ts`
+- Create `backend/src/queue/ai-discovery-automation-worker.ts`
+- Create `backend/src/ai-automation-config.ts`
+- Modify `backend/test/ai-discovery-automation-queue.test.ts`
 
-- [ ] **Step 1: Expand RED scheduler/config tests**
+- [ ] RED tests cover queue name `hai-dau-ai-discovery-automation-v1`, scheduler ID, one-hour interval `3_600_000`, exact payload, `attempts:1`, enabled upsert, disabled removal, idempotent reconciliation, stale disabled no-op, disabled config without OpenAI credentials, enabled config fail-closed.
 
-Test:
-- queue name `hai-dau-ai-discovery-automation-v1`;
-- scheduler ID `ai-discovery-hourly-v1`;
-- one-hour repeat interval `3_600_000` ms;
-- job template data exactly `{schemaVersion:1}`;
-- job options `attempts:1`;
-- disabled startup removes stale scheduler;
-- stale delivered job while disabled returns no-op before tick creation;
-- disabled config requires only `DATABASE_URL` + `REDIS_URL`;
-- enabled config requires valid provider settings.
-
-- [ ] **Step 2: Verify RED**
+- [ ] Verify RED:
 
 ```bash
 cd backend && node --import tsx --test --test-concurrency=1 test/ai-discovery-automation-queue.test.ts
 ```
 
-Expected: FAIL because scheduler/config/worker modules are absent.
-
-- [ ] **Step 3: Implement exact config parser**
+- [ ] Define runtime config:
 
 ```ts
 export interface AiAutomationConfig {
@@ -581,11 +518,9 @@ export interface AiAutomationConfig {
 }
 ```
 
-`AI_DISCOVERY_SCHEDULER_ENABLED` undefined => false; only exact `true`/`false` accepted. Enabled path reuses the same OpenAI model/timeout/endpoint restrictions as the existing private 8B CLI; production custom endpoint remains prohibited.
+Undefined scheduler flag => false. Enabled path applies the same provider/model/timeout/custom-endpoint restrictions as existing private 8B execution; production custom endpoint remains prohibited.
 
-- [ ] **Step 4: Reconcile scheduler desired state**
-
-Enabled:
+- [ ] Enabled scheduler reconciliation:
 
 ```ts
 await queue.upsertJobScheduler(
@@ -605,58 +540,48 @@ Disabled:
 await queue.removeJobScheduler(AI_DISCOVERY_SCHEDULER_ID);
 ```
 
-- [ ] **Step 5: Implement queue worker with disabled no-op guard and concurrency 1**
+- [ ] Queue worker concurrency = 1. Validate exact job-data keys. If desired state is disabled, return `SCHEDULER_DISABLED` before tick creation. Worker source must not import lifecycle mutation authorities.
 
-Validate exact job data keys before execution. If local desired state is disabled, return `SCHEDULER_DISABLED` without creating a tick/provider run. The worker module must not import any materialization/review/moderation/eligibility/publication mutation module.
-
-- [ ] **Step 6: Run Task 5 GREEN**
+- [ ] Run GREEN:
 
 ```bash
 cd backend && node --import tsx --test --test-concurrency=1 test/ai-discovery-automation-queue.test.ts
 ```
 
-Expected: PASS.
-
-- [ ] **Step 7: Commit Task 5**
+- [ ] Commit:
 
 ```bash
 git add backend/src/queue/names.ts backend/src/queue/ai-discovery-scheduler.ts backend/src/queue/ai-discovery-automation-worker.ts backend/src/ai-automation-config.ts backend/test/ai-discovery-automation-queue.test.ts
 git commit -m "feat: add private hourly AI automation queue"
 ```
 
-### Task 6: Add the dedicated AI automation process lifecycle
+## Task 6: Add the dedicated AI automation process lifecycle
 
 **Files:**
-- Create: `backend/src/ai-automation-worker.ts`
-- Modify: `backend/package.json`
-- Modify: `backend/test/ai-discovery-automation-queue.test.ts`
+- Create `backend/src/ai-automation-worker.ts`
+- Modify `backend/package.json`
+- Modify `backend/test/ai-discovery-automation-queue.test.ts`
 
-- [ ] **Step 1: Add RED lifecycle assertions**
+- [ ] Add RED lifecycle assertions: package script exists, dedicated entrypoint owns provider construction, existing `backend/src/worker.ts` remains provider-free.
 
-Assert package script `start:ai-automation` exists and the dedicated entrypoint owns provider construction. Assert existing `backend/src/worker.ts` remains provider-free.
-
-- [ ] **Step 2: Implement process entrypoint**
-
-Lifecycle:
-1. parse automation config;
+- [ ] Entry lifecycle:
+1. parse automation runtime config;
 2. create PostgreSQL pool and dedicated Redis queue/worker connections;
 3. instantiate queue;
 4. reconcile scheduler desired state;
-5. if enabled, construct provider and AI automation worker;
-6. if disabled, still run a no-provider worker capable of draining stale jobs as no-ops;
+5. enabled => construct provider and worker;
+6. disabled => construct no-provider stale-job-draining worker;
 7. SIGINT/SIGTERM closes worker, queue, Redis connections, pool exactly once.
 
-Sanitize process-level errors to stable operational codes; do not print secrets/provider bodies.
-
-- [ ] **Step 3: Add package script**
+- [ ] Add:
 
 ```json
 "start:ai-automation": "node dist/src/ai-automation-worker.js"
 ```
 
-Do not alter `start` or `start:worker` to require OpenAI environment variables.
+Do not alter public `start` or core `start:worker` to require OpenAI settings.
 
-- [ ] **Step 4: Run typecheck/build/lifecycle tests**
+- [ ] Run:
 
 ```bash
 npm --prefix backend run typecheck
@@ -664,65 +589,44 @@ npm --prefix backend run build
 cd backend && node --import tsx --test --test-concurrency=1 test/ai-discovery-automation-queue.test.ts
 ```
 
-Expected: PASS.
-
-- [ ] **Step 5: Commit Task 6**
+- [ ] Commit:
 
 ```bash
 git add backend/src/ai-automation-worker.ts backend/package.json backend/test/ai-discovery-automation-queue.test.ts
 git commit -m "feat: add dedicated AI automation runtime"
 ```
 
-### Task 7: Extend safe read-only observability and status inspection
+## Task 7: Extend safe read-only observability and status inspection
 
 **Files:**
-- Modify: `backend/src/modules/ai-operations/types.ts`
-- Modify: `backend/src/modules/ai-operations/read-ai-operations-snapshot.ts`
-- Create: `backend/src/ai-automation-status-cli.ts`
-- Modify: `backend/package.json`
-- Modify: `backend/test/ai-discovery-automation-reader.test.ts`
-- Regression test: `backend/test/ai-operations-reader.test.ts`
+- Modify `backend/src/modules/ai-operations/types.ts`
+- Modify `backend/src/modules/ai-operations/read-ai-operations-snapshot.ts`
+- Create `backend/src/ai-automation-status-cli.ts`
+- Modify `backend/package.json`
+- Modify `backend/test/ai-discovery-automation-reader.test.ts`
+- Regression: `backend/test/ai-operations-reader.test.ts`
 
-- [ ] **Step 1: Expand RED reader/status tests**
+- [ ] RED reader tests require safe `snapshot.automation` fields: last completed tick time/outcome/hash/run ID/budget reservation time and bounded counters for total/no-new-input/policy-cadence blocked/completed/provider-failed-ambiguous/incomplete-processing. Serialized snapshot must not contain prompt, observation body, provider response, auth header, or API key.
 
-Require `snapshot.automation` to expose only:
-- last completed tick time;
-- last outcome;
-- last scheduled content hash;
-- last AI discovery run ID;
-- last budget reservation time;
-- bounded counters for ticks/no-new-input/policy-cadence blocked/completed/provider-failed-ambiguous/incomplete-processing.
-
-Assert serialized snapshot contains no prompt, observation body, provider response, authorization header, or API key.
-
-- [ ] **Step 2: Verify RED**
+- [ ] Verify RED:
 
 ```bash
 cd backend && node --import tsx --test --test-concurrency=1 test/ai-discovery-automation-reader.test.ts
 ```
 
-Expected: FAIL because automation read model/status CLI is absent.
+- [ ] Extend `readAiOperationsSnapshot()` by querying only safe tick columns and `ai_operations_run_budget_reservations.reserved_at`. Preserve existing `activePolicy`, `budget`, and `proposals` behavior and add `automation`.
 
-- [ ] **Step 3: Extend `readAiOperationsSnapshot()`**
+- [ ] Add a **separate read-only status config parser** requiring only `DATABASE_URL`, `REDIS_URL`, and exact/defaulted `AI_DISCOVERY_SCHEDULER_ENABLED`. Even when desired state is enabled, `ai-automation:status` must not require or read `OPENAI_API_KEY` because inspection itself never executes the provider.
 
-Query only safe tick columns and `ai_operations_run_budget_reservations.reserved_at`; do not read provider request/response data. Keep existing activePolicy/budget/proposals shape intact and add `automation`.
+- [ ] `ai-automation-status-cli.ts` may read BullMQ scheduler inventory and DB snapshot only. It must not call `upsertJobScheduler`, `removeJobScheduler`, provider execution, materialization, or publication. Output only scheduler ID/cadence/next-run style metadata plus safe DB automation snapshot.
 
-- [ ] **Step 4: Add private status CLI**
-
-The CLI may read:
-- parsed desired scheduler state;
-- BullMQ Job Scheduler inventory;
-- `readAiOperationsSnapshot()`.
-
-It must not call scheduler mutation methods, provider execution, materialization, or publication mutation. Output only sanitized scheduler identity/cadence/next-run metadata plus safe DB snapshot.
-
-- [ ] **Step 5: Add package script**
+- [ ] Add:
 
 ```json
 "ai-automation:status": "node dist/src/ai-automation-status-cli.js"
 ```
 
-- [ ] **Step 6: Run reader regressions GREEN**
+- [ ] Run GREEN:
 
 ```bash
 cd backend && node --import tsx --test --test-concurrency=1 \
@@ -731,51 +635,37 @@ cd backend && node --import tsx --test --test-concurrency=1 \
 npm run typecheck
 ```
 
-Expected: PASS.
-
-- [ ] **Step 7: Commit Task 7**
+- [ ] Commit:
 
 ```bash
 git add backend/src/modules/ai-operations/types.ts backend/src/modules/ai-operations/read-ai-operations-snapshot.ts backend/src/ai-automation-status-cli.ts backend/package.json backend/test/ai-discovery-automation-reader.test.ts
 git commit -m "feat: expose safe AI automation operations status"
 ```
 
-### Task 8: Complete repository authority/security contract and operations runbook
+## Task 8: Complete repository authority/security contract and runbook
 
 **Files:**
-- Modify: `tests/ai-discovery-automation-contract.test.mjs`
-- Modify: `package.json`
-- Create: `docs/runbooks/ai-discovery-automation.md`
+- Modify `tests/ai-discovery-automation-contract.test.mjs`
+- Modify `package.json`
+- Create `docs/runbooks/ai-discovery-automation.md`
 
-- [ ] **Step 1: Expand root authority contract before wiring scripts**
+- [ ] Root contract statically verifies scheduled source graph has no Candidate materialization/HumanReview/Moderation/Eligibility/Evidence/Publication mutation call path; exact queue/scheduler constants; disabled default; dedicated process/status scripts; read-only workflow permissions/no deploy or production secret; runbook exists.
 
-Statically assert:
-- scheduled source graph does not contain `materializeAiCandidateProposal`, Human Review mutation, Moderation mutation, Eligibility mutation, Evidence mutation, Publication mutation;
-- exact queue/scheduler constants exist;
-- scheduler defaults disabled;
-- package has dedicated automation process/status scripts;
-- workflow has read-only permissions and no deployment/production-secret command;
-- runbook exists and does not instruct automatic production activation.
-
-- [ ] **Step 2: Verify contract remains RED before root wiring/runbook**
+- [ ] Verify contract RED before root wiring:
 
 ```bash
 node --test tests/ai-discovery-automation-contract.test.mjs
 ```
 
-Expected: FAIL until root script/runbook/workflow pieces exist.
-
-- [ ] **Step 3: Add root test script without removing inherited gates**
+- [ ] Add root script:
 
 ```json
 "test:ai-discovery-automation": "node --test tests/ai-discovery-automation-contract.test.mjs"
 ```
 
-Add it to the root `test` chain while preserving every existing 8A/8B/8C and inherited regression command.
+Add it to root `test` chain without removing inherited tests.
 
-- [ ] **Step 4: Write disabled-default operations runbook**
-
-Document prerequisites without embedding secrets:
+- [ ] Runbook prerequisites/disabled startup:
 
 ```bash
 test -n "$DATABASE_URL"
@@ -784,38 +674,26 @@ AI_DISCOVERY_SCHEDULER_ENABLED=false npm --prefix backend run start:ai-automatio
 AI_DISCOVERY_SCHEDULER_ENABLED=false npm --prefix backend run ai-automation:status
 ```
 
-Document later activation as a **separate explicit authorization** sequence only. Rollback procedure: set false -> restart/reconcile -> status verifies scheduler absent -> preserve PostgreSQL history.
+Activation instructions must explicitly state separate authorization is required. Rollback: set false -> restart/reconcile -> status confirms scheduler absent -> preserve PostgreSQL history.
 
-- [ ] **Step 5: Run root contract**
+- [ ] Run root contract. At this point only the not-yet-created Task 9 workflow assertion may remain RED; document that exact expected failure.
 
-At this point it may still fail only because the dedicated workflow is Task 9. Record that exact remaining expected failure; all other assertions should pass.
-
-- [ ] **Step 6: Commit Task 8**
+- [ ] Commit:
 
 ```bash
 git add tests/ai-discovery-automation-contract.test.mjs package.json docs/runbooks/ai-discovery-automation.md
 git commit -m "test: lock Sprint 8D automation authority boundaries"
 ```
 
-### Task 9: Add the dedicated Sprint 8D GitHub Actions gate
+## Task 9: Add the dedicated Sprint 8D GitHub Actions gate
 
-**Files:**
-- Create: `.github/workflows/sprint-8d-ai-discovery-automation.yml`
+**File:** Create `.github/workflows/sprint-8d-ai-discovery-automation.yml`
 
-- [ ] **Step 1: Create workflow with exact path filters**
+- [ ] Path filters cover migration 0016, `backend/src/modules/ai-automation/**`, `backend/src/queue/ai-discovery-*`, `backend/src/ai-automation-*`, touched AI-operations files, 8D tests/contract, package files, runbook/spec/plan, and workflow itself.
 
-Include migration 0016, `backend/src/modules/ai-automation/**`, `backend/src/queue/ai-discovery-*`, `backend/src/ai-automation-*`, touched AI operations files, 8D tests/contract, package files, runbook/spec/plan, and the workflow itself.
+- [ ] Runtime: PostgreSQL 17, Redis 7, Node 22.13.0, `permissions: contents: read`, root/backend `npm ci`, no provider secret env.
 
-- [ ] **Step 2: Use established CI runtime**
-
-- PostgreSQL 17 service;
-- Redis 7 service;
-- Node 22.13.0;
-- `permissions: contents: read`;
-- root/backend `npm ci`;
-- no provider secret in workflow env.
-
-- [ ] **Step 3: Add focused and inherited commands**
+- [ ] Focused/inherited steps:
 
 ```yaml
 - run: npm run test:ai-discovery-automation
@@ -829,9 +707,9 @@ Include migration 0016, `backend/src/modules/ai-automation/**`, `backend/src/que
 - run: npm --prefix backend run build
 ```
 
-Add repository cleanliness and deployment/secret guards following the 8C pattern. Explicitly reject production deploy commands and secret material; do not add `OPENAI_API_KEY`.
+- [ ] Add repository cleanliness + deployment/secret guards following established 8C pattern. Explicitly reject deployment commands and secret material. Do not add `OPENAI_API_KEY`.
 
-- [ ] **Step 4: Run root contract GREEN**
+- [ ] Run:
 
 ```bash
 npm run test:ai-discovery-automation
@@ -840,19 +718,16 @@ git diff --check
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit Task 9**
+- [ ] Commit:
 
 ```bash
 git add .github/workflows/sprint-8d-ai-discovery-automation.yml
 git commit -m "ci: add Sprint 8D AI automation gate"
 ```
 
-### Task 10: Full local regression and authority audit
+## Task 10: Full regression and authority audit
 
-**Files:**
-- No new files unless a verified regression defect inside approved 8D scope requires correction.
-
-- [ ] **Step 1: Run focused 8D checks**
+- [ ] Focused 8D:
 
 ```bash
 npm run test:ai-discovery-automation
@@ -861,7 +736,7 @@ cd backend && node --import tsx --test --test-concurrency=1 test/ai-discovery-au
 cd ..
 ```
 
-- [ ] **Step 2: Run inherited 8A/8B/8C and full backend checks**
+- [ ] Inherited/full:
 
 ```bash
 npm run test:guarded-ai-discovery
@@ -872,81 +747,42 @@ npm --prefix backend run build
 npm run lint
 ```
 
-Expected: all PASS.
-
-- [ ] **Step 3: Run cleanliness checks**
+- [ ] Cleanliness:
 
 ```bash
 git diff --check
 git status --short
 ```
 
-Expected: no generated/uncommitted changes.
+Expected: all PASS and clean worktree.
 
-- [ ] **Step 4: Perform manual final authority audit from the diff**
+- [ ] Manual diff audit confirms exact minimal Redis data, no downstream content-authority mutation path, provider credentials only in dedicated automation runtime/config, core worker/public API provider-secret independence, and no production deployment/provisioning command.
 
-Verify:
-- Redis job data remains exact minimal schema;
-- no automatic Candidate/HumanReview/Moderation/Eligibility/Evidence/Publication mutation path exists;
-- provider credentials exist only in dedicated AI automation config/runtime;
-- core `backend/src/worker.ts` and public server remain provider-secret-independent;
-- no production deployment/provisioning command was introduced.
+- [ ] Any failure is handled via systematic debugging/TDD. Do not weaken tests to pass gates.
 
-- [ ] **Step 5: Fix only verified scoped defects and rerun affected + full gates**
+## Task 11: Draft PR and exact-head verification handoff
 
-Use systematic debugging/TDD for any failure. Do not weaken tests to make gates pass.
+- [ ] Push implementation feature branch created from approved spec/plan, never commit implementation directly to `main`.
 
-### Task 11: Draft PR and exact-head verification handoff
-
-**Files:**
-- No implementation changes unless Task 10 exposes a verified defect.
-
-- [ ] **Step 1: Push the implementation feature branch**
-
-Use the implementation branch created from the approved plan/spec, not `main` directly.
-
-- [ ] **Step 2: Open a draft PR**
-
-Title:
+- [ ] Open draft PR titled:
 
 ```text
 Sprint 8D: guarded hourly AI discovery automation
 ```
 
-PR body must state:
-- hourly scheduler disabled by default;
-- PostgreSQL owns ticks/budget;
-- Redis/BullMQ is schedule/delivery only;
-- AI stops at durable proposals;
-- no auto-materialize/publish;
-- no production secrets/deploy;
-- CI uses fake provider only.
+PR body states: hourly disabled by default; PostgreSQL owns ticks/budget; Redis/BullMQ only schedules/delivers; AI stops at durable proposals; no auto-materialize/publish; no production secrets/deploy; fake provider CI only.
 
-- [ ] **Step 3: Verify required GitHub Actions at the exact PR head**
+- [ ] Verify exact-head green set:
+  - Sprint 8D dedicated gate;
+  - Sprint 8C policy/budget;
+  - Sprint 8B provider execution;
+  - Sprint 8A guarded AI discovery;
+  - Sprint 7A/7B/7C;
+  - Sprint 5C frontend/backend regression + staging integration;
+  - Sprint 5D release candidate;
+  - deployment workflow dry-run;
+  - every additional inherited required check triggered by diff.
 
-Required green set:
-- Sprint 8D dedicated gate;
-- Sprint 8C policy/budget gate;
-- Sprint 8B provider execution gate;
-- Sprint 8A guarded AI discovery gate;
-- Sprint 7A/7B/7C gates;
-- Sprint 5C frontend/backend regression + staging integration;
-- Sprint 5D release-candidate gate;
-- deployment workflow dry-run;
-- any additional inherited required checks triggered by the diff.
+- [ ] Review PR comments/threads; only technically valid actionable feedback is applied through TDD/systematic debugging, then exact-head gates rerun.
 
-- [ ] **Step 4: Review PR comments/threads**
-
-Address only actionable, technically valid feedback through TDD/systematic debugging. Re-run exact-head gates after any change.
-
-- [ ] **Step 5: Stop before merge and production activation**
-
-Report:
-- exact feature-head SHA;
-- PR number;
-- changed-file summary;
-- focused/full test status;
-- exact-head workflow status;
-- review comment/thread status.
-
-Do **not** merge, deploy, provision provider credentials, or enable the production scheduler. Merge and production activation remain separate explicit authorization gates.
+- [ ] Stop before merge and production activation. Report exact feature-head SHA, PR number, changed-file summary, test/workflow status, review status. **Do not merge, deploy, provision provider credentials, or enable production scheduler.** Those remain separate explicit authorization gates.
