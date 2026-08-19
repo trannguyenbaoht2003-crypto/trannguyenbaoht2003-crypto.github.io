@@ -79,10 +79,38 @@ export interface AiOperationsProposalSnapshot {
   materialized: number;
 }
 
+export type AiOperationsAutomationOutcome =
+  | 'NO_NEW_INPUT'
+  | 'CADENCE_NOT_ELAPSED'
+  | 'POLICY_DISABLED'
+  | 'DAILY_BUDGET_EXHAUSTED'
+  | 'POLICY_MIN_INTERVAL'
+  | 'COMPLETED'
+  | 'PROVIDER_FAILED'
+  | 'AMBIGUOUS_FAILURE';
+
+export interface AiOperationsAutomationSnapshot {
+  lastCompletedAt: string | null;
+  lastOutcome: AiOperationsAutomationOutcome | null;
+  lastScheduledContentHash: string | null;
+  lastAiDiscoveryRunId: string | null;
+  lastBudgetReservedAt: string | null;
+  recentWindowSize: number;
+  recent: {
+    ticks: number;
+    noNewInput: number;
+    policyCadenceBlocked: number;
+    completed: number;
+    providerFailedOrAmbiguous: number;
+    incompleteProcessing: number;
+  };
+}
+
 export interface AiOperationsSnapshot {
   activePolicy: AiOperationsActivePolicySnapshot;
   budget: AiOperationsBudgetSnapshot;
   proposals: AiOperationsProposalSnapshot;
+  automation: AiOperationsAutomationSnapshot;
 }
 
 export interface ExecutePolicyGovernedAiDiscoveryRunCommand {
