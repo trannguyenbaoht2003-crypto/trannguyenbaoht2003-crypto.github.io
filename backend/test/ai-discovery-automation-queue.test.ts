@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import { parseAiAutomationConfig } from '../src/ai-automation-config.js';
@@ -78,4 +79,14 @@ test('scheduler flag only accepts exact true or false', () => {
     }),
     /AI_AUTOMATION_CONFIG_INVALID/,
   );
+});
+
+test('dedicated automation entrypoint owns provider wiring while core worker stays provider-free', async () => {
+  const automation = await readFile(new URL('../src/ai-automation-worker.ts', import.meta.url), 'utf8');
+  const coreWorker = await readFile(new URL('../src/worker.ts', import.meta.url), 'utf8');
+  const packageJson = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
+  assert.match(automation, /createOpenAiResponsesProvider/u);
+  assert.equal(coreWorker.includes('createOpenAiResponsesProvider'), false);
+  assert.equal(coreWorker.includes('OPENAI_API_KEY'), false);
+  assert.equal(packageJson.scripts['start:ai-automation'], 'node dist/src/ai-automation-worker.js');
 });

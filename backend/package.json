@@ -18,6 +18,7 @@
     "ai-discovery:materialize": "node dist/src/ai-discovery-materialize-cli.js",
     "start": "node dist/src/server.js",
     "start:worker": "node dist/src/worker.js",
+    "start:ai-automation": "node dist/src/ai-automation-worker.js",
     "operator:dev": "node --import tsx src/operator-server.ts",
     "operator": "node dist/src/operator-server.js"
   },
