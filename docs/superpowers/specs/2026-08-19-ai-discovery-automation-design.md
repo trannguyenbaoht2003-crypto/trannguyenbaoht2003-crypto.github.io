@@ -38,6 +38,7 @@ No scheduled path may materialize a Candidate, complete Human Review, mutate Mod
 - Sprint 8A AI run/proposal persistence remains unchanged.
 - Sprint 8A `materializeAiCandidateProposal()` remains explicit/private and is not imported or called by the Sprint 8D scheduler/worker path.
 - AI output remains advisory and is never Evidence.
+- Scheduled input excludes `ai_generated` provenance so AI output cannot become its own automatic discovery signal.
 - No public Fastify mutation route, operator-browser mutation, automatic materialization, automatic Human Review, automatic Publication, production credential provisioning, or production deployment is authorized by Sprint 8D.
 
 ## 1. Runtime topology
@@ -75,6 +76,8 @@ At AI automation process startup:
 - reconciliation is idempotent and safe across repeated process starts;
 - scheduler-management failures fail the AI automation process closed and emit only sanitized operational errors.
 
+The AI queue consumer may run while the scheduler is disabled so stale already-delivered jobs can be drained as no-ops. Its processor checks the local desired-state flag before creating a tick or touching provider execution.
+
 The Redis job payload is deliberately minimal:
 
 ```json
@@ -85,7 +88,7 @@ It must not contain observation text, prompts, catalog payloads, AI proposals, p
 
 ### Hour-slot resolution
 
-The final data-minimization boundary is authoritative: the dynamic hour slot is not placed in Redis. When a scheduled job starts processing, PostgreSQL derives the current UTC hour with its own clock and attempts to create/claim the corresponding durable tick. A delayed scheduler job therefore does not backfill missed hours. This is intentional: Sprint 8D prefers a missed discovery opportunity over a backlog of provider calls.
+The final data-minimization boundary is authoritative: the dynamic hour slot is not placed in Redis. When an enabled scheduled job starts processing, PostgreSQL derives the current UTC hour with its own clock and attempts to create/claim the corresponding durable tick. A delayed scheduler job therefore does not backfill missed hours. This is intentional: Sprint 8D prefers a missed discovery opportunity over a backlog of provider calls.
 
 BullMQ timing is not a cost authority. Even if a newly reconciled scheduler produces an unexpected early trigger, the scheduled budget reservation described below enforces a rolling one-hour provider-attempt floor atomically in PostgreSQL.
 
@@ -98,12 +101,11 @@ Each row represents at most one processed scheduled trigger for one PostgreSQL U
 - `scheduled_ai_discovery_tick_id uuid primary key`
 - `scheduler_key text`, fixed to `ai-discovery-hourly-v1`
 - `utc_hour timestamptz`, normalized to the start of a UTC hour
-- `status text` constrained to the approved outcome vocabulary
-- `input_hash text null`
+- `status text`, initially `PROCESSING`, then one approved terminal outcome
+- `scheduled_content_hash text null`
 - `ai_discovery_run_id uuid null`
 - `ai_operations_policy_revision_id uuid null`
 - `ai_operations_run_budget_reservation_id uuid null`
-- `provider_attempted boolean not null default false`
 - `created_at timestamptz default clock_timestamp()`
 - `completed_at timestamptz null`
 
@@ -111,7 +113,7 @@ A unique constraint on `(scheduler_key, utc_hour)` makes duplicate/concurrent Bu
 
 The row stores safe hashes/IDs/status only. It does not store raw observations, prompts, request/response bodies, rationales, API keys, secrets, or publication content.
 
-Approved terminal outcomes are:
+`PROCESSING` is the only non-terminal state. Approved terminal outcomes are:
 
 - `NO_NEW_INPUT`
 - `CADENCE_NOT_ELAPSED`
@@ -122,83 +124,125 @@ Approved terminal outcomes are:
 - `PROVIDER_FAILED`
 - `AMBIGUOUS_FAILURE`
 
-`SCHEDULER_DISABLED` is an operational reconciliation state, not a durable tick outcome, because a disabled scheduler should not intentionally create new tick rows.
+`SCHEDULER_DISABLED` is an operational reconciliation/no-op state, not a durable tick outcome, because a disabled scheduler should not intentionally create new tick rows.
 
-A process crash may leave a claimed tick without `completed_at`. Sprint 8D does not automatically retry that tick. The next eligible scheduler occurrence creates a new UTC-hour tick. This is intentional fail-closed crash behavior.
+A process crash may leave a claimed tick in `PROCESSING` with `completed_at = null`. Sprint 8D does not automatically retry that tick. The next eligible scheduler occurrence creates a new UTC-hour tick. This is intentional fail-closed crash behavior.
+
+Before provider orchestration begins, the owned tick is updated with `scheduled_content_hash` and deterministic `ai_discovery_run_id`. If a later crash occurs after Sprint 8C budget reservation, the durable budget row can still be joined back to the tick by `ai_discovery_run_id` even if the tick did not receive its final reservation metadata update.
 
 ## 4. Deterministic scheduled input builder
 
-Add a read-only authority `buildScheduledAiDiscoveryInput()` that constructs Sprint 8B canonical provider input exclusively from existing PostgreSQL authorities.
+Add a read-only authority `buildScheduledAiDiscoveryInput()` that constructs scheduled AI content exclusively from existing PostgreSQL authorities.
 
 Input sources:
 
-1. active patch;
-2. active game catalog/rules for `aram_mayhem`;
-3. normalized stored observations that are valid for the active patch/catalog.
+1. the active patch;
+2. the active catalog revision for `aram_mayhem`;
+3. `normalized_observations` belonging to that exact patch/catalog revision;
+4. their existing provenance origin for signal labeling.
 
-The builder must not read Redis and must not invent subjects, augments, items, observations, or patch identifiers.
+The existing normalization authority stores structured selection payloads, not arbitrary raw observation text. Sprint 8D therefore does **not** assume that a raw community post/video transcript is available. It deterministically serializes each eligible structured normalized observation into a bounded provider observation string.
 
-Initial bounded selection is locked to:
+Eligible origins are:
+
+- `collector_detected`
+- `community_submitted`
+- `editorial`
+
+`ai_generated` is excluded from scheduled discovery input.
+
+### Deterministic ranking and bounds
+
+Initial selection is locked to:
 
 - at most 8 subjects per scheduled provider run;
-- at most 4 selected observations per subject;
+- at most 4 normalized observations per subject;
 - only `aram_mayhem`;
-- only subjects/items/augments present in the active catalog/rules;
-- only normalized stored observations;
-- prioritize subjects with observations not represented in the most recent scheduled input;
-- stable ASCII tie-break by `subjectExternalId`;
-- canonical stable ordering/deduplication for selected observations and allowlists.
+- only the active patch and exact active catalog revision;
+- subjects ranked by their newest eligible `normalized_observations.created_at` descending, then `subjectExternalId` ASCII ascending;
+- observations within a subject ranked by `created_at` descending, then `normalized_observation_id` ascending;
+- after selecting the top subjects/observations, the final provider subject list is normalized by the existing Sprint 8B normalization function.
 
-The resulting shape remains the existing Sprint 8B provider input:
+A structured observation string is the canonical JSON serialization of only safe structured facts needed for discovery, for example the equivalent of:
 
-```text
-runKey
-patchKey
-gameModeExternalId = aram_mayhem
-subjects[]
-  subjectExternalId
-  allowedAugmentExternalIds[]
-  allowedItemExternalIds[]
-  observations[]
+```json
+{
+  "schemaVersion": 1,
+  "origin": "collector_detected",
+  "augmentExternalIds": ["..."],
+  "itemExternalIds": ["..."]
+}
 ```
 
-The builder produces a canonical input hash using the existing Sprint 8B normalization/hash semantics rather than defining a competing hash format.
+The serializer uses fixed key order and already-normalized ID arrays. It never includes source URLs, raw blobs, authorization data, usernames, free-form collector text, Evidence claims, or publication state.
 
-### No-new-input gate
+Each serialized observation must independently satisfy Sprint 8B observation validation, including its length/control/secret-pattern bounds. An oversized or otherwise invalid structured serialization is ineligible; Sprint 8D does not truncate an observation because truncation could silently change its meaning.
 
-Before any budget reservation, Sprint 8D compares the canonical input hash with the latest prior scheduled tick that has an `input_hash`.
+Duplicate structured observations may remain as separate entries when they correspond to separate normalized observation rows. This lets additional durable community sightings change the scheduled content while keeping the provider input factual and structured.
 
-If there is no eligible input, or the canonical input hash is identical to the latest scheduled input hash:
+### Provider allow-lists
+
+For each selected subject, `allowedAugmentExternalIds` and `allowedItemExternalIds` are the ASCII-sorted union of IDs present in the selected eligible normalized observations for that subject, revalidated against the exact active catalog revision.
+
+The builder must not add unobserved IDs merely because they exist in the catalog. This keeps scheduled AI discovery bounded to combinations already present in authoritative normalized community/editorial signals.
+
+If adding an observation would cause an existing Sprint 8B allow-list limit to be exceeded, that observation is skipped deterministically rather than truncating its selection. If no valid observations remain, the subject is omitted. If no subjects remain, the tick becomes `NO_NEW_INPUT`.
+
+## 5. Scheduled content hash and deterministic run identity
+
+Sprint 8B's provider execution input contains `runKey`, so its existing full provider-input hash cannot be used to derive `runKey` without a circular dependency.
+
+Sprint 8D therefore defines a separate versioned **scheduled content hash** over the provider-facing content **before** `runKey` exists:
 
 ```text
-NO_NEW_INPUT
-→ complete tick
-→ zero budget reservations
-→ zero provider calls
+ScheduledAiDiscoveryContentV1 = {
+  patchKey,
+  gameModeExternalId,
+  subjects
+}
+
+scheduledContentHash = hashCanonicalJson(ScheduledAiDiscoveryContentV1)
 ```
 
-A failed scheduled provider run is not automatically repeated with the same input. The same hash remains `NO_NEW_INPUT` until authoritative input changes. Explicit private/manual execution remains a separate operator path if recovery is required.
+This uses the repository's existing canonical JSON hash primitive; it is not a replacement for Sprint 8B's provider input hash. Sprint 8B continues to compute and persist its own full normalized provider-input hash after `runKey` is assigned.
 
-## 5. Deterministic run identity
-
-The scheduled provider identity is based on canonical input, not the wall-clock hour:
+Scheduled identities are then derived from `scheduledContentHash`:
 
 ```text
-runKey = scheduled:v1:<inputHash>
-idempotencyKey = ai-discovery-scheduled:v1:<inputHash>
-aiDiscoveryRunId = deterministic UUIDv5-style value derived from a fixed Sprint 8D namespace + inputHash
+runKey = scheduled:v1:<scheduledContentHash>
+idempotencyKey = ai-discovery-scheduled:v1:<scheduledContentHash>
+aiDiscoveryRunId = deterministic UUID derived from a fixed Sprint 8D namespace + scheduledContentHash
 ```
 
 Exact UUID derivation must use a repository-local deterministic helper with a fixed versioned namespace and tests. It must not depend on process randomness, Redis job ID, hostname, worker count, or hour slot.
 
 Consequences:
 
-- the same authoritative input cannot become a new AI run merely because another hour passed;
+- the same authoritative scheduled content cannot become a new AI run merely because another hour passed;
 - duplicate jobs/workers converge on the same provider identity;
 - Sprint 8B replay preflight can return an existing durable run without another provider call;
-- new authoritative input produces a new identity.
+- new authoritative selected content produces a new identity.
 
 `startedAt` for a newly executing scheduled run comes from PostgreSQL-backed tick processing time, not untrusted Redis payload data.
+
+### No-new-input gate
+
+Before any new budget reservation, Sprint 8D compares the current `scheduledContentHash` with prior scheduled content that has already consumed a Sprint 8C budget reservation.
+
+The authoritative consumed-input test is a join from prior scheduled ticks by `ai_discovery_run_id` to `ai_operations_run_budget_reservations`; it does not rely only on the tick's final status/metadata, because a crash may occur after reservation but before final tick update.
+
+If the same `scheduledContentHash` already has a budget reservation:
+
+```text
+NO_NEW_INPUT
+→ complete current tick
+→ zero new budget reservations
+→ zero provider calls
+```
+
+If an earlier tick with the same content was blocked **before** budget reservation (for example policy disabled, daily budget exhausted, or cadence not elapsed), the content is not considered consumed and may be attempted on a later hourly tick when policy permits.
+
+A failed or ambiguous provider attempt that already consumed a budget reservation is considered consumed scheduled content and is not automatically retried with identical input. Explicit private/manual execution remains a separate operator recovery path.
 
 ## 6. Scheduled policy/budget reservation
 
@@ -227,9 +271,14 @@ Both paths:
 
 The public behavior of existing Sprint 8C manual/private commands does not become stricter. Only scheduled Sprint 8D execution injects the 3600-second floor.
 
+For denial reporting, evaluate the active policy interval and scheduled floor distinctly while holding the same budget authority lock:
+
+- if elapsed time violates the active policy's own interval, return `POLICY_MIN_INTERVAL`;
+- otherwise, if elapsed time is at least the policy interval but below 3600 seconds, return `CADENCE_NOT_ELAPSED`.
+
 The scheduled execution composes `executePolicyGovernedAiDiscoveryRun()` with the stricter scheduled reservation dependency. It does not bypass or replace Sprint 8C policy-governed execution.
 
-Policy/budget denial is mapped to the safe scheduled outcomes `POLICY_DISABLED`, `DAILY_BUDGET_EXHAUSTED`, `POLICY_MIN_INTERVAL`, or `CADENCE_NOT_ELAPSED` as applicable, with zero provider calls.
+`POLICY_DISABLED`, `DAILY_BUDGET_EXHAUSTED`, `POLICY_MIN_INTERVAL`, and `CADENCE_NOT_ELAPSED` all result in zero provider calls.
 
 ## 7. Provider execution, retry, and crash safety
 
@@ -245,8 +294,9 @@ Therefore:
 ambiguous process/provider boundary crash
 → no automatic BullMQ provider retry
 → any already-created budget reservation remains consumed
-→ durable tick may remain incomplete or become AMBIGUOUS_FAILURE when safely detectable
-→ wait for a later hour and new authoritative input
+→ durable tick may remain PROCESSING or become AMBIGUOUS_FAILURE when safely detectable
+→ identical scheduled content is treated as consumed if a budget reservation exists
+→ wait for later new authoritative content or explicit private/manual recovery
 ```
 
 A provider result that Sprint 8B safely records as failed maps the tick to `PROVIDER_FAILED`. A completed/replayed provider run maps the tick to `COMPLETED` and stores only safe IDs/metadata.
@@ -266,7 +316,7 @@ Create an AI-automation-specific configuration parser with:
 - bounded optional `AI_DISCOVERY_TIMEOUT_MS`
 - optional non-production `AI_DISCOVERY_OPENAI_ENDPOINT` using the existing Sprint 8B production restriction
 
-When scheduler desired state is disabled, provider credentials are not required; the process must still be able to connect to Redis, remove a stale scheduler, and exit/run safely without an OpenAI secret.
+When scheduler desired state is disabled, provider credentials are not required; the process must still be able to connect to Redis, remove a stale scheduler, consume stale jobs as no-ops, and shut down safely without an OpenAI secret.
 
 When scheduler desired state is enabled, missing/invalid provider configuration fails closed before processing provider work.
 
@@ -287,9 +337,9 @@ Add an `automation` section containing at least:
 
 - last completed tick time;
 - last tick outcome;
-- last input hash;
+- last scheduled content hash;
 - last AI discovery run ID;
-- last budget reservation/provider-attempt time where available.
+- last budget reservation/provider-attempt authorization time where available.
 
 Add bounded recent counters derived from durable tick rows:
 
@@ -297,9 +347,10 @@ Add bounded recent counters derived from durable tick rows:
 - no-new-input;
 - policy/cadence blocked;
 - completed;
-- provider failed/ambiguous.
+- provider failed/ambiguous;
+- incomplete `PROCESSING` ticks.
 
-The snapshot must never expose prompts, raw observation text, provider response bodies, API keys, request headers, or Evidence/Publication mutation capability.
+The snapshot must never expose prompts, raw observation text, structured observation bodies, provider response bodies, API keys, request headers, or Evidence/Publication mutation capability.
 
 Add a private status command/runbook procedure that can inspect BullMQ Job Scheduler inventory and compare actual Redis scheduler state with the configured desired state. It is observational only.
 
@@ -318,7 +369,7 @@ A later explicitly authorized production activation sequence is:
 1. deploy code/migrations;
 2. verify core API/worker unaffected;
 3. verify AI automation runtime with scheduler disabled;
-4. verify stale scheduler is absent;
+4. verify stale scheduler is absent and stale jobs are no-op safe;
 5. provision provider secret/model configuration;
 6. activate an appropriate Sprint 8C policy;
 7. enable scheduler;
@@ -330,11 +381,10 @@ Primary rollback:
 1. set `AI_DISCOVERY_SCHEDULER_ENABLED=false`;
 2. restart/reconcile AI automation runtime;
 3. verify `ai-discovery-hourly-v1` is removed from Redis scheduler inventory;
-4. leave all PostgreSQL history intact.
+4. verify any stale delivered job exits before creating a provider run;
+5. leave all PostgreSQL history intact.
 
 Rollback must not delete AI runs, proposals, budget reservations, scheduled ticks, audit events, Candidate history, reviews, moderation decisions, eligibility decisions, or publications.
-
-A stale already-delivered job encountered after disable must check desired state before scheduled provider execution and exit without a provider call.
 
 ## 11. Testing and CI gates
 
@@ -348,38 +398,49 @@ Required Sprint 8D tests include:
 - enabled startup upserts desired scheduler;
 - disabled startup removes stale scheduler;
 - repeated reconciliation is idempotent;
+- stale jobs while disabled are consumed as no-ops before tick/provider execution;
 - disabled configuration does not require OpenAI credentials;
 - enabled configuration fails closed when provider configuration is invalid;
-- Redis job payload is limited to the approved minimal schema;
+- Redis job payload is exactly the approved minimal schema;
 - produced jobs use `attempts: 1`.
 
 ### Tick concurrency and durability
 
 - PostgreSQL UTC hour is used;
+- new tick begins as `PROCESSING`;
 - duplicate delivery creates one tick;
 - two workers racing the same UTC hour produce one owned tick;
 - duplicate/non-owner path performs zero provider calls;
+- deterministic run ID is persisted on the tick before provider orchestration;
+- a reservation created before a crash remains discoverable by tick `ai_discovery_run_id`;
 - crash/incomplete tick is not automatically retried/backfilled.
 
 ### Deterministic input and identity
 
-- only active patch/catalog/rules/normalized observations are selected;
+- only active patch/exact active catalog/normalized observations are selected;
+- `ai_generated` provenance is excluded;
 - selection caps are 8 subjects and 4 observations per subject;
-- ordering and deduplication are deterministic;
+- subject and observation ranking are deterministic using durable `created_at`/ID tie-breaks;
+- structured observation serialization is deterministic and contains no raw/free-form source data;
+- oversized/invalid structured observations are skipped, never truncated;
+- per-subject allow-lists are only the sorted union of IDs in selected observations and revalidate against the active catalog;
 - invalid/non-catalog IDs cannot enter provider input;
-- identical authoritative state produces identical normalized input/hash/run identity;
-- changed authoritative input produces a new identity;
-- identical latest input produces `NO_NEW_INPUT`, zero budget reservations, and zero provider calls.
+- scheduled content hash excludes `runKey` and is deterministic;
+- identical authoritative selected content produces identical scheduled content hash/run identity;
+- changed authoritative selected content produces a new identity;
+- same content with a prior budget reservation produces `NO_NEW_INPUT`, zero new reservations, and zero provider calls;
+- same content previously blocked before reservation remains eligible on a later tick.
 
 ### Policy, cadence, cost, and provider safety
 
 - scheduled effective interval is `max(policy interval, 3600)`;
-- cadence rejection is atomic under concurrency;
+- cadence/policy interval rejection is atomic under concurrency and maps to the correct safe reason;
 - disabled policy, exhausted daily budget, policy interval, and scheduled cadence denial all produce zero provider calls;
 - same scheduled run replay consumes no second reservation and performs no second provider call;
 - existing Sprint 8B bounded internal provider retry still works;
 - BullMQ does not retry an ambiguous provider job;
 - provider proposal cap remains enforced by Sprint 8C;
+- failed/ambiguous provider attempts with a durable budget reservation are not automatically retried with identical scheduled content;
 - failed provider runs remain consumed budget units as in Sprint 8C.
 
 ### Authority/security contracts
@@ -387,7 +448,7 @@ Required Sprint 8D tests include:
 - scheduled worker/module graph has no import/call path to `materializeAiCandidateProposal()`;
 - no automatic Human Review/Moderation/Eligibility/Publication mutation is introduced;
 - AI output remains non-Evidence;
-- OpenAI secret and raw prompt/observation/provider response are absent from Redis job data, safe logs, tick persistence, and read-only snapshot;
+- OpenAI secret, source raw text/blob, prompt, structured observation bodies, and provider response are absent from Redis job data, safe logs, tick persistence, and read-only snapshot;
 - no production deployment/secret command is introduced.
 
 ### Regression gates
@@ -416,9 +477,11 @@ Sprint 8D is complete only when all of the following are true:
 - scheduler cadence is one hour and scheduled provider attempts cannot occur more frequently than the stricter of 3600 seconds or active Sprint 8C policy;
 - PostgreSQL uniquely owns each processed UTC-hour tick;
 - duplicate/concurrent delivery cannot create duplicate provider execution;
-- deterministic input selection uses only existing authoritative normalized data and approved caps;
-- no-new-input produces zero budget/provider usage;
-- same input cannot become a new scheduled AI run solely because time passed;
+- deterministic input selection uses only the active patch/catalog and existing authoritative normalized structured signals, excluding AI-generated provenance;
+- scheduled observation strings are deterministic bounded serializations of structured data, not assumed raw community text;
+- no-new-input is based on previously budget-consumed scheduled content, so policy-blocked content can be attempted later while failed/ambiguous billable attempts are not automatically repeated;
+- scheduled content hash is non-circular and distinct from Sprint 8B's full provider input hash;
+- same selected content cannot become a new scheduled AI run solely because time passed;
 - Sprint 8C policy/budget remains mandatory and authoritative;
 - BullMQ performs no automatic provider retry;
 - core API/worker do not require OpenAI credentials;
@@ -440,5 +503,6 @@ Explicitly deferred to later separately designed/approved work:
 - dynamic cadence configuration;
 - multi-game-mode or non-`aram_mayhem` AI discovery;
 - automatic retry/backfill of missed or ambiguous scheduled runs;
+- raw transcript/text ingestion as an AI discovery prerequisite;
 - semantic/vector search or a new observation ranking subsystem;
 - replacing PostgreSQL budget authority with Redis/BullMQ state.
