@@ -77,7 +77,7 @@ test('scheduled subject skips an observation whose cumulative allow-list would e
   assert.ok(subject);
   assert.equal(subject.observations.length, 3);
   assert.equal(subject.allowedItemExternalIds.length, 120);
-  assert.equal(subject.allowedItemExternalIds.some((id) => id.startsWith('item:4:')), false);
+  assert.equal(subject.allowedItemExternalIds.some((id: string) => id.startsWith('item:4:')), false);
 });
 
 test('scheduled input builder fails closed when there is no exact active catalog authority', async () => {
