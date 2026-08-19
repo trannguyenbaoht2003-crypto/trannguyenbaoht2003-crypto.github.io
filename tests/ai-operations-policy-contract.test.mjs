@@ -33,7 +33,7 @@ test('Sprint 8C repository contains the complete private operations boundary', (
   }
 });
 
-test('AI operations never add public mutation routes or an AI BullMQ worker', () => {
+test('AI operations never add public mutation routes or put provider work in the core BullMQ worker', () => {
   const app = read('backend/src/app.ts');
   const operatorHttp = read('backend/src/operator/http.ts');
   const worker = read('backend/src/worker.ts');
@@ -44,7 +44,13 @@ test('AI operations never add public mutation routes or an AI BullMQ worker', ()
     assert.doesNotMatch(source, /materializeAiCandidateProposal/);
   }
   assert.doesNotMatch(worker, /ai[-_ ]operations|ai[-_ ]provider|ai[-_ ]discovery/i);
-  assert.doesNotMatch(queueNames, /AI.*QUEUE|ai[-_ ]operations|ai[-_ ]provider/i);
+
+  const approvedAiQueueLines = queueNames
+    .split('\n')
+    .filter((line) => /AI.*QUEUE|ai[-_ ]operations|ai[-_ ]provider/i.test(line));
+  assert.deepEqual(approvedAiQueueLines, [
+    "export const AI_DISCOVERY_AUTOMATION_QUEUE_NAME = 'hai-dau-ai-discovery-automation-v1';",
+  ]);
 });
 
 test('policy-governed tick cannot automatically materialize candidates or mutate downstream authorities', () => {
