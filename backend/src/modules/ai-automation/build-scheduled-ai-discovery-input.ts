@@ -37,7 +37,7 @@ interface CandidatePayload {
   itemExternalIds: string[];
 }
 
-interface ValidObservation {
+export interface ScheduledAiDiscoveryObservationCandidate {
   id: string;
   createdAt: number;
   origin: AllowedOrigin;
@@ -141,22 +141,34 @@ function serializeObservation(
   });
 }
 
-function providerObservationIsValid(
-  patchKey: string,
+function subjectFromObservations(
   subjectExternalId: string,
-  observation: ValidObservation,
+  observations: ScheduledAiDiscoveryObservationCandidate[],
+): ScheduledAiDiscoverySubjectV1 {
+  const augments = new Set<string>();
+  const items = new Set<string>();
+  for (const observation of observations) {
+    observation.augmentExternalIds.forEach((id) => augments.add(id));
+    observation.itemExternalIds.forEach((id) => items.add(id));
+  }
+  return {
+    subjectExternalId,
+    allowedAugmentExternalIds: [...augments].sort(compareAscii),
+    allowedItemExternalIds: [...items].sort(compareAscii),
+    observations: observations.map((observation) => observation.serialized),
+  };
+}
+
+function providerSubjectIsValid(
+  patchKey: string,
+  subject: ScheduledAiDiscoverySubjectV1,
 ): boolean {
   try {
     normalizeAiProviderExecutionInput({
       runKey: 'scheduled-validation-v1',
       patchKey,
       gameModeExternalId: 'aram_mayhem',
-      subjects: [{
-        subjectExternalId,
-        allowedAugmentExternalIds: observation.augmentExternalIds,
-        allowedItemExternalIds: observation.itemExternalIds,
-        observations: [observation.serialized],
-      }],
+      subjects: [subject],
     });
     return true;
   } catch {
@@ -168,7 +180,7 @@ async function validateObservation(
   pool: Pool,
   authority: ActiveAuthorityRow,
   row: ObservationRow,
-): Promise<ValidObservation | null> {
+): Promise<ScheduledAiDiscoveryObservationCandidate | null> {
   const payload = candidatePayload(row.canonical_payload);
   const createdAt = timestamp(row.created_at);
   if (!payload || createdAt === null) return null;
@@ -181,7 +193,7 @@ async function validateObservation(
     patchId: authority.patch_id,
   });
   if (!selection.valid) return null;
-  const observation: ValidObservation = {
+  const observation: ScheduledAiDiscoveryObservationCandidate = {
     id: row.normalized_observation_id,
     createdAt,
     origin: row.origin,
@@ -189,30 +201,38 @@ async function validateObservation(
     itemExternalIds: payload.itemExternalIds,
     serialized: serializeObservation(row.origin, payload),
   };
-  return providerObservationIsValid(authority.patch_key, row.subject_external_id, observation)
+  return providerSubjectIsValid(
+    authority.patch_key,
+    subjectFromObservations(row.subject_external_id, [observation]),
+  )
     ? observation
     : null;
 }
 
-function buildSubject(
+export function buildScheduledAiDiscoverySubject(
+  patchKey: string,
   subjectExternalId: string,
-  observations: ValidObservation[],
-): ScheduledAiDiscoverySubjectV1 {
-  const selected = observations
-    .sort((left, right) => right.createdAt - left.createdAt || compareAscii(left.id, right.id))
-    .slice(0, MAX_OBSERVATIONS_PER_SUBJECT);
-  const augments = new Set<string>();
-  const items = new Set<string>();
-  for (const observation of selected) {
-    observation.augmentExternalIds.forEach((id) => augments.add(id));
-    observation.itemExternalIds.forEach((id) => items.add(id));
+  observations: ScheduledAiDiscoveryObservationCandidate[],
+): ScheduledAiDiscoverySubjectV1 | null {
+  const ranked = [...observations].sort((left, right) => (
+    right.createdAt - left.createdAt || compareAscii(left.id, right.id)
+  ));
+  const selected: ScheduledAiDiscoveryObservationCandidate[] = [];
+
+  for (const observation of ranked) {
+    if (selected.length >= MAX_OBSERVATIONS_PER_SUBJECT) break;
+    const candidateSelection = [...selected, observation];
+    const candidateSubject = subjectFromObservations(
+      subjectExternalId,
+      candidateSelection,
+    );
+    if (!providerSubjectIsValid(patchKey, candidateSubject)) continue;
+    selected.push(observation);
   }
-  return {
-    subjectExternalId,
-    allowedAugmentExternalIds: [...augments].sort(compareAscii),
-    allowedItemExternalIds: [...items].sort(compareAscii),
-    observations: selected.map((observation) => observation.serialized),
-  };
+
+  return selected.length === 0
+    ? null
+    : subjectFromObservations(subjectExternalId, selected);
 }
 
 export async function buildScheduledAiDiscoveryInput(
@@ -220,7 +240,7 @@ export async function buildScheduledAiDiscoveryInput(
 ): Promise<BuiltScheduledAiDiscoveryInput | null> {
   const authority = await loadActiveAuthority(pool);
   const rows = await loadObservations(pool, authority);
-  const bySubject = new Map<string, ValidObservation[]>();
+  const bySubject = new Map<string, ScheduledAiDiscoveryObservationCandidate[]>();
   for (const row of rows) {
     const observation = await validateObservation(pool, authority, row);
     if (!observation) continue;
@@ -241,12 +261,20 @@ export async function buildScheduledAiDiscoveryInput(
     ))
     .slice(0, MAX_SUBJECTS);
 
+  const subjects = ranked.flatMap(({ subjectExternalId, observations }) => {
+    const subject = buildScheduledAiDiscoverySubject(
+      authority.patch_key,
+      subjectExternalId,
+      observations,
+    );
+    return subject ? [subject] : [];
+  });
+  if (subjects.length === 0) return null;
+
   const content: ScheduledAiDiscoveryContentV1 = {
     patchKey: authority.patch_key,
     gameModeExternalId: 'aram_mayhem',
-    subjects: ranked.map(({ subjectExternalId, observations }) => (
-      buildSubject(subjectExternalId, observations)
-    )),
+    subjects,
   };
   const identity = deriveScheduledAiDiscoveryIdentity(content);
   const input: NormalizedAiProviderExecutionInput = normalizeAiProviderExecutionInput({
