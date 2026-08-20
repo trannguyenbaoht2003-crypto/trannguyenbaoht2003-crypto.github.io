@@ -17,6 +17,7 @@
     "ai-operations:tick": "node dist/src/ai-operations-tick-cli.js",
     "ai-discovery:materialize": "node dist/src/ai-discovery-materialize-cli.js",
     "ai-automation:status": "node dist/src/ai-automation-status-cli.js",
+    "ai-provider-execution": "node dist/src/ai-provider-execution-cli.js",
     "start": "node dist/src/server.js",
     "start:worker": "node dist/src/worker.js",
     "start:ai-automation": "node dist/src/ai-automation-worker.js",
