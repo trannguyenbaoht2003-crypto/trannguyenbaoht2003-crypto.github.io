@@ -106,11 +106,27 @@ export interface AiOperationsAutomationSnapshot {
   };
 }
 
+export interface AiOperationsProviderExecutionSnapshot {
+  prepared: number;
+  inFlight: number;
+  completed: number;
+  failed: number;
+  uncertain: number;
+  stalePrepared: number;
+  staleInFlight: number;
+  attemptsToday: number;
+  safeRetriesToday: number;
+  uncertainExecutions: number;
+  unreconciledUncertain: number;
+  lastExecutionAt: string | null;
+}
+
 export interface AiOperationsSnapshot {
   activePolicy: AiOperationsActivePolicySnapshot;
   budget: AiOperationsBudgetSnapshot;
   proposals: AiOperationsProposalSnapshot;
   automation: AiOperationsAutomationSnapshot;
+  providerExecution: AiOperationsProviderExecutionSnapshot;
 }
 
 export interface ExecutePolicyGovernedAiDiscoveryRunCommand {

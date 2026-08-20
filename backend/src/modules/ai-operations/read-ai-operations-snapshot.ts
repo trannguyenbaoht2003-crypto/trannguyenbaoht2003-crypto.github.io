@@ -45,6 +45,21 @@ interface AutomationCounterRow {
   incomplete_processing: number;
 }
 
+interface ProviderExecutionAggregateRow {
+  prepared: number;
+  in_flight: number;
+  completed: number;
+  failed: number;
+  uncertain: number;
+  stale_prepared: number;
+  stale_in_flight: number;
+  attempts_today: number;
+  safe_retries_today: number;
+  uncertain_executions: number;
+  unreconciled_uncertain: number;
+  last_execution_at: string | Date | null;
+}
+
 function dateText(value: string | Date): string {
   return typeof value === 'string' ? value : value.toISOString().slice(0, 10);
 }
@@ -145,6 +160,98 @@ export async function readAiOperationsSnapshot(
     provider_failed_or_ambiguous: 0,
     incomplete_processing: 0,
   };
+
+  const providerExecutionResult = await pool.query<ProviderExecutionAggregateRow>(
+    `with execution_counts as (
+       select count(*) filter (where status = 'PREPARED')::int as prepared,
+              count(*) filter (where status = 'IN_FLIGHT')::int as in_flight,
+              count(*) filter (where status = 'COMPLETED')::int as completed,
+              count(*) filter (where status = 'FAILED')::int as failed,
+              count(*) filter (where status = 'UNCERTAIN')::int as uncertain,
+              count(*) filter (
+                where status = 'PREPARED'
+                  and lease_expires_at is not null
+                  and lease_expires_at <= clock_timestamp()
+              )::int as stale_prepared,
+              count(*) filter (
+                where status = 'IN_FLIGHT'
+                  and lease_expires_at <= clock_timestamp()
+              )::int as stale_in_flight,
+              count(*) filter (where status = 'UNCERTAIN')::int as uncertain_executions,
+              max(created_at) as last_execution_at
+         from ai_provider_executions
+     ), attempt_counts as (
+       select count(*) filter (
+                where (timezone('UTC', attempt.prepared_at))::date =
+                      (timezone('UTC', clock_timestamp()))::date
+              )::int as attempts_today,
+              count(*) filter (
+                where attempt.ordinal > 1
+                  and (timezone('UTC', attempt.prepared_at))::date =
+                      (timezone('UTC', clock_timestamp()))::date
+                  and (
+                    exists (
+                      select 1
+                        from ai_provider_execution_attempts prior
+                       where prior.ai_provider_execution_id = attempt.ai_provider_execution_id
+                         and prior.ordinal = attempt.ordinal - 1
+                         and prior.status = 'FAILED'
+                         and prior.failure_code = 'PROVIDER_RATE_LIMITED'
+                    )
+                    or exists (
+                      select 1
+                        from ai_provider_execution_attempts prior
+                        join ai_provider_execution_reconciliations reconciliation
+                          on reconciliation.ai_provider_execution_attempt_id =
+                             prior.ai_provider_execution_attempt_id
+                       where prior.ai_provider_execution_id = attempt.ai_provider_execution_id
+                         and prior.ordinal = attempt.ordinal - 1
+                         and prior.status = 'UNCERTAIN'
+                         and reconciliation.decision = 'CONFIRMED_NOT_RECEIVED'
+                    )
+                  )
+              )::int as safe_retries_today
+         from ai_provider_execution_attempts attempt
+     ), uncertain_counts as (
+       select count(*)::int as unreconciled_uncertain
+         from ai_provider_execution_attempts attempt
+         left join ai_provider_execution_reconciliations reconciliation
+           on reconciliation.ai_provider_execution_attempt_id =
+              attempt.ai_provider_execution_attempt_id
+        where attempt.status = 'UNCERTAIN'
+          and reconciliation.ai_provider_execution_reconciliation_id is null
+     )
+     select execution_counts.prepared,
+            execution_counts.in_flight,
+            execution_counts.completed,
+            execution_counts.failed,
+            execution_counts.uncertain,
+            execution_counts.stale_prepared,
+            execution_counts.stale_in_flight,
+            attempt_counts.attempts_today,
+            attempt_counts.safe_retries_today,
+            execution_counts.uncertain_executions,
+            uncertain_counts.unreconciled_uncertain,
+            execution_counts.last_execution_at
+       from execution_counts
+       cross join attempt_counts
+       cross join uncertain_counts`,
+  );
+  const providerExecution = providerExecutionResult.rows[0] ?? {
+    prepared: 0,
+    in_flight: 0,
+    completed: 0,
+    failed: 0,
+    uncertain: 0,
+    stale_prepared: 0,
+    stale_in_flight: 0,
+    attempts_today: 0,
+    safe_retries_today: 0,
+    uncertain_executions: 0,
+    unreconciled_uncertain: 0,
+    last_execution_at: null,
+  };
+
   const usedRuns = budget.used_runs;
 
   return {
@@ -182,6 +289,20 @@ export async function readAiOperationsSnapshot(
         providerFailedOrAmbiguous: counters.provider_failed_or_ambiguous,
         incompleteProcessing: counters.incomplete_processing,
       },
+    },
+    providerExecution: {
+      prepared: providerExecution.prepared,
+      inFlight: providerExecution.in_flight,
+      completed: providerExecution.completed,
+      failed: providerExecution.failed,
+      uncertain: providerExecution.uncertain,
+      stalePrepared: providerExecution.stale_prepared,
+      staleInFlight: providerExecution.stale_in_flight,
+      attemptsToday: providerExecution.attempts_today,
+      safeRetriesToday: providerExecution.safe_retries_today,
+      uncertainExecutions: providerExecution.uncertain_executions,
+      unreconciledUncertain: providerExecution.unreconciled_uncertain,
+      lastExecutionAt: timestampText(providerExecution.last_execution_at),
     },
   };
 }
