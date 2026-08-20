@@ -3,6 +3,7 @@ import type { Redis } from 'ioredis';
 import type { Pool } from 'pg';
 
 import type { AiDiscoveryProvider } from '../modules/ai-provider/openai-responses-provider.js';
+import { recoverStaleAiProviderExecutions } from '../modules/ai-provider-execution/recover-stale-ai-provider-executions.js';
 import {
   processScheduledAiDiscoveryTick,
   type ProcessScheduledAiDiscoveryTickResult,
@@ -28,6 +29,7 @@ export interface CreateAiDiscoveryAutomationWorkerOptions {
   concurrency?: number;
   now?: () => string;
   processTick?: typeof processScheduledAiDiscoveryTick;
+  recover?: typeof recoverStaleAiProviderExecutions;
 }
 
 function validJobData(value: unknown): value is AiDiscoveryAutomationJobData {
@@ -40,23 +42,15 @@ export async function processAiDiscoveryAutomationJob(
   job: Job<AiDiscoveryAutomationJobData>,
   options: Omit<CreateAiDiscoveryAutomationWorkerOptions, 'connection' | 'concurrency'>,
 ): Promise<AiDiscoveryAutomationWorkerResult> {
-  if (!validJobData(job.data) || job.name !== 'scheduled-ai-discovery') {
-    throw new Error('AI_AUTOMATION_JOB_INVALID');
-  }
+  if (!validJobData(job.data) || job.name !== 'scheduled-ai-discovery') throw new Error('AI_AUTOMATION_JOB_INVALID');
   if (!options.schedulerEnabled) {
-    return {
-      outcome: 'SCHEDULER_DISABLED',
-      scheduledAiDiscoveryTickId: null,
-      aiDiscoveryRunId: null,
-    };
+    return { outcome: 'SCHEDULER_DISABLED', scheduledAiDiscoveryTickId: null, aiDiscoveryRunId: null };
   }
-  if (!options.provider || !options.modelKey || !options.modelRevision) {
-    throw new Error('AI_AUTOMATION_PROVIDER_UNAVAILABLE');
-  }
-
+  await (options.recover ?? recoverStaleAiProviderExecutions)(options.pool);
+  if (!options.provider || !options.modelKey || !options.modelRevision) throw new Error('AI_AUTOMATION_PROVIDER_UNAVAILABLE');
   const processTick = options.processTick ?? processScheduledAiDiscoveryTick;
   const now = options.now ?? (() => new Date().toISOString());
-  const result = await processTick(options.pool, {
+  return processTick(options.pool, {
     actorId: 'system:ai-automation',
     correlationId: `ai-automation-job:${job.id ?? 'unknown'}`,
     provider: options.provider,
@@ -64,7 +58,6 @@ export async function processAiDiscoveryAutomationJob(
     modelRevision: options.modelRevision,
     startedAt: now(),
   });
-  return result;
 }
 
 export function createAiDiscoveryAutomationWorker(
@@ -73,9 +66,6 @@ export function createAiDiscoveryAutomationWorker(
   return new Worker<AiDiscoveryAutomationJobData, AiDiscoveryAutomationWorkerResult>(
     AI_DISCOVERY_AUTOMATION_QUEUE_NAME,
     async (job) => processAiDiscoveryAutomationJob(job, options),
-    {
-      connection: options.connection,
-      concurrency: options.concurrency ?? 1,
-    },
+    { connection: options.connection, concurrency: options.concurrency ?? 1 },
   );
 }
