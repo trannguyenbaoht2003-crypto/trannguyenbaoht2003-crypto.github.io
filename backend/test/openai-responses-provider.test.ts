@@ -251,3 +251,26 @@ test('OpenAI Responses adapter honors an injected non-production endpoint withou
   assert.equal(capturedUrl, 'http://127.0.0.1:9999/v1/responses');
   assert.equal(result.proposals.length, 0);
 });
+
+test('OpenAI Responses adapter sends client tracing ID and separates HTTP request ID from response object ID', async () => {
+  let capturedInit: RequestInit | undefined;
+  const fakeFetch = (async (_input: string | URL | Request, init?: RequestInit) => {
+    capturedInit = init;
+    return new Response(JSON.stringify(responseBody({ proposals: [] }, 'resp_object_123')), {
+      status: 200,
+      headers: { 'content-type': 'application/json', 'x-request-id': 'req_server_456' },
+    });
+  }) as typeof fetch;
+  const provider = createOpenAiResponsesProvider({
+    apiKey: 'test-secret-value',
+    model: 'test-model',
+    fetchImpl: fakeFetch,
+  });
+  const result = await provider.execute(requestFixture(), {
+    clientRequestId: '11111111-1111-5111-8111-111111111111',
+  });
+  const headers = new Headers(capturedInit?.headers);
+  assert.equal(headers.get('x-client-request-id'), '11111111-1111-5111-8111-111111111111');
+  assert.equal(result.providerRequestId, 'req_server_456');
+  assert.equal(result.providerResponseId, 'resp_object_123');
+});
