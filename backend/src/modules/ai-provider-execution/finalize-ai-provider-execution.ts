@@ -18,6 +18,7 @@ export interface FinalizeAiProviderExecutionCommand {
   executionId: string;
   attemptId: string;
   ordinal: AiProviderAttemptOrdinal;
+  leaseToken: string;
   disposition: AiProviderAttemptDisposition;
   completedRun?: RecordAiDiscoveryRunCommand | undefined;
   failedRun?: RecordAiDiscoveryRunCommand | undefined;
@@ -46,6 +47,7 @@ interface LockedExecutionRow {
   status: string;
   current_attempt_ordinal: number;
   current_attempt_id: string;
+  lease_token: string | null;
   lease_valid: boolean;
 }
 
@@ -76,6 +78,7 @@ export async function finalizeAiProviderExecution(
       `select e.ai_discovery_run_id,e.run_key,e.provider_key,e.model_key,e.model_revision,
               e.prompt_template_key,e.prompt_template_version,e.input_hash,e.status,
               e.current_attempt_ordinal,a.ai_provider_execution_attempt_id as current_attempt_id,
+              e.lease_token,
               (e.lease_token is not null and e.lease_expires_at > clock_timestamp()) as lease_valid
          from ai_provider_executions e
          join ai_provider_execution_attempts a
@@ -91,6 +94,7 @@ export async function finalizeAiProviderExecution(
       || execution.status !== 'IN_FLIGHT'
       || execution.current_attempt_ordinal !== command.ordinal
       || execution.current_attempt_id !== command.attemptId
+      || execution.lease_token !== command.leaseToken
       || execution.lease_valid !== true
     ) {
       throw new Error('AI_PROVIDER_EXECUTION_FINALIZATION_CONFLICT');
@@ -143,11 +147,17 @@ export async function finalizeAiProviderExecution(
       const attempt = await client.query(
         `update ai_provider_execution_attempts
             set status='FAILED',failure_code=$3,provider_request_id=$4,
-                completed_at=clock_timestamp()
+                output_hash=$5,completed_at=clock_timestamp()
           where ai_provider_execution_attempt_id=$1
             and ai_provider_execution_id=$2
             and status='IN_FLIGHT'`,
-        [command.attemptId, command.executionId, command.disposition.failureCode, providerRequestId],
+        [
+          command.attemptId,
+          command.executionId,
+          command.disposition.failureCode,
+          providerRequestId,
+          command.failedRun.outputHash,
+        ],
       );
       if (attempt.rowCount !== 1) {
         throw new Error('AI_PROVIDER_EXECUTION_FINALIZATION_CONFLICT');
@@ -163,6 +173,40 @@ export async function finalizeAiProviderExecution(
     }
 
     if (command.disposition.kind === 'SAFE_RETRYABLE') {
+      if (command.ordinal === 3) {
+        if (!command.failedRun) {
+          throw new Error('AI_PROVIDER_EXECUTION_FINALIZATION_INPUT_INVALID');
+        }
+        assertRunIdentity(execution, command.failedRun);
+        const run = await recordAiDiscoveryRunInTransaction(client, command.failedRun);
+        const attempt = await client.query(
+          `update ai_provider_execution_attempts
+              set status='FAILED',failure_code=$3,provider_request_id=$4,
+                  output_hash=$5,completed_at=clock_timestamp()
+            where ai_provider_execution_attempt_id=$1
+              and ai_provider_execution_id=$2
+              and status='IN_FLIGHT'`,
+          [
+            command.attemptId,
+            command.executionId,
+            command.disposition.failureCode,
+            providerRequestId,
+            command.failedRun.outputHash,
+          ],
+        );
+        if (attempt.rowCount !== 1) {
+          throw new Error('AI_PROVIDER_EXECUTION_FINALIZATION_CONFLICT');
+        }
+        await client.query(
+          `update ai_provider_executions
+              set status='FAILED',lease_token=null,leased_at=null,lease_expires_at=null,
+                  terminal_at=clock_timestamp(),updated_at=clock_timestamp()
+            where ai_provider_execution_id=$1`,
+          [command.executionId],
+        );
+        return { kind: 'FAILED', run };
+      }
+
       const attempt = await client.query(
         `update ai_provider_execution_attempts
             set status='FAILED',failure_code=$3,provider_request_id=$4,
@@ -174,21 +218,6 @@ export async function finalizeAiProviderExecution(
       );
       if (attempt.rowCount !== 1) {
         throw new Error('AI_PROVIDER_EXECUTION_FINALIZATION_CONFLICT');
-      }
-      if (command.ordinal === 3) {
-        if (!command.failedRun) {
-          throw new Error('AI_PROVIDER_EXECUTION_FINALIZATION_INPUT_INVALID');
-        }
-        assertRunIdentity(execution, command.failedRun);
-        const run = await recordAiDiscoveryRunInTransaction(client, command.failedRun);
-        await client.query(
-          `update ai_provider_executions
-              set status='FAILED',lease_token=null,leased_at=null,lease_expires_at=null,
-                  terminal_at=clock_timestamp(),updated_at=clock_timestamp()
-            where ai_provider_execution_id=$1`,
-          [command.executionId],
-        );
-        return { kind: 'FAILED', run };
       }
 
       const nextOrdinal = (command.ordinal + 1) as AiProviderAttemptOrdinal;

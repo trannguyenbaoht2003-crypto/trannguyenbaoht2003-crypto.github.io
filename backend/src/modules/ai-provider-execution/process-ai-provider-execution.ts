@@ -342,6 +342,11 @@ export async function processAiProviderExecution(
       }
     }
 
+    const activeLeaseToken = heldLeaseToken;
+    if (activeLeaseToken === null) {
+      return { kind: 'UNCERTAIN', executionId, reservation };
+    }
+
     let disposition: AiProviderAttemptDisposition = await executeAiProviderAttempt({
       provider: command.provider,
       request,
@@ -393,6 +398,7 @@ export async function processAiProviderExecution(
       executionId,
       attemptId: attempt.ai_provider_execution_attempt_id,
       ordinal: attempt.ordinal,
+      leaseToken: activeLeaseToken,
       disposition,
       completedRun,
       failedRun,

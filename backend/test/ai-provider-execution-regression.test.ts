@@ -203,6 +203,7 @@ test('finalization rejects a non-current attempt id and leaves both run and jour
       executionId: prepared.executionId,
       attemptId: randomUUID(),
       ordinal: 1,
+      leaseToken,
       disposition: {
         kind: 'SAFE_TERMINAL',
         failureCode: 'PROVIDER_AUTH_REJECTED',
@@ -246,6 +247,7 @@ test('finalization rejects AI run identity that does not match the durable execu
       executionId: prepared.executionId,
       attemptId: prepared.attemptId,
       ordinal: 1,
+      leaseToken,
       disposition: {
         kind: 'SAFE_TERMINAL',
         failureCode: 'PROVIDER_AUTH_REJECTED',

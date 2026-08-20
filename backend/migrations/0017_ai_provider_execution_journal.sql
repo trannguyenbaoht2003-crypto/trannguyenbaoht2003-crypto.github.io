@@ -77,6 +77,12 @@ as $$
 declare
   recon_decision text;
   next_attempt_exists boolean;
+  prior_attempt_status text;
+  prior_failure_code text;
+  next_attempt_status text;
+  terminal_attempt_status text;
+  terminal_attempt_output_hash text;
+  durable_run record;
 begin
   if tg_op = 'DELETE' then
     raise exception 'AI provider executions cannot be deleted';
@@ -124,16 +130,68 @@ begin
     raise exception 'uncertain AI provider execution is fail closed';
   end if;
 
+  if old.status = 'IN_FLIGHT' and new.status = 'PREPARED' then
+    select a.status, a.failure_code
+      into prior_attempt_status, prior_failure_code
+      from ai_provider_execution_attempts a
+     where a.ai_provider_execution_id = old.ai_provider_execution_id
+       and a.ordinal = old.current_attempt_ordinal;
+    select a.status
+      into next_attempt_status
+      from ai_provider_execution_attempts a
+     where a.ai_provider_execution_id = old.ai_provider_execution_id
+       and a.ordinal = new.current_attempt_ordinal;
+    if old.current_attempt_ordinal >= 3
+       or new.current_attempt_ordinal <> old.current_attempt_ordinal + 1
+       or prior_attempt_status is distinct from 'FAILED'
+       or prior_failure_code is distinct from 'PROVIDER_RATE_LIMITED'
+       or next_attempt_status is distinct from 'PREPARED' then
+      raise exception 'AI provider execution transition requires safe rate-limit retry';
+    end if;
+  end if;
+
   if new.status = 'IN_FLIGHT' and (
     new.lease_token is null or new.lease_expires_at <= clock_timestamp()
   ) then
     raise exception 'in-flight AI provider execution requires valid lease';
   end if;
 
-  if new.status in ('COMPLETED','FAILED') and (
-    new.terminal_at is null or new.lease_token is not null
-  ) then
-    raise exception 'terminal AI provider execution requires terminal timestamp and cleared lease';
+  if new.status in ('COMPLETED','FAILED') then
+    if new.terminal_at is null or new.lease_token is not null then
+      raise exception 'terminal AI provider execution requires terminal timestamp and cleared lease';
+    end if;
+    if old.status is distinct from 'IN_FLIGHT' then
+      raise exception 'terminal provider execution requires in-flight predecessor';
+    end if;
+
+    select a.status, a.output_hash
+      into terminal_attempt_status, terminal_attempt_output_hash
+      from ai_provider_execution_attempts a
+     where a.ai_provider_execution_id = new.ai_provider_execution_id
+       and a.ordinal = new.current_attempt_ordinal;
+    if terminal_attempt_status is distinct from new.status
+       or terminal_attempt_output_hash is null then
+      raise exception 'terminal provider execution requires matching terminal attempt';
+    end if;
+
+    select r.run_key,r.provider_key,r.model_key,r.model_revision,
+           r.prompt_template_key,r.prompt_template_version,r.input_hash,
+           r.output_hash,r.status
+      into durable_run
+      from ai_discovery_runs r
+     where r.ai_discovery_run_id = new.ai_discovery_run_id;
+    if not found
+       or durable_run.run_key is distinct from new.run_key
+       or durable_run.provider_key is distinct from new.provider_key
+       or durable_run.model_key is distinct from new.model_key
+       or durable_run.model_revision is distinct from new.model_revision
+       or durable_run.prompt_template_key is distinct from new.prompt_template_key
+       or durable_run.prompt_template_version is distinct from new.prompt_template_version
+       or durable_run.input_hash is distinct from new.input_hash
+       or durable_run.output_hash is distinct from terminal_attempt_output_hash
+       or durable_run.status is distinct from lower(new.status) then
+      raise exception 'terminal provider execution requires matching durable AI discovery run';
+    end if;
   end if;
 
   return new;
