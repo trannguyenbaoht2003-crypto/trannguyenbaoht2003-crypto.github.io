@@ -108,7 +108,8 @@ test('Sprint 8E preserves scheduler fail-closed defaults and recovery-before-dis
     'runtime recovery must occur before scheduler reconciliation',
   );
   assert.ok(
-    worker.indexOf('if (!options.schedulerEnabled)') < worker.indexOf('recoverStaleAiProviderExecutions'),
+    worker.indexOf('if (!options.schedulerEnabled)') <
+      worker.indexOf('await recoverStaleAiProviderExecutions(options.pool)'),
     'disabled stale jobs must no-op before recovery/provider work',
   );
   assert.doesNotMatch(runtime, /AI_DISCOVERY_SCHEDULER_ENABLED\s*=\s*true/);
