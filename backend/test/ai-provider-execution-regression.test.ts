@@ -264,3 +264,121 @@ test('finalization rejects AI run identity that does not match the durable execu
   assert.equal(attempt.rows[0]?.status, 'IN_FLIGHT');
   await pool.end();
 });
+
+test('finalization rejects a caller that does not present the active lease token', async () => {
+  const pool = await resetDatabase();
+  try {
+    await enablePolicy(pool);
+    const command = prepareCommand();
+    const prepared = await prepareAiProviderExecution(pool, command, { minimumIntervalFloorSeconds: 0 });
+    assert.equal(prepared.kind, 'PREPARED');
+    if (prepared.kind !== 'PREPARED') throw new Error('fixture preparation failed');
+    const leaseToken = randomUUID();
+    assert.equal(await claimAiProviderExecution(pool, {
+      executionId: prepared.executionId,
+      leaseToken,
+      leaseSeconds: 120,
+    }), true);
+    await markAiProviderAttemptInFlight(pool, {
+      executionId: prepared.executionId,
+      attemptId: prepared.attemptId,
+      leaseToken,
+    });
+
+    const staleHolderCommand = {
+      executionId: prepared.executionId,
+      attemptId: prepared.attemptId,
+      ordinal: 1 as const,
+      leaseToken: randomUUID(),
+      disposition: {
+        kind: 'SAFE_TERMINAL' as const,
+        failureCode: 'PROVIDER_AUTH_REJECTED',
+        providerRequestId: 'req-auth',
+      },
+      failedRun: failedRun(command),
+    };
+    await assert.rejects(
+      finalizeAiProviderExecution(pool, staleHolderCommand),
+      /AI_PROVIDER_EXECUTION_FINALIZATION_CONFLICT/,
+    );
+    const runs = await pool.query<{ count: number }>(`select count(*)::int as count from ai_discovery_runs`);
+    assert.equal(runs.rows[0]?.count, 0);
+  } finally {
+    await pool.end();
+  }
+});
+
+test('database rejects IN_FLIGHT to PREPARED without a durable safe-429 next attempt transition', async () => {
+  const pool = await resetDatabase();
+  try {
+    await enablePolicy(pool);
+    const command = prepareCommand();
+    const prepared = await prepareAiProviderExecution(pool, command, { minimumIntervalFloorSeconds: 0 });
+    assert.equal(prepared.kind, 'PREPARED');
+    if (prepared.kind !== 'PREPARED') throw new Error('fixture preparation failed');
+    const leaseToken = randomUUID();
+    assert.equal(await claimAiProviderExecution(pool, {
+      executionId: prepared.executionId,
+      leaseToken,
+      leaseSeconds: 120,
+    }), true);
+    await markAiProviderAttemptInFlight(pool, {
+      executionId: prepared.executionId,
+      attemptId: prepared.attemptId,
+      leaseToken,
+    });
+
+    await assert.rejects(
+      pool.query(
+        `update ai_provider_executions
+            set status='PREPARED', updated_at=clock_timestamp()
+          where ai_provider_execution_id=$1`,
+        [prepared.executionId],
+      ),
+      /safe rate-limit retry|provider execution transition/i,
+    );
+  } finally {
+    await pool.end();
+  }
+});
+
+test('database rejects terminal execution state without a matching durable AI discovery run', async () => {
+  const pool = await resetDatabase();
+  try {
+    await enablePolicy(pool);
+    const command = prepareCommand();
+    const prepared = await prepareAiProviderExecution(pool, command, { minimumIntervalFloorSeconds: 0 });
+    assert.equal(prepared.kind, 'PREPARED');
+    if (prepared.kind !== 'PREPARED') throw new Error('fixture preparation failed');
+    const leaseToken = randomUUID();
+    assert.equal(await claimAiProviderExecution(pool, {
+      executionId: prepared.executionId,
+      leaseToken,
+      leaseSeconds: 120,
+    }), true);
+    await markAiProviderAttemptInFlight(pool, {
+      executionId: prepared.executionId,
+      attemptId: prepared.attemptId,
+      leaseToken,
+    });
+    await pool.query(
+      `update ai_provider_execution_attempts
+          set status='FAILED',failure_code='PROVIDER_AUTH_REJECTED',completed_at=clock_timestamp()
+        where ai_provider_execution_attempt_id=$1`,
+      [prepared.attemptId],
+    );
+
+    await assert.rejects(
+      pool.query(
+        `update ai_provider_executions
+            set status='FAILED',lease_token=null,leased_at=null,lease_expires_at=null,
+                terminal_at=clock_timestamp(),updated_at=clock_timestamp()
+          where ai_provider_execution_id=$1`,
+        [prepared.executionId],
+      ),
+      /matching durable AI discovery run|terminal provider execution/i,
+    );
+  } finally {
+    await pool.end();
+  }
+});
