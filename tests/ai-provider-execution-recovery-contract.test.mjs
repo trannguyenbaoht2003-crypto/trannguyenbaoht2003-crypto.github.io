@@ -152,3 +152,15 @@ test('Sprint 8E root orchestration and runbook keep the feature review-only and 
     'No production deployment', 'No production OpenAI credential',
   ]) assert.match(runbook, new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'));
 });
+
+test('Sprint 8E dedicated workflow runs the recovery gate without deployment or provider secrets', async () => {
+  const workflow = await read('.github/workflows/sprint-8e-ai-provider-execution-recovery.yml');
+  assert.match(workflow, /^name: Sprint 8E AI provider execution recovery gate$/m);
+  assert.match(workflow, /^permissions:\n  contents: read$/m);
+  assert.match(workflow, /npm run test:ai-provider-execution-recovery/);
+  assert.match(workflow, /npm --prefix backend run typecheck/);
+  assert.match(workflow, /postgres:17/);
+  assert.match(workflow, /redis:7/);
+  assert.doesNotMatch(workflow, /OPENAI_API_KEY|railway\s+up|wrangler\s+deploy|docker\s+push|kubectl|terraform|pulumi/i);
+  assert.doesNotMatch(workflow, /(contents|packages|pages|id-token):\s*write/i);
+});
