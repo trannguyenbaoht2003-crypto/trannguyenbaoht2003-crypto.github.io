@@ -114,7 +114,8 @@ test('OpenAI Responses adapter sends strict structured output with store disable
     },
   });
 
-  assert.equal(result.providerRequestId, 'resp_test');
+  assert.equal(result.providerRequestId, null);
+  assert.equal(result.providerResponseId, 'resp_test');
   assert.deepEqual(result.proposals, [
     {
       subjectExternalId: 'samira',
