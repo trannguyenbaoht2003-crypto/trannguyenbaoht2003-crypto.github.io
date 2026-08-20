@@ -25,6 +25,9 @@ const expectedTables = [
   'ai_discovery_runs',
   'ai_operations_policy_revisions',
   'ai_operations_run_budget_reservations',
+  'ai_provider_execution_attempts',
+  'ai_provider_execution_reconciliations',
+  'ai_provider_executions',
   'audit_events',
   'candidate_claim_set_seals',
   'candidate_claims',
@@ -128,45 +131,25 @@ test('Sprint 5C workflow preserves the inherited backend public read operations 
     ...sprint4bRunbookContracts,
     ...sprint5aRunbookContracts,
   ]) {
-    assert.ok(
-      runbook.includes(contract),
-      `backend runbook is missing inherited contract: ${contract}`,
-    );
-    assert.ok(
-      workflow.includes(`"${contract}"`),
-      `Sprint 5C workflow is missing inherited contract assertion: ${contract}`,
-    );
+    assert.ok(runbook.includes(contract), `backend runbook is missing inherited contract: ${contract}`);
+    assert.ok(workflow.includes(`"${contract}"`), `Sprint 5C workflow is missing inherited contract assertion: ${contract}`);
   }
 
   assert.match(workflow, /^name: Sprint 5C frontend and backend regression gate$/m);
-  assert.match(
-    workflow,
-    /group: sprint-5c-frontend-backend-regression-\$\{\{ github\.ref \}\}/,
-  );
+  assert.match(workflow, /group: sprint-5c-frontend-backend-regression-\$\{\{ github\.ref \}\}/);
   assert.match(workflow, /^    name: verify frontend and backend regression$/m);
   assert.match(workflow, /^permissions:\n  contents: read$/m);
-  assert.doesNotMatch(
-    workflow,
-    /(contents|packages|pages|id-token):[ \t]*write/,
-  );
+  assert.doesNotMatch(workflow, /(contents|packages|pages|id-token):[ \t]*write/);
 });
 
 test('migration creates the production foundation tables from an empty schema', async () => {
   const pool = createPool(testDatabaseUrl());
   await pool.query('drop schema public cascade; create schema public');
-
   await migrate(pool);
-
   const result = await pool.query<{ table_name: string }>(
-    `select table_name
-       from information_schema.tables
-      where table_schema = 'public'
-      order by table_name`,
+    `select table_name from information_schema.tables where table_schema = 'public' order by table_name`,
   );
-  assert.deepEqual(
-    result.rows.map((row) => row.table_name),
-    expectedTables,
-  );
+  assert.deepEqual(result.rows.map((row) => row.table_name), expectedTables);
   await pool.end();
 });
 
@@ -174,12 +157,7 @@ test('migration refuses an applied version whose checksum changed', async () => 
   const pool = createPool(testDatabaseUrl());
   await pool.query('drop schema public cascade; create schema public');
   await migrate(pool);
-  await pool.query(
-    `update schema_migrations
-        set checksum = 'invalid'
-      where version = '0001_production_foundation.sql'`,
-  );
-
+  await pool.query(`update schema_migrations set checksum = 'invalid' where version = '0001_production_foundation.sql'`);
   await assert.rejects(migrate(pool), /checksum mismatch/);
   await pool.end();
 });
@@ -192,18 +170,9 @@ test('append-only audit history rejects update and delete', async () => {
     `insert into audit_events
       (audit_event_id, actor_id, action, reason, correlation_id, payload)
      values
-      ('00000000-0000-4000-8000-000000000001',
-       'actor-test',
-       'test.created',
-       'migration invariant',
-       'correlation-test',
-       '{}'::jsonb)`,
+      ('00000000-0000-4000-8000-000000000001','actor-test','test.created','migration invariant','correlation-test','{}'::jsonb)`,
   );
-
-  await assert.rejects(
-    pool.query(`update audit_events set action = 'test.changed'`),
-    /immutable/,
-  );
+  await assert.rejects(pool.query(`update audit_events set action = 'test.changed'`), /immutable/);
   await assert.rejects(pool.query('delete from audit_events'), /immutable/);
   await pool.end();
 });
@@ -212,7 +181,6 @@ test('transaction helper rolls back every write after an error', async () => {
   const pool = createPool(testDatabaseUrl());
   await pool.query('drop schema public cascade; create schema public');
   await migrate(pool);
-
   await assert.rejects(
     withTransaction(pool, async (client) => {
       await client.query(
