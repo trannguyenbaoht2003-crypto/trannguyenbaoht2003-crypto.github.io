@@ -104,7 +104,7 @@ test('Sprint 8E preserves scheduler fail-closed defaults and recovery-before-dis
   assert.match(config, /value === undefined \|\| value === 'false'\) return false/);
   assert.ok(
     runtime.indexOf('recoverStaleAiProviderExecutions(pool)') <
-      runtime.indexOf('reconcileAiDiscoveryScheduler'),
+      runtime.indexOf('reconcileAiDiscoveryScheduler(queue'),
     'runtime recovery must occur before scheduler reconciliation',
   );
   assert.ok(
