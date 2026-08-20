@@ -234,6 +234,34 @@ test('OpenAI Responses adapter rejects malformed, extra-field and allow-list vio
   }
 });
 
+test('OpenAI Responses adapter preserves HTTP request ID on nested validation failure', async () => {
+  const fakeFetch = (async () => new Response(JSON.stringify(responseBody({
+    proposals: [{
+      subjectExternalId: 'samira',
+      augmentExternalIds: ['1194'],
+      itemExternalIds: ['3006'],
+      rationale: 'x'.repeat(2_001),
+    }],
+  })), {
+    status: 200,
+    headers: { 'content-type': 'application/json', 'x-request-id': 'req_nested_789' },
+  })) as typeof fetch;
+
+  const provider = createOpenAiResponsesProvider({
+    apiKey: 'test-secret-value',
+    model: 'test-model',
+    fetchImpl: fakeFetch,
+  });
+
+  await assert.rejects(provider.execute(requestFixture()), (error: unknown) => {
+    assert.ok(error instanceof AiProviderError);
+    assert.equal(error.code, 'AI_PROVIDER_OUTPUT_INVALID');
+    assert.equal(error.retryable, false);
+    assert.equal(error.providerRequestId, 'req_nested_789');
+    return true;
+  });
+});
+
 test('OpenAI Responses adapter honors an injected non-production endpoint without changing request authority', async () => {
   let capturedUrl = '';
   const fakeFetch = (async (input: string | URL | Request) => {
