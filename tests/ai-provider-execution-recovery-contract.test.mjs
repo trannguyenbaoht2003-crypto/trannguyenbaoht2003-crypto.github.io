@@ -109,7 +109,7 @@ test('Sprint 8E preserves scheduler fail-closed defaults and recovery-before-dis
   );
   assert.ok(
     worker.indexOf('if (!options.schedulerEnabled)') <
-      worker.indexOf('await recoverStaleAiProviderExecutions(options.pool)'),
+      worker.indexOf('await (options.recover ?? recoverStaleAiProviderExecutions)(options.pool)'),
     'disabled stale jobs must no-op before recovery/provider work',
   );
   assert.doesNotMatch(runtime, /AI_DISCOVERY_SCHEDULER_ENABLED\s*=\s*true/);
