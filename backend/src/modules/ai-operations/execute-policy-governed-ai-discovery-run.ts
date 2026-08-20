@@ -70,5 +70,10 @@ export async function executePolicyGovernedAiDiscoveryRun(
   if (dependencies.sleep) processDependencies.sleep=dependencies.sleep;
   const result=await process(pool,{...command,minimumIntervalFloorSeconds:dependencies.minimumIntervalFloorSeconds??0},processDependencies);
   if (result.kind==='UNCERTAIN') throw new Error('AI_PROVIDER_EXECUTION_UNCERTAIN');
-  return {...result.run,aiOperationsRunBudgetReservationId:result.reservation.aiOperationsRunBudgetReservationId,aiOperationsPolicyRevisionId:result.reservation.aiOperationsPolicyRevisionId,budgetReplayed:result.reservation.replayed};
+  return {
+    ...result.run,
+    aiOperationsRunBudgetReservationId:result.reservation?.aiOperationsRunBudgetReservationId??null,
+    aiOperationsPolicyRevisionId:result.reservation?.aiOperationsPolicyRevisionId??null,
+    budgetReplayed:result.reservation?.replayed??null,
+  };
 }

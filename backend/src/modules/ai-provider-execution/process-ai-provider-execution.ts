@@ -51,7 +51,7 @@ export type ProcessAiProviderExecutionResult =
   | {
       kind: 'RESOLVED';
       run: RecordAiDiscoveryRunResult;
-      reservation: ReserveAiOperationsRunBudgetResult;
+      reservation: ReserveAiOperationsRunBudgetResult | null;
     }
   | {
       kind: 'UNCERTAIN';
@@ -232,7 +232,13 @@ export async function processAiProviderExecution(
       [command.aiDiscoveryRunId],
     );
     const row = reservation.rows[0];
-    if (!row) throw new Error('AI_PROVIDER_EXECUTION_REPLAY_RESERVATION_MISSING');
+    if (!row) {
+      return {
+        kind: 'RESOLVED',
+        run: prepared.run,
+        reservation: null,
+      };
+    }
     return {
       kind: 'RESOLVED',
       run: prepared.run,

@@ -48,7 +48,10 @@ export async function processScheduledAiDiscoveryTick(pool:Pool,command:ProcessS
     const executeRun=dependencies.executeRun??executePolicyGovernedAiDiscoveryRun;
     const result=await executeRun(pool,{actorId:command.actorId,correlationId:command.correlationId,idempotencyKey:built.idempotencyKey,aiDiscoveryRunId:built.aiDiscoveryRunId,provider:command.provider,modelKey:command.modelKey,modelRevision:command.modelRevision,input:built.input,startedAt:command.startedAt},{minimumIntervalFloorSeconds:SCHEDULED_INTERVAL_SECONDS});
     const outcome=result.status==='completed'?'COMPLETED':'PROVIDER_FAILED';
-    await finalizeTick(pool,tickId,outcome,{policyRevisionId:result.aiOperationsPolicyRevisionId,budgetReservationId:result.aiOperationsRunBudgetReservationId});
+    const links=result.aiOperationsPolicyRevisionId!==null&&result.aiOperationsRunBudgetReservationId!==null
+      ?{policyRevisionId:result.aiOperationsPolicyRevisionId,budgetReservationId:result.aiOperationsRunBudgetReservationId}
+      :{};
+    await finalizeTick(pool,tickId,outcome,links);
     return{outcome,scheduledAiDiscoveryTickId:tickId,aiDiscoveryRunId:built.aiDiscoveryRunId};
   }catch(error){
     const budgetOutcome=knownBudgetOutcome(error);

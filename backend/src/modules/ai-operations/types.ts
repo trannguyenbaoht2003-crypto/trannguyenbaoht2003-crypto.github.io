@@ -148,9 +148,9 @@ export interface ExecutePolicyGovernedAiDiscoveryRunResult {
   proposalIds: string[];
   proposalCount: number;
   replayed: boolean;
-  aiOperationsRunBudgetReservationId: string;
-  aiOperationsPolicyRevisionId: string;
-  budgetReplayed: boolean;
+  aiOperationsRunBudgetReservationId: string | null;
+  aiOperationsPolicyRevisionId: string | null;
+  budgetReplayed: boolean | null;
 }
 
 export interface NormalizedPolicyGovernedAiDiscoveryRunCommand extends Omit<
