@@ -15,6 +15,8 @@ The target flow is:
 ```text
 Sprint 8D scheduled/manual provider trigger
         ↓
+existing durable AI-run replay preflight
+        ↓ no replay
 normalized provider input + deterministic run identity
         ↓
 ATOMIC PostgreSQL preparation
@@ -213,10 +215,10 @@ When attempts remain, one transaction:
 1. marks the current attempt `FAILED` with `PROVIDER_RATE_LIMITED`;
 2. creates the next attempt `PREPARED` with a new deterministic client request ID;
 3. updates `current_attempt_ordinal`;
-4. moves the logical execution back to `PREPARED` while preserving the same lease when still valid;
+4. moves the logical execution back to `PREPARED` while preserving the same lease only when that lease remains valid;
 5. commits before any subsequent provider call.
 
-Backoff may preserve the existing bounded delays (`500 ms`, then `1500 ms`), but the retry is now visible in durable attempt history.
+Backoff may preserve the existing bounded delays (`500 ms`, then `1500 ms`), but the retry is now visible in durable attempt history. If the lease expires before the next dispatch, the provider must not be called until the prepared execution is safely reclaimed with a new valid lease.
 
 If attempt 3 receives `429`, no attempt 4 may be created. The logical execution resolves to terminal `FAILED` and a final failed AI discovery run is atomically recorded with `PROVIDER_RATE_LIMITED`.
 
@@ -263,6 +265,8 @@ if ordinal < 3, in one transaction:
   current_attempt_ordinal += 1
   terminal_at remains null
 ```
+
+If the current uncertain attempt is ordinal 3, `CONFIRMED_NOT_RECEIVED` may still be recorded as truth/audit evidence, but no attempt 4 exists. The execution remains `UNCERTAIN`, is operationally terminal, and sets `terminal_at` in the same reconciliation transaction.
 
 `CONFIRMED_RECEIVED` and `ABANDONED` do not permit another provider call. The execution remains `UNCERTAIN`; the reconciliation makes it operationally terminal and sets `terminal_at`.
 
@@ -333,6 +337,23 @@ Both go through the same transaction-scoped Sprint 8C budget authority.
 
 Sprint 8E is not permitted to synthesize external attempts for historical ambiguous rows.
 
+### Mandatory replay-first ordering
+
+Every policy-governed provider execution first performs the existing durable AI-run replay preflight **before** attempting 8E budget/journal preparation:
+
+```text
+readAiDiscoveryRunReplay(...)
+        ↓ durable compatible run exists
+return replay, zero budget, zero journal, zero provider call
+
+        ↓ no durable run
+inspect existing 8E execution / historical consumed authorization
+        ↓ only if truly new and unconsumed
+atomic 8C + 8E preparation
+```
+
+This ordering is mandatory for both private/manual and scheduled paths. It prevents an already-completed historical/new run from encountering the budget-uniqueness gate before replay is recognized.
+
 ### Existing completed/failed AI runs
 
 Sprint 8B replay preflight remains authoritative for already-durable `ai_discovery_runs`. If a compatible historical run and completed idempotency record exist, it is replayed with zero provider call and does not require a backfilled 8E journal.
@@ -343,9 +364,11 @@ A pre-8E budget reservation without a durable AI run is treated as already consu
 
 ### New 8E executions
 
-Before creating a new execution, preparation checks for an existing execution by `aiDiscoveryRunId`/`runKey` and verifies immutable execution identity (`provider`, model revision, prompt template, input hash). Replays behave by state:
+After replay preflight returns no durable run, execution preparation checks for an existing execution by `aiDiscoveryRunId`/`runKey` and verifies immutable execution identity (`provider`, model revision, prompt template, input hash) before considering any new budget reservation.
 
-- `COMPLETED` / terminal `FAILED`: return the durable AI run replay, zero provider calls;
+Replays/resumes behave by state:
+
+- `COMPLETED` / terminal `FAILED`: use the durable AI run replay, zero provider calls;
 - `PREPARED`: may be safely reclaimed/continued through lease authority, no new budget reservation;
 - `IN_FLIGHT` with valid lease: duplicate caller does not execute provider;
 - stale `IN_FLIGHT`: recovery first marks `UNCERTAIN`; no provider replay;
@@ -409,7 +432,7 @@ X-Client-Request-Id: <client_request_id>
 
 The ID is a trace/reconciliation identifier only. Sprint 8E must not treat it as a provider-supported idempotency key.
 
-The OpenAI provider adapter captures `x-request-id` from HTTP response headers when available and separately captures the Responses body `id`. Both are bounded opaque metadata. Neither authorizes replay.
+The OpenAI provider adapter captures `x-request-id` from HTTP response headers when available and separately captures the Responses body `id`. For HTTP error responses, the typed provider error/disposition must also carry the bounded `x-request-id` when it is present so safe terminal/rate-limit attempt history remains traceable. Neither identifier authorizes replay.
 
 OpenAI API request-ID behavior referenced by this design is documented at:
 
@@ -511,7 +534,7 @@ Runs only the deterministic recovery sweep described above. It never calls the p
 
 Requires explicit execution/attempt identity, one approved decision, actor/reason/evidence metadata, and exact uncertain-state validation.
 
-`CONFIRMED_NOT_RECEIVED` means the operator has external evidence that the uncertain request did not reach the provider. If attempts remain, reconciliation and creation of the next `PREPARED` attempt happen in one transaction. The reconcile command itself does **not** immediately call the provider.
+`CONFIRMED_NOT_RECEIVED` means the operator has external evidence that the uncertain request did not reach the provider. If attempts remain, reconciliation and creation of the next `PREPARED` attempt happen in one transaction. The reconcile command itself does **not** immediately call the provider. If the reconciled attempt is ordinal 3, the decision is recorded but the execution becomes operationally terminal because the attempt ceiling is exhausted.
 
 `CONFIRMED_RECEIVED` means the request is known to have reached the provider but Hải Đấu does not have a durable final AI run. The execution remains `UNCERTAIN`, becomes operationally terminal, and cannot be retried automatically.
 
@@ -560,7 +583,7 @@ A non-final `429` attempt does not create a failed AI discovery run because the 
 
 ## 12. Integration with Sprint 8C and Sprint 8D
 
-`executePolicyGovernedAiDiscoveryRun()` becomes the façade over atomic 8C+8E preparation plus durable 8E attempt orchestration. It must not separately commit a budget reservation and only then create the provider execution.
+`executePolicyGovernedAiDiscoveryRun()` becomes the façade over replay-first resolution, atomic 8C+8E preparation/resume, and durable 8E attempt orchestration. It must not separately commit a budget reservation and only then create the provider execution.
 
 The production caller-facing command remains policy-governed. Internal test/dependency injection may change from `reserveBudget` + `executeRun` to a transaction-aware preparation/execution boundary.
 
@@ -596,8 +619,9 @@ provider.execute(request, { clientRequestId })
 It must:
 
 - send `X-Client-Request-Id` explicitly;
-- capture HTTP `x-request-id` when present;
-- capture JSON response `id` separately;
+- capture HTTP `x-request-id` on both successful and error HTTP responses when present;
+- capture JSON response `id` separately on valid Responses bodies;
+- propagate bounded HTTP request ID metadata through typed provider errors/dispositions instead of losing it before the journal can persist it;
 - never log API keys or Authorization headers;
 - keep raw response/output text only in process memory long enough to validate/canonicalize it;
 - return only the bounded data required for canonicalization/final persistence;
@@ -663,17 +687,18 @@ At minimum:
 5. at most one active attempt per execution;
 6. attempts limited to ordinals 1..3;
 7. provider dispatch requires a valid lease and durable `IN_FLIGHT` state;
-8. attempt/execution cannot move `IN_FLIGHT → PREPARED` except the approved safe-retry transaction that terminally records the prior `429` attempt and creates the next attempt;
+8. attempt/execution cannot move `IN_FLIGHT → PREPARED` except the approved safe-`429` retry transaction that terminally records the prior attempt and creates the next attempt;
 9. stale `IN_FLIGHT` can only converge to `UNCERTAIN`, never to a dispatchable state;
-10. `UNCERTAIN → PREPARED` requires an append-only `CONFIRMED_NOT_RECEIVED` reconciliation for the current uncertain attempt and creation of the next attempt in the same transaction;
-11. `COMPLETED` requires a matching durable completed `ai_discovery_run` whose run/provider/model/prompt/input/output identity agrees with the execution/current attempt;
-12. terminal `FAILED` requires a matching durable failed `ai_discovery_run`;
-13. `COMPLETED`/`FAILED` executions and terminal attempts are immutable;
-14. execution/attempt/reconciliation rows cannot be deleted;
-15. reconciliation rows cannot be updated;
-16. reconciled `CONFIRMED_RECEIVED`/`ABANDONED` uncertainty cannot be reopened;
-17. lease field consistency and expiry ordering are checked;
-18. hashes/identifiers use bounded canonical formats.
+10. `UNCERTAIN → PREPARED` requires an append-only `CONFIRMED_NOT_RECEIVED` reconciliation for the current uncertain attempt, an ordinal below 3, and creation of the next attempt in the same transaction;
+11. `CONFIRMED_NOT_RECEIVED` at ordinal 3, `CONFIRMED_RECEIVED`, and `ABANDONED` set terminal reconciliation state and cannot reopen execution;
+12. `COMPLETED` requires a matching durable completed `ai_discovery_run` whose run/provider/model/prompt/input/output identity agrees with the execution/current attempt;
+13. terminal `FAILED` requires a matching durable failed `ai_discovery_run`;
+14. `COMPLETED`/`FAILED` executions and terminal attempts are immutable;
+15. execution/attempt/reconciliation rows cannot be deleted;
+16. reconciliation rows cannot be updated;
+17. reconciled terminal uncertainty cannot be reopened;
+18. lease field consistency and expiry ordering are checked;
+19. hashes/identifiers use bounded canonical formats.
 
 Triggers/checks may be split for clarity, but no application-only escape hatch may bypass these transitions.
 
@@ -714,7 +739,7 @@ All private mutation commands fail closed:
 - identity mismatch → no state change;
 - reconciliation of non-uncertain attempt → no state change;
 - second reconciliation for the same attempt → conflict, no overwrite;
-- `CONFIRMED_NOT_RECEIVED` at attempt 3 → decision may be recorded but no attempt 4 may be created and no provider call is authorized;
+- `CONFIRMED_NOT_RECEIVED` at attempt 3 → decision is recorded, execution remains `UNCERTAIN`, `terminal_at` is set, no attempt 4 is created, and no provider call is authorized;
 - database transaction failure → rollback;
 - missing provider credentials do not prevent `status`, `recover`, or `reconcile` from operating because none of those commands contacts the provider.
 
@@ -738,6 +763,7 @@ Required focused coverage includes:
 
 ### Atomic preparation
 
+- replay preflight occurs before budget/journal preparation and uses zero new budget/provider work when a durable run exists;
 - policy denial produces neither budget reservation nor journal;
 - budget reservation + execution + attempt #1 commit atomically;
 - injected transaction failure rolls all three back;
@@ -759,6 +785,7 @@ Required focused coverage includes:
 - deterministic unique per-attempt `X-Client-Request-Id`;
 - exact request header is sent;
 - HTTP `x-request-id` and JSON response `id` are captured separately;
+- HTTP error dispositions retain bounded `x-request-id` when present;
 - IDs are bounded/sanitized;
 - no raw Authorization/prompt/output is persisted/logged.
 
@@ -766,6 +793,7 @@ Required focused coverage includes:
 
 - `429` is the only automatic retry class;
 - retry creates a durable next attempt rather than looping opaquely;
+- expired lease blocks next retry dispatch until safely reclaimed;
 - at most three attempts;
 - timeout/transport/408/5xx produce `UNCERTAIN` with zero automatic retry;
 - auth/request rejection is terminal failed with zero retry;
@@ -776,6 +804,7 @@ Required focused coverage includes:
 
 - `UNCERTAIN` cannot retry without reconciliation;
 - `CONFIRMED_NOT_RECEIVED` is append-only and alone can create the next prepared attempt when ordinal < 3;
+- `CONFIRMED_NOT_RECEIVED` at ordinal 3 records the decision, sets terminal uncertainty, and creates no attempt 4;
 - reconcile command itself never calls the provider;
 - `CONFIRMED_RECEIVED`/`ABANDONED` remain non-retryable terminal uncertainty;
 - no force-retry path exists;
@@ -810,7 +839,11 @@ Run the dedicated Sprint 8E gate plus inherited Sprint 8A, 8B, 8C, 8D, 7A, 7B, 7
 Sprint 8E is complete only when all of the following are proven by code, database constraints, tests, and exact-head CI:
 
 ```text
-1 logical aiDiscoveryRun
+existing durable compatible AI run
+→ replay before budget/journal work
+→ zero provider call
+
+1 logical new aiDiscoveryRun
 → exactly 1 new-8E provider execution journal
 
 1 execution
@@ -830,6 +863,9 @@ expired IN_FLIGHT
 
 UNCERTAIN
 → cannot retry without append-only CONFIRMED_NOT_RECEIVED
+
+CONFIRMED_NOT_RECEIVED at attempt 3
+→ terminal uncertainty, no attempt 4
 
 429
 → only automatic retry class
