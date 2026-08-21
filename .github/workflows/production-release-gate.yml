@@ -136,7 +136,7 @@ jobs:
     name: deploy exact SHA to Railway production
     needs: verify
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     environment: production
     env:
       RELEASE_SHA: ${{ inputs.release_sha }}
@@ -146,6 +146,7 @@ jobs:
       RAILWAY_BACKEND_SERVICE: ${{ vars.RAILWAY_BACKEND_SERVICE }}
       RAILWAY_WORKER_SERVICE: ${{ vars.RAILWAY_WORKER_SERVICE }}
       RAILWAY_COLLECTOR_SERVICE: ${{ vars.RAILWAY_COLLECTOR_SERVICE }}
+      RAILWAY_AI_AUTOMATION_SERVICE: ${{ vars.RAILWAY_AI_AUTOMATION_SERVICE }}
       RAILWAY_GATEWAY_SERVICE: ${{ vars.RAILWAY_GATEWAY_SERVICE }}
       PRODUCTION_BASE_URL: ${{ vars.PRODUCTION_BASE_URL }}
 
@@ -171,7 +172,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for name in RAILWAY_TOKEN RAILWAY_PROJECT_ID RAILWAY_ENVIRONMENT RAILWAY_BACKEND_SERVICE RAILWAY_WORKER_SERVICE RAILWAY_COLLECTOR_SERVICE RAILWAY_GATEWAY_SERVICE PRODUCTION_BASE_URL; do
+          for name in \
+            RAILWAY_TOKEN RAILWAY_PROJECT_ID RAILWAY_ENVIRONMENT \
+            RAILWAY_BACKEND_SERVICE RAILWAY_WORKER_SERVICE \
+            RAILWAY_COLLECTOR_SERVICE RAILWAY_AI_AUTOMATION_SERVICE \
+            RAILWAY_GATEWAY_SERVICE PRODUCTION_BASE_URL; do
             if [ -z "${!name:-}" ]; then
               echo "production-release: required Railway/GitHub binding is missing: ${name}" >&2
               exit 1
@@ -194,44 +199,174 @@ jobs:
           railway --version
 
       - name: Deploy backend from exact tree
+        id: deploy_backend
         shell: bash
         run: |
           set -euo pipefail
-          railway up --ci \
+          payload="$(railway up --detach --json \
             --project "$RAILWAY_PROJECT_ID" \
             --environment "$RAILWAY_ENVIRONMENT" \
             --service "$RAILWAY_BACKEND_SERVICE" \
-            --message "release ${RELEASE_SHA} backend"
+            --message "release ${RELEASE_SHA} backend")"
+          deployment_id="$(printf '%s' "$payload" | node --input-type=module -e '
+            let raw="";
+            process.stdin.setEncoding("utf8");
+            process.stdin.on("data", chunk => raw += chunk);
+            process.stdin.on("end", () => {
+              let value;
+              try { value = JSON.parse(raw); } catch { process.exit(1); }
+              const id = value?.deploymentId;
+              if (typeof id !== "string" || id.length < 1 || id.length > 128 || !/^[A-Za-z0-9-]+$/.test(id)) process.exit(1);
+              process.stdout.write(id);
+            });
+          ')"
+          test -n "$deployment_id"
+          echo "deployment_id=$deployment_id" >> "$GITHUB_OUTPUT"
+
+      - name: Verify backend exact deployment
+        run: >-
+          node scripts/verify-railway-deployment.mjs
+          --mode status-only
+          --project "$RAILWAY_PROJECT_ID"
+          --environment "$RAILWAY_ENVIRONMENT"
+          --service "$RAILWAY_BACKEND_SERVICE"
+          --deployment-id "${{ steps.deploy_backend.outputs.deployment_id }}"
 
       - name: Deploy worker from exact tree
+        id: deploy_worker
         shell: bash
         run: |
           set -euo pipefail
-          railway up --ci \
+          payload="$(railway up --detach --json \
             --project "$RAILWAY_PROJECT_ID" \
             --environment "$RAILWAY_ENVIRONMENT" \
             --service "$RAILWAY_WORKER_SERVICE" \
-            --message "release ${RELEASE_SHA} worker"
+            --message "release ${RELEASE_SHA} worker")"
+          deployment_id="$(printf '%s' "$payload" | node --input-type=module -e '
+            let raw="";
+            process.stdin.setEncoding("utf8");
+            process.stdin.on("data", chunk => raw += chunk);
+            process.stdin.on("end", () => {
+              let value;
+              try { value = JSON.parse(raw); } catch { process.exit(1); }
+              const id = value?.deploymentId;
+              if (typeof id !== "string" || id.length < 1 || id.length > 128 || !/^[A-Za-z0-9-]+$/.test(id)) process.exit(1);
+              process.stdout.write(id);
+            });
+          ')"
+          test -n "$deployment_id"
+          echo "deployment_id=$deployment_id" >> "$GITHUB_OUTPUT"
+
+      - name: Verify worker exact deployment
+        run: >-
+          node scripts/verify-railway-deployment.mjs
+          --mode status-only
+          --project "$RAILWAY_PROJECT_ID"
+          --environment "$RAILWAY_ENVIRONMENT"
+          --service "$RAILWAY_WORKER_SERVICE"
+          --deployment-id "${{ steps.deploy_worker.outputs.deployment_id }}"
 
       - name: Deploy collector from exact tree
+        id: deploy_collector
         shell: bash
         run: |
           set -euo pipefail
-          railway up --ci \
+          payload="$(railway up --detach --json \
             --project "$RAILWAY_PROJECT_ID" \
             --environment "$RAILWAY_ENVIRONMENT" \
             --service "$RAILWAY_COLLECTOR_SERVICE" \
-            --message "release ${RELEASE_SHA} collector"
+            --message "release ${RELEASE_SHA} collector")"
+          deployment_id="$(printf '%s' "$payload" | node --input-type=module -e '
+            let raw="";
+            process.stdin.setEncoding("utf8");
+            process.stdin.on("data", chunk => raw += chunk);
+            process.stdin.on("end", () => {
+              let value;
+              try { value = JSON.parse(raw); } catch { process.exit(1); }
+              const id = value?.deploymentId;
+              if (typeof id !== "string" || id.length < 1 || id.length > 128 || !/^[A-Za-z0-9-]+$/.test(id)) process.exit(1);
+              process.stdout.write(id);
+            });
+          ')"
+          test -n "$deployment_id"
+          echo "deployment_id=$deployment_id" >> "$GITHUB_OUTPUT"
 
-      - name: Deploy gateway from exact tree
+      - name: Verify collector exact deployment
+        run: >-
+          node scripts/verify-railway-deployment.mjs
+          --mode status-only
+          --project "$RAILWAY_PROJECT_ID"
+          --environment "$RAILWAY_ENVIRONMENT"
+          --service "$RAILWAY_COLLECTOR_SERVICE"
+          --deployment-id "${{ steps.deploy_collector.outputs.deployment_id }}"
+
+      - name: Deploy AI automation from exact tree
+        id: deploy_ai_automation
         shell: bash
         run: |
           set -euo pipefail
-          railway up --ci \
+          payload="$(railway up --detach --json \
+            --project "$RAILWAY_PROJECT_ID" \
+            --environment "$RAILWAY_ENVIRONMENT" \
+            --service "$RAILWAY_AI_AUTOMATION_SERVICE" \
+            --message "release ${RELEASE_SHA} ai-automation")"
+          deployment_id="$(printf '%s' "$payload" | node --input-type=module -e '
+            let raw="";
+            process.stdin.setEncoding("utf8");
+            process.stdin.on("data", chunk => raw += chunk);
+            process.stdin.on("end", () => {
+              let value;
+              try { value = JSON.parse(raw); } catch { process.exit(1); }
+              const id = value?.deploymentId;
+              if (typeof id !== "string" || id.length < 1 || id.length > 128 || !/^[A-Za-z0-9-]+$/.test(id)) process.exit(1);
+              process.stdout.write(id);
+            });
+          ')"
+          test -n "$deployment_id"
+          echo "deployment_id=$deployment_id" >> "$GITHUB_OUTPUT"
+
+      - name: Verify AI automation exact disabled deployment
+        run: >-
+          node scripts/verify-railway-deployment.mjs
+          --mode status-and-disabled-marker
+          --project "$RAILWAY_PROJECT_ID"
+          --environment "$RAILWAY_ENVIRONMENT"
+          --service "$RAILWAY_AI_AUTOMATION_SERVICE"
+          --deployment-id "${{ steps.deploy_ai_automation.outputs.deployment_id }}"
+
+      - name: Deploy gateway from exact tree
+        id: deploy_gateway
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload="$(railway up --detach --json \
             --project "$RAILWAY_PROJECT_ID" \
             --environment "$RAILWAY_ENVIRONMENT" \
             --service "$RAILWAY_GATEWAY_SERVICE" \
-            --message "release ${RELEASE_SHA} gateway"
+            --message "release ${RELEASE_SHA} gateway")"
+          deployment_id="$(printf '%s' "$payload" | node --input-type=module -e '
+            let raw="";
+            process.stdin.setEncoding("utf8");
+            process.stdin.on("data", chunk => raw += chunk);
+            process.stdin.on("end", () => {
+              let value;
+              try { value = JSON.parse(raw); } catch { process.exit(1); }
+              const id = value?.deploymentId;
+              if (typeof id !== "string" || id.length < 1 || id.length > 128 || !/^[A-Za-z0-9-]+$/.test(id)) process.exit(1);
+              process.stdout.write(id);
+            });
+          ')"
+          test -n "$deployment_id"
+          echo "deployment_id=$deployment_id" >> "$GITHUB_OUTPUT"
+
+      - name: Verify gateway exact deployment
+        run: >-
+          node scripts/verify-railway-deployment.mjs
+          --mode status-only
+          --project "$RAILWAY_PROJECT_ID"
+          --environment "$RAILWAY_ENVIRONMENT"
+          --service "$RAILWAY_GATEWAY_SERVICE"
+          --deployment-id "${{ steps.deploy_gateway.outputs.deployment_id }}"
 
       - name: Production HTTP smoke
         run: npm run production:smoke
@@ -244,3 +379,4 @@ jobs:
         run: |
           set -euo pipefail
           echo "PRODUCTION_DEPLOYED_AND_SMOKE_VERIFIED release_sha=${RELEASE_SHA}"
+          echo "AI_AUTOMATION_DISABLED_DELIVERY_READY release_sha=${RELEASE_SHA}"

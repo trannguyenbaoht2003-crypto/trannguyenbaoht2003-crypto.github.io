@@ -26,9 +26,10 @@ test('Sprint 8F production delivery surface exists and keeps the AI service priv
     assert.equal(await exists(path), true, `missing Sprint 8F artifact: ${path}`);
   }
 
-  const [railway, workflow, envExample] = await Promise.all([
+  const [railway, workflow, verifier, envExample] = await Promise.all([
     read('backend/railway.ai-automation.toml'),
     read('.github/workflows/production-release-gate.yml'),
+    read('scripts/verify-railway-deployment.mjs'),
     read('deploy/production/production.env.example'),
   ]);
 
@@ -43,10 +44,28 @@ test('Sprint 8F production delivery surface exists and keeps the AI service priv
   assert.match(workflow, /railway up --detach --json/u);
   assert.match(workflow, /verify-railway-deployment\.mjs/u);
   assert.match(workflow, /status-and-disabled-marker/u);
-  assert.match(workflow, new RegExp(READY_MARKER.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&')));
-  assert.doesNotMatch(workflow, /OPENAI_API_KEY|AI_DISCOVERY_SCHEDULER_ENABLED\s*=\s*true/iu);
+  assert.ok(verifier.includes(READY_MARKER));
+  assert.doesNotMatch(workflow, /OPENAI_API_KEY|OPENAI_MODEL|OPENAI_BASE_URL|AI_DISCOVERY_SCHEDULER_ENABLED\s*=\s*true/iu);
   assert.doesNotMatch(workflow, /--latest|railway\s+logs\s+--latest/iu);
   assert.doesNotMatch(workflow, /railway\s+(?:init|add)|railway\s+project\s+new/iu);
+
+  const orderedSteps = [
+    'Deploy backend from exact tree',
+    'Verify backend exact deployment',
+    'Deploy worker from exact tree',
+    'Verify worker exact deployment',
+    'Deploy collector from exact tree',
+    'Verify collector exact deployment',
+    'Deploy AI automation from exact tree',
+    'Verify AI automation exact disabled deployment',
+    'Deploy gateway from exact tree',
+    'Verify gateway exact deployment',
+    'Production HTTP smoke',
+    'Production browser smoke',
+  ];
+  const positions = orderedSteps.map((name) => workflow.indexOf(`name: ${name}`));
+  assert.ok(positions.every((position) => position >= 0), `missing release step: ${JSON.stringify({ orderedSteps, positions })}`);
+  assert.ok(positions.every((position, index) => index === 0 || positions[index - 1] < position), 'release verification sequence is out of order');
 
   assert.match(envExample, /^AI_DISCOVERY_SCHEDULER_ENABLED=false$/mu);
   assert.doesNotMatch(envExample, /OPENAI_API_KEY|OPENAI_MODEL|OPENAI_BASE_URL|OPENAI_ENDPOINT/iu);
@@ -61,6 +80,7 @@ test('Sprint 8F workflow cannot grant provider-spend or public AI authority', as
 
   assert.doesNotMatch(workflow, /inputs:[\s\S]*AI_DISCOVERY_SCHEDULER_ENABLED/iu);
   assert.doesNotMatch(workflow, /OPENAI_API_KEY|OPENAI_MODEL|OPENAI_BASE_URL|OPENAI_ENDPOINT/iu);
+  assert.doesNotMatch(workflow, /enable_ai|activate_ai|scheduler_enabled.*true/iu);
   assert.match(runtime, /createAiAutomationProvider/u);
   assert.match(runtime, /AI_AUTOMATION_DISABLED_READY/u);
   assert.equal(coreWorker.includes('createOpenAiResponsesProvider'), false);
