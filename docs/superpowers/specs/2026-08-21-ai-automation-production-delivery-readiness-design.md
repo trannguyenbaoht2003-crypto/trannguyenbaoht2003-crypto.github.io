@@ -269,7 +269,7 @@ The release workflow keeps Railway CLI pinned to:
 @railway/cli@5.30.1
 ```
 
-Sprint 8F replaces build-log-only `railway up --ci` sequencing with a deterministic deployment-ID flow.
+Sprint 8F replaces the current opaque per-service `railway up --ci` invocation with an explicit exact-deployment identity flow. The reason is not that v5.30.1 cannot wait for a terminal deploy status; the reason is that 8F must correlate readiness and logs to the exact deployment created by each release step.
 
 For each service, creation uses:
 
@@ -283,9 +283,11 @@ railway up --detach --json \
 
 For Railway CLI v5.30.1, detached JSON output directly returns the deployment identifier created by that upload.
 
-The workflow/helper must parse the returned `deploymentId` and reject missing/malformed output.
+The workflow captures this stdout without echoing the full payload, parses exactly one JSON object, extracts only `deploymentId`, validates it as a bounded identifier, and exposes only that ID to the next verification step.
 
-It must never infer the deployment by choosing `latest`, sorting timestamps, or sleeping and selecting the first result.
+Missing, malformed, multiple-object, or unbounded output fails closed.
+
+The workflow must never infer the deployment by choosing `latest`, sorting timestamps, or sleeping and selecting the first result.
 
 ## 14. Exact deployment status verification
 
@@ -296,21 +298,30 @@ railway deployment list --json \
   --project "$RAILWAY_PROJECT_ID" \
   --environment "$RAILWAY_ENVIRONMENT" \
   --service "$SERVICE" \
-  --limit 100
+  --limit 1000
 ```
 
-The verifier searches the result for the exact captured deployment ID.
+The verifier searches the result only for the exact captured deployment ID.
 
-Allowed non-terminal states include Railway building/deploying/initializing/waiting/queued states.
+Allowed non-terminal states are:
 
-Terminal interpretation:
+```text
+BUILDING
+DEPLOYING
+INITIALIZING
+WAITING
+QUEUED
+```
+
+Terminal interpretation is:
 
 ```text
 SUCCESS -> pass
 FAILED -> fail
 CRASHED -> fail
+REMOVING -> fail
 REMOVED -> fail
-other terminal/error condition -> fail closed
+unknown status -> fail closed
 ```
 
 Polling is bounded:
@@ -320,9 +331,9 @@ interval = 5 seconds
 per-deployment timeout = 900 seconds
 ```
 
-The verifier must fail rather than switch to another deployment ID if the target is temporarily absent from the list.
+If the exact target ID is temporarily absent from a list response, the verifier continues polling the same ID until the same 900-second deadline. It never switches to another deployment. If the ID is still absent when the deadline expires, verification fails.
 
-The production deploy job timeout increases only as needed to cover sequential bounded verification; it does not become unbounded.
+The production deploy job timeout is set to exactly 90 minutes. This bounds the full sequential release while allowing normal per-service verification without making the workflow unbounded.
 
 ## 15. Exact AI deployment log verification
 
@@ -338,13 +349,13 @@ railway logs "$DEPLOYMENT_ID" \
   --service "$RAILWAY_AI_AUTOMATION_SERVICE"
 ```
 
-The helper parses bounded JSON log output and requires the exact marker:
+The helper parses bounded JSON log output and requires a log record whose message, after trimming surrounding whitespace, equals exactly:
 
 ```text
 AI_AUTOMATION_DISABLED_READY scheduler_enabled=false provider_configured=false
 ```
 
-Because Railway log ingestion can lag terminal deployment status, marker lookup may retry for a separate bounded period:
+Because Railway log ingestion can lag terminal deployment status, marker lookup retries for a separate bounded period:
 
 ```text
 interval = 5 seconds
@@ -361,11 +372,11 @@ Add:
 scripts/verify-railway-deployment.mjs
 ```
 
-The helper has two modes:
+The helper has two explicit modes:
 
 ```text
 status-only
-status-and-marker
+status-and-disabled-marker
 ```
 
 Required inputs are bounded identifiers only:
@@ -374,9 +385,11 @@ Required inputs are bounded identifiers only:
 - environment ID/name;
 - service ID/name;
 - exact deployment ID;
-- optional expected fixed marker enum.
+- mode.
 
-The marker is not arbitrary user input. The only 8F supported marker value is the fixed disabled-ready marker.
+The marker is not arbitrary user input. `status-and-disabled-marker` always uses the fixed marker defined in this spec.
+
+The helper uses `child_process.spawn`/`spawnSync` argument arrays rather than shell command interpolation.
 
 The helper:
 
@@ -387,7 +400,7 @@ The helper:
 - never mutates Railway resources;
 - never chooses `latest`.
 
-Repository tests use a fake Railway CLI fixture and do not require a Railway account.
+Repository tests put a fake `railway` executable first in `PATH`; they do not require a Railway account.
 
 ## 17. Positive evidence vs absence of logs
 
@@ -442,7 +455,7 @@ No AI-specific pre-deploy command may:
 - mutate Candidate/Review/Evidence/Publication authority;
 - create or remove AI history.
 
-The service can rely on runtime startup for DB/Redis/recovery readiness evidence.
+The service relies on runtime startup for DB/Redis/recovery readiness evidence.
 
 ## 21. GitHub production environment binding
 
@@ -509,8 +522,6 @@ It must not contain provider credential/model placeholders.
 
 ## 24. Application source changes
 
-Expected application-source changes are narrowly scoped to disabled readiness and testability.
-
 Primary file:
 
 ```text
@@ -519,12 +530,25 @@ backend/src/ai-automation-worker.ts
 
 The runtime must:
 
-- await worker readiness before emitting the disabled marker;
+- await `worker.waitUntilReady()` before emitting the disabled marker;
 - emit the marker only for disabled mode;
 - keep startup failure output bounded;
 - preserve graceful `SIGINT`/`SIGTERM` shutdown.
 
-A small isolated provider-construction helper or dependency boundary may be introduced so tests can prove a disabled runtime does not invoke provider construction. The helper must not alter enabled-mode provider semantics.
+Extract and export this exact provider-construction boundary from the same module:
+
+```text
+createAiAutomationProvider(config, factory)
+```
+
+Semantics:
+
+```text
+schedulerEnabled=false -> return undefined without calling factory
+schedulerEnabled=true -> call factory exactly once with providerConfig
+```
+
+`startAiAutomationRuntime()` must use this helper for provider creation. Tests inject a counting fake factory to prove disabled zero-call behavior, including when dummy provider environment variables are present.
 
 No core worker or public server ownership moves into this file.
 
@@ -548,13 +572,13 @@ Update:
 tests/production-delivery.test.mjs
 ```
 
-The old contract that merely requires `railway up --ci` is replaced with semantic assertions requiring:
+The old contract that merely requires a `railway up --ci` invocation is replaced with semantic assertions requiring:
 
 - `backend/railway.ai-automation.toml` exists;
 - correct backend Dockerfile reuse;
 - correct AI runtime start command;
 - AI service binding exists;
-- deploy creation returns/captures an exact deployment ID;
+- deploy creation captures an exact deployment ID from detached JSON output;
 - each service is verified by exact deployment ID;
 - AI deployment requires disabled-ready marker;
 - AI deploy completes before gateway creation;
@@ -612,29 +636,34 @@ Redis 7
 Node 22.13.0
 ```
 
-Required checks:
+Required checks are exactly:
 
-1. Sprint 8F repository contract;
-2. production delivery contract;
+1. `npm run test:ai-automation-production-delivery`;
+2. `npm run test:production-contract`;
 3. backend typecheck;
-4. backend focused tests;
+4. focused backend AI automation tests;
 5. backend full tests;
 6. backend build;
 7. local disabled-runtime integration;
 8. stale scheduler cleanup integration;
 9. provider-construction-zero-call regression;
-10. Sprint 8E regression;
-11. Sprint 8D regression;
-12. Sprint 8C / 8B / 8A regressions;
-13. Sprint 5C / 5D release regressions or their existing source contracts as appropriate;
-14. repository cleanliness;
-15. deployment/secret guard.
+10. `npm run test:ai-provider-execution-recovery`;
+11. `npm run test:ai-discovery-automation`;
+12. `npm run test:ai-operations-policy`;
+13. `npm run test:ai-provider-execution`;
+14. `npm run test:guarded-ai-discovery`;
+15. `npm run test:staging-contract`;
+16. `npm run test:release-source`;
+17. repository cleanliness;
+18. deployment/secret guard.
+
+The dedicated 8F workflow does not duplicate the full Docker staging/release rehearsal. Before merge, exact-head verification additionally requires the inherited Sprint 5C staging/regression workflows and Sprint 5D release-candidate workflow to be terminal `SUCCESS`, along with inherited 8A-8E authority gates.
 
 No CI step makes a real OpenAI request or a real Railway deployment.
 
 ## 29. Local disabled-runtime integration
 
-Repository integration tests must start the built AI automation runtime with real test PostgreSQL and Redis:
+Repository integration tests start the built AI automation runtime with real test PostgreSQL and Redis:
 
 ```text
 DATABASE_URL=<test postgres>
@@ -648,9 +677,9 @@ Acceptance:
 
 ```text
 process stays alive
-AI_AUTOMATION_DISABLED_READY appears exactly after reconciliation/readiness
+AI_AUTOMATION_DISABLED_READY appears only after reconciliation/readiness
 scheduler ai-discovery-hourly-v1 is absent
-provider call/construction count is zero
+provider construction/call count is zero
 graceful SIGTERM closes runtime cleanly
 ```
 
@@ -680,7 +709,7 @@ Expected:
 provider factory call count = 0
 ```
 
-The test must not contact OpenAI.
+The test uses the `createAiAutomationProvider(config, factory)` dependency boundary and must not contact OpenAI.
 
 This locks the control-flow invariant that scheduler authority, not accidental secret presence, decides provider construction.
 
@@ -859,7 +888,7 @@ Mandatory test groups:
 13. Missing/malformed deployment ID fails closed.
 14. Verifier waits for exact deployment ID only.
 15. Verifier does not use latest/timestamp heuristics.
-16. Failed/crashed/removed deployment fails release.
+16. Failed/crashed/removing/removed deployment fails release.
 17. AI exact deployment must contain disabled-ready marker.
 18. Marker lookup is bounded and exact-deployment scoped.
 19. Gateway deploy is last.
@@ -872,7 +901,7 @@ Mandatory test groups:
 26. 8E execution recovery regression remains green.
 27. 8D automation regression remains green.
 28. 8C/8B/8A authority regressions remain green.
-29. 5C/5D release regressions remain green.
+29. 5C/5D inherited release workflows are terminal `SUCCESS` on exact PR head.
 30. Repository tests use fake Railway CLI; no Railway account required.
 31. No test or workflow calls real OpenAI.
 
