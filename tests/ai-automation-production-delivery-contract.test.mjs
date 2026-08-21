@@ -66,6 +66,8 @@ test('production release gate uses exact deployment IDs and verified sequential 
   assert.match(workflow, /verify-railway-deployment\.mjs/);
   assert.match(workflow, /status-and-disabled-marker/);
   assert.match(workflow, /timeout-minutes:\s*90/);
+  assert.match(workflow, /AI_AUTOMATION_DISABLED_DELIVERY_READY/);
+  assert.doesNotMatch(workflow, /AI_DISCOVERY_PRODUCTION_ACTIVE/);
   assert.doesNotMatch(workflow, /railway up --ci/);
   assert.doesNotMatch(workflow, /--latest|railway logs --latest/);
   assert.doesNotMatch(workflow, /OPENAI_API_KEY|AI_DISCOVERY_SCHEDULER_ENABLED\s*=\s*true/);
@@ -105,7 +107,7 @@ test('Sprint 8F repository-only workflow cannot deploy Railway or activate the p
   assert.match(workflow, /AI_AUTOMATION_PRODUCTION_REPO_READY/);
   assert.doesNotMatch(workflow, /railway up|railway redeploy|workflow_dispatch[\s\S]*AI_DISCOVERY_SCHEDULER_ENABLED/i);
   assert.doesNotMatch(workflow, /OPENAI_API_KEY|AI_DISCOVERY_OPENAI_MODEL|AI_DISCOVERY_OPENAI_ENDPOINT/);
-  assert.doesNotMatch(workflow, /AI_AUTOMATION_DISABLED_DELIVERY_READY/);
+  assert.doesNotMatch(workflow, /AI_AUTOMATION_DISABLED_DELIVERY_READY|AI_DISCOVERY_PRODUCTION_ACTIVE/);
 });
 
 test('Sprint 8F adds no public AI HTTP surface or downstream authority', async () => {
