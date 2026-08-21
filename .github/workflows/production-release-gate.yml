@@ -375,3 +375,4 @@ jobs:
         run: |
           set -euo pipefail
           echo "PRODUCTION_DEPLOYED_AND_SMOKE_VERIFIED release_sha=${RELEASE_SHA}"
+          echo "AI_AUTOMATION_DISABLED_DELIVERY_READY release_sha=${RELEASE_SHA}"
