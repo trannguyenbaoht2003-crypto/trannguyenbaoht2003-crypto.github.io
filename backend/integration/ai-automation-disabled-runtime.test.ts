@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
+import { access } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import test from 'node:test';
@@ -19,6 +20,7 @@ import {
 
 const READY_MARKER = 'AI_AUTOMATION_DISABLED_READY scheduler_enabled=false provider_configured=false';
 const backendRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const compiledRuntimePath = resolve(backendRoot, 'dist/src/ai-automation-worker.js');
 
 function requiredEnv(name: 'TEST_DATABASE_URL' | 'TEST_REDIS_URL'): string {
   const value = process.env[name]?.trim();
@@ -77,6 +79,8 @@ test('compiled disabled AI automation reconciles stale scheduler, becomes ready,
     },
   );
 
+  await access(compiledRuntimePath);
+
   const child = spawn(process.execPath, ['dist/src/ai-automation-worker.js'], {
     cwd: backendRoot,
     env: {
@@ -85,6 +89,7 @@ test('compiled disabled AI automation reconciles stale scheduler, becomes ready,
       REDIS_URL: redisUrl,
       AI_DISCOVERY_SCHEDULER_ENABLED: 'false',
       OPENAI_API_KEY: 'dummy-must-be-ignored',
+      OPENAI_MODEL: 'dummy-must-be-ignored',
       AI_DISCOVERY_PROVIDER: 'openai',
       AI_DISCOVERY_OPENAI_MODEL: 'dummy-must-be-ignored',
     },
