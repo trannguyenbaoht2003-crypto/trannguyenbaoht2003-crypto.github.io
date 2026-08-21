@@ -153,6 +153,8 @@ async function verifyStatus(input, dependencies, timing) {
       input.environment,
       '--service',
       input.service,
+      '--limit',
+      '1000',
     ]);
     const entries = parseJsonArray(stdout).map(deploymentStatus);
     const target = entries.find((entry) => entry.id === input.deploymentId);
