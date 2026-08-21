@@ -3,6 +3,8 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import { parseAiAutomationConfig } from '../src/ai-automation-config.js';
+import { createAiAutomationProvider } from '../src/ai-automation-worker.js';
+import type { AiDiscoveryProvider } from '../src/modules/ai-provider/openai-responses-provider.js';
 import {
   AI_DISCOVERY_SCHEDULER_EVERY_MS,
   AI_DISCOVERY_SCHEDULER_ID,
@@ -79,6 +81,58 @@ test('scheduler flag only accepts exact true or false', () => {
     }),
     /AI_AUTOMATION_CONFIG_INVALID/,
   );
+});
+
+test('disabled AI automation never constructs a provider even when dummy provider env is present', () => {
+  let calls = 0;
+  const fakeProvider = {
+    providerKey: 'fake',
+    async execute() {
+      throw new Error('not-called');
+    },
+  } satisfies AiDiscoveryProvider;
+  const factory = () => {
+    calls += 1;
+    return fakeProvider;
+  };
+
+  const config = parseAiAutomationConfig({
+    DATABASE_URL: 'postgres://example',
+    REDIS_URL: 'redis://example',
+    AI_DISCOVERY_SCHEDULER_ENABLED: 'false',
+    AI_DISCOVERY_PROVIDER: 'openai',
+    OPENAI_API_KEY: 'dummy-must-be-ignored',
+    AI_DISCOVERY_OPENAI_MODEL: 'dummy-must-be-ignored',
+  });
+
+  assert.equal(createAiAutomationProvider(config, factory), undefined);
+  assert.equal(calls, 0);
+});
+
+test('enabled AI automation constructs exactly one provider from the approved provider config', () => {
+  let calls = 0;
+  const fakeProvider = {
+    providerKey: 'fake',
+    async execute() {
+      throw new Error('not-called');
+    },
+  } satisfies AiDiscoveryProvider;
+  const factory = () => {
+    calls += 1;
+    return fakeProvider;
+  };
+
+  const config = parseAiAutomationConfig({
+    DATABASE_URL: 'postgres://example',
+    REDIS_URL: 'redis://example',
+    AI_DISCOVERY_SCHEDULER_ENABLED: 'true',
+    AI_DISCOVERY_PROVIDER: 'openai',
+    OPENAI_API_KEY: 'dummy',
+    AI_DISCOVERY_OPENAI_MODEL: 'gpt-test',
+  });
+
+  assert.equal(createAiAutomationProvider(config, factory), fakeProvider);
+  assert.equal(calls, 1);
 });
 
 test('dedicated automation entrypoint owns provider wiring while core worker stays provider-free', async () => {
