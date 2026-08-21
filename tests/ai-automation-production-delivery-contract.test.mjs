@@ -131,3 +131,28 @@ test('Sprint 8F contracts are wired into the root regression', async () => {
   );
   assert.match(packageJson.scripts.test, /npm run test:ai-automation-production-delivery/);
 });
+
+test('Sprint 8F runbooks distinguish repository readiness, inert delivery, and activation authority', async () => {
+  const [production, recovery] = await Promise.all([
+    readRequired('docs/runbooks/production-delivery.md'),
+    readRequired('docs/runbooks/ai-provider-execution-recovery.md'),
+  ]);
+
+  for (const phrase of [
+    'ai-automation',
+    'RAILWAY_AI_AUTOMATION_SERVICE',
+    'AI_AUTOMATION_PRODUCTION_REPO_READY',
+    'AI_AUTOMATION_DISABLED_DELIVERY_READY',
+    'AI_DISCOVERY_SCHEDULER_ENABLED=false',
+    'exact deployment ID',
+  ]) {
+    assert.ok(production.includes(phrase), `production runbook missing Sprint 8F contract: ${phrase}`);
+  }
+  assert.match(production, /gateway is the only public service/i);
+  assert.match(production, /separate explicit authorization/i);
+
+  assert.match(recovery, /Sprint 8F may deploy/i);
+  assert.match(recovery, /disabled mode|inert/i);
+  assert.match(recovery, /UNCERTAIN/);
+  assert.match(recovery, /no automatic replay|not replayed/i);
+});
