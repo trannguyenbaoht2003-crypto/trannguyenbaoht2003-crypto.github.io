@@ -110,6 +110,7 @@ test('status-only accepts SUCCESS for the exact requested deployment and records
     '--project', 'project-1',
     '--environment', 'production',
     '--service', 'backend',
+    '--limit', '1000',
   ]);
 });
 
