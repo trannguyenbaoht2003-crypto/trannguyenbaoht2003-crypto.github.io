@@ -10,8 +10,10 @@ const REQUIRED_FILES = [
   'deploy/production/railway.gateway.toml',
   'deploy/production/production.env.example',
   'backend/railway.toml',
+  'backend/railway.ai-automation.toml',
   'scripts/production-smoke.mjs',
   'scripts/production-browser-smoke.mjs',
+  'scripts/verify-railway-deployment.mjs',
   '.github/workflows/production-release-gate.yml',
   'docs/runbooks/production-delivery.md',
 ];
@@ -53,11 +55,12 @@ test('Sprint 6A production delivery assets are explicitly versioned', async () =
 });
 
 test('Railway production config preserves same-origin and private-backend boundaries', async () => {
-  const [caddy, gatewayDocker, gatewayRailway, backendRailway, envExample] = await Promise.all([
+  const [caddy, gatewayDocker, gatewayRailway, backendRailway, aiRailway, envExample] = await Promise.all([
     readRequired('deploy/production/Caddyfile'),
     readRequired('deploy/production/Dockerfile.gateway'),
     readRequired('deploy/production/railway.gateway.toml'),
     readRequired('backend/railway.toml'),
+    readRequired('backend/railway.ai-automation.toml'),
     readRequired('deploy/production/production.env.example'),
   ]);
 
@@ -86,9 +89,18 @@ test('Railway production config preserves same-origin and private-backend bounda
   assert.match(backendRailway, /restartPolicyType\s*=\s*"ON_FAILURE"/);
   assert.match(backendRailway, /restartPolicyMaxRetries\s*=\s*10/);
 
+  assert.match(aiRailway, /builder\s*=\s*"DOCKERFILE"/);
+  assert.match(aiRailway, /dockerfilePath\s*=\s*"Dockerfile"/);
+  assert.match(aiRailway, /startCommand\s*=\s*"node dist\/src\/ai-automation-worker\.js"/);
+  assert.match(aiRailway, /restartPolicyType\s*=\s*"ON_FAILURE"/);
+  assert.match(aiRailway, /restartPolicyMaxRetries\s*=\s*3/);
+  assert.doesNotMatch(aiRailway, /healthcheckPath|public|domain/i);
+
   assert.match(envExample, /BACKEND_ORIGIN=http:\/\/\$\{\{backend\.RAILWAY_PRIVATE_DOMAIN\}\}:3001/);
   assert.match(envExample, /DATABASE_URL=\$\{\{Postgres\.DATABASE_URL\}\}/);
   assert.match(envExample, /REDIS_URL=\$\{\{Redis\.REDIS_URL\}\}/);
+  assert.match(envExample, /^AI_DISCOVERY_SCHEDULER_ENABLED=false$/m);
+  assert.doesNotMatch(envExample, /OPENAI_API_KEY|OPENAI_MODEL|OPENAI_BASE_URL|OPENAI_ENDPOINT/i);
   assert.doesNotMatch(envExample, /password\s*=|token\s*=|BEGIN (RSA|OPENSSH|EC) PRIVATE KEY/i);
 });
 
@@ -180,7 +192,7 @@ test('production smoke rejects non-HTTPS remote origins before network access', 
   assert.match(result.stderr, /PRODUCTION_BASE_URL_MUST_BE_HTTPS/);
 });
 
-test('production release workflow is exact-SHA gated and cannot create Railway infrastructure', async () => {
+test('production release workflow is exact-SHA gated, exact-deployment verified, and cannot create Railway infrastructure', async () => {
   const workflow = await readRequired('.github/workflows/production-release-gate.yml');
 
   assert.match(workflow, /workflow_dispatch:/);
@@ -191,16 +203,32 @@ test('production release workflow is exact-SHA gated and cannot create Railway i
   assert.match(workflow, /needs:\s*verify/);
   assert.match(workflow, /environment:\s*production/);
   assert.match(workflow, /@railway\/cli@5\.30\.1/);
-  assert.match(workflow, /railway up --ci/);
+  assert.match(workflow, /timeout-minutes:\s*90/);
+  assert.match(workflow, /railway up --detach --json/);
+  assert.doesNotMatch(workflow, /railway up --ci/);
   assert.match(workflow, /--project "\$RAILWAY_PROJECT_ID"/);
   assert.match(workflow, /--environment "\$RAILWAY_ENVIRONMENT"/);
   assert.match(workflow, /--service "\$RAILWAY_BACKEND_SERVICE"/);
+  assert.match(workflow, /--service "\$RAILWAY_AI_AUTOMATION_SERVICE"/);
   assert.match(workflow, /--service "\$RAILWAY_GATEWAY_SERVICE"/);
+  assert.match(workflow, /verify-railway-deployment\.mjs/);
+  assert.match(workflow, /status-and-disabled-marker/);
   assert.match(workflow, /PRODUCTION_DEPLOYED_AND_SMOKE_VERIFIED/);
   assert.doesNotMatch(workflow, /PRODUCTION_DELIVERY_READY/);
 
+  const stepNames = [
+    'Deploy backend from exact tree',
+    'Deploy worker from exact tree',
+    'Deploy collector from exact tree',
+    'Deploy AI automation from exact tree',
+    'Deploy gateway from exact tree',
+  ];
+  const positions = stepNames.map((name) => workflow.indexOf(`name: ${name}`));
+  assert.ok(positions.every((position) => position >= 0), `missing deploy step: ${JSON.stringify({ stepNames, positions })}`);
+  assert.ok(positions.every((position, index) => index === 0 || positions[index - 1] < position), 'deployment steps are out of order');
+
   for (const forbidden of [
-    '--new',
+    '--latest',
     'railway init',
     'railway add',
     'railway project new',
@@ -209,6 +237,7 @@ test('production release workflow is exact-SHA gated and cannot create Railway i
     'id-token: write',
     'printenv',
     'set -x',
+    'OPENAI_API_KEY',
   ]) {
     assert.ok(!workflow.includes(forbidden), `production workflow contains forbidden operation: ${forbidden}`);
   }

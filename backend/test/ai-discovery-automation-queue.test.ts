@@ -3,6 +3,8 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import { parseAiAutomationConfig } from '../src/ai-automation-config.js';
+import { createAiAutomationProvider } from '../src/ai-automation-worker.js';
+import type { AiDiscoveryProvider } from '../src/modules/ai-provider/openai-responses-provider.js';
 import {
   AI_DISCOVERY_SCHEDULER_EVERY_MS,
   AI_DISCOVERY_SCHEDULER_ID,
@@ -81,11 +83,65 @@ test('scheduler flag only accepts exact true or false', () => {
   );
 });
 
+test('disabled provider boundary never constructs provider even when dummy provider env exists', () => {
+  const config = parseAiAutomationConfig({
+    DATABASE_URL: 'postgres://example',
+    REDIS_URL: 'redis://example',
+    AI_DISCOVERY_SCHEDULER_ENABLED: 'false',
+    AI_DISCOVERY_PROVIDER: 'openai',
+    OPENAI_API_KEY: 'dummy-must-be-ignored',
+    AI_DISCOVERY_OPENAI_MODEL: 'dummy-must-be-ignored',
+  });
+  let calls = 0;
+  const fakeProvider = {
+    providerKey: 'fake',
+    async execute() {
+      throw new Error('not-called');
+    },
+  } satisfies AiDiscoveryProvider;
+  const factory = () => {
+    calls += 1;
+    return fakeProvider;
+  };
+
+  assert.equal(createAiAutomationProvider(config, factory), undefined);
+  assert.equal(calls, 0);
+});
+
+test('enabled provider boundary constructs exactly one provider from parsed provider config', () => {
+  const config = parseAiAutomationConfig({
+    DATABASE_URL: 'postgres://example',
+    REDIS_URL: 'redis://example',
+    AI_DISCOVERY_SCHEDULER_ENABLED: 'true',
+    AI_DISCOVERY_PROVIDER: 'openai',
+    OPENAI_API_KEY: 'dummy-key',
+    AI_DISCOVERY_OPENAI_MODEL: 'dummy-model',
+  });
+  let calls = 0;
+  const fakeProvider = {
+    providerKey: 'fake',
+    async execute() {
+      throw new Error('not-called');
+    },
+  } satisfies AiDiscoveryProvider;
+  const provider = createAiAutomationProvider(config, (providerConfig) => {
+    calls += 1;
+    assert.equal(providerConfig.apiKey, 'dummy-key');
+    assert.equal(providerConfig.model, 'dummy-model');
+    return fakeProvider;
+  });
+
+  assert.equal(provider, fakeProvider);
+  assert.equal(calls, 1);
+});
+
 test('dedicated automation entrypoint owns provider wiring while core worker stays provider-free', async () => {
   const automation = await readFile(new URL('../src/ai-automation-worker.ts', import.meta.url), 'utf8');
   const coreWorker = await readFile(new URL('../src/worker.ts', import.meta.url), 'utf8');
   const packageJson = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
   assert.match(automation, /createOpenAiResponsesProvider/u);
+  assert.match(automation, /createAiAutomationProvider/u);
+  assert.match(automation, /AI_AUTOMATION_DISABLED_READY/u);
   assert.equal(coreWorker.includes('createOpenAiResponsesProvider'), false);
   assert.equal(coreWorker.includes('OPENAI_API_KEY'), false);
   assert.equal(packageJson.scripts['start:ai-automation'], 'node dist/src/ai-automation-worker.js');
