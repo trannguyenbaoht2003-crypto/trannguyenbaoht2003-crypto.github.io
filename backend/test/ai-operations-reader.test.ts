@@ -16,7 +16,7 @@ import {
 } from '../src/modules/ai-operations/reserve-ai-operations-run-budget.js';
 import { resetDatabase } from './helpers/database.js';
 
-test('AI operations snapshot exposes only safe policy, budget and proposal aggregates', async () => {
+test('AI operations snapshot exposes only safe policy, budget, proposal and provider execution aggregates', async () => {
   const pool = await resetDatabase();
   const active = await pool.query<{ ai_operations_policy_revision_id: string }>(
     `select ai_operations_policy_revision_id
@@ -47,7 +47,7 @@ test('AI operations snapshot exposes only safe policy, budget and proposal aggre
   });
 
   const aiDiscoveryRunId = randomUUID();
-  await reserveAiOperationsRunBudget(pool, {
+  const reservation = await reserveAiOperationsRunBudget(pool, {
     actorId: 'operator:test',
     correlationId: 'corr-reader-reserve',
     idempotencyKey: 'idem-reader-reserve',
@@ -75,6 +75,28 @@ test('AI operations snapshot exposes only safe policy, budget and proposal aggre
     [randomUUID(), aiDiscoveryRunId, 'c'.repeat(64)],
   );
 
+  const executionId = randomUUID();
+  const attemptId = randomUUID();
+  await pool.query(
+    `insert into ai_provider_executions
+      (ai_provider_execution_id, ai_discovery_run_id,
+       ai_operations_run_budget_reservation_id, run_key, idempotency_key,
+       provider_key, model_key, model_revision, prompt_template_key,
+       prompt_template_version, input_hash, status, current_attempt_ordinal,
+       terminal_at)
+     values ($1,$2,$3,'run-reader-fixture','idem-reader-execution',
+             'fixture-provider','fixture-model','r1','aram-mayhem-discovery',1,
+             $4,'COMPLETED',1,clock_timestamp())`,
+    [executionId, aiDiscoveryRunId, reservation.aiOperationsRunBudgetReservationId, 'a'.repeat(64)],
+  );
+  await pool.query(
+    `insert into ai_provider_execution_attempts
+      (ai_provider_execution_attempt_id, ai_provider_execution_id, ordinal,
+       client_request_id, status, dispatch_started_at, completed_at)
+     values ($1,$2,1,$3,'COMPLETED',clock_timestamp(),clock_timestamp())`,
+    [attemptId, executionId, randomUUID()],
+  );
+
   const snapshot = await readAiOperationsSnapshot(pool);
 
   assert.equal(snapshot.activePolicy.aiOperationsPolicyRevisionId, policyId);
@@ -89,6 +111,21 @@ test('AI operations snapshot exposes only safe policy, budget and proposal aggre
   assert.equal(snapshot.budget.remainingRuns, 2);
   assert.equal(typeof snapshot.budget.lastReservedAt, 'string');
   assert.deepEqual(snapshot.proposals, { pending: 1, materialized: 0 });
+  assert.deepEqual(snapshot.providerExecution, {
+    prepared: 0,
+    inFlight: 0,
+    completed: 1,
+    failed: 0,
+    uncertain: 0,
+    stalePrepared: 0,
+    staleInFlight: 0,
+    attemptsToday: 1,
+    safeRetriesToday: 0,
+    uncertainExecutions: 0,
+    unreconciledUncertain: 0,
+    lastExecutionAt: snapshot.providerExecution.lastExecutionAt,
+  });
+  assert.equal(typeof snapshot.providerExecution.lastExecutionAt, 'string');
 
   const serialized = JSON.stringify(snapshot).toLowerCase();
   for (const forbidden of [
@@ -101,6 +138,8 @@ test('AI operations snapshot exposes only safe policy, budget and proposal aggre
     'requestbody',
     'responsebody',
     'observations',
+    'outputtext',
+    'providerresponsebody',
   ]) {
     assert.equal(serialized.includes(forbidden), false, forbidden);
   }

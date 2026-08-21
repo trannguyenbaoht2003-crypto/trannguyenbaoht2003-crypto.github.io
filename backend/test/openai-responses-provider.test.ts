@@ -114,7 +114,8 @@ test('OpenAI Responses adapter sends strict structured output with store disable
     },
   });
 
-  assert.equal(result.providerRequestId, 'resp_test');
+  assert.equal(result.providerRequestId, null);
+  assert.equal(result.providerResponseId, 'resp_test');
   assert.deepEqual(result.proposals, [
     {
       subjectExternalId: 'samira',
@@ -233,6 +234,34 @@ test('OpenAI Responses adapter rejects malformed, extra-field and allow-list vio
   }
 });
 
+test('OpenAI Responses adapter preserves HTTP request ID on nested validation failure', async () => {
+  const fakeFetch = (async () => new Response(JSON.stringify(responseBody({
+    proposals: [{
+      subjectExternalId: 'samira',
+      augmentExternalIds: ['1194'],
+      itemExternalIds: ['3006'],
+      rationale: 'x'.repeat(2_001),
+    }],
+  })), {
+    status: 200,
+    headers: { 'content-type': 'application/json', 'x-request-id': 'req_nested_789' },
+  })) as typeof fetch;
+
+  const provider = createOpenAiResponsesProvider({
+    apiKey: 'test-secret-value',
+    model: 'test-model',
+    fetchImpl: fakeFetch,
+  });
+
+  await assert.rejects(provider.execute(requestFixture()), (error: unknown) => {
+    assert.ok(error instanceof AiProviderError);
+    assert.equal(error.code, 'AI_PROVIDER_OUTPUT_INVALID');
+    assert.equal(error.retryable, false);
+    assert.equal(error.providerRequestId, 'req_nested_789');
+    return true;
+  });
+});
+
 test('OpenAI Responses adapter honors an injected non-production endpoint without changing request authority', async () => {
   let capturedUrl = '';
   const fakeFetch = (async (input: string | URL | Request) => {
@@ -250,4 +279,27 @@ test('OpenAI Responses adapter honors an injected non-production endpoint withou
 
   assert.equal(capturedUrl, 'http://127.0.0.1:9999/v1/responses');
   assert.equal(result.proposals.length, 0);
+});
+
+test('OpenAI Responses adapter sends client tracing ID and separates HTTP request ID from response object ID', async () => {
+  let capturedInit: RequestInit | undefined;
+  const fakeFetch = (async (_input: string | URL | Request, init?: RequestInit) => {
+    capturedInit = init;
+    return new Response(JSON.stringify(responseBody({ proposals: [] }, 'resp_object_123')), {
+      status: 200,
+      headers: { 'content-type': 'application/json', 'x-request-id': 'req_server_456' },
+    });
+  }) as typeof fetch;
+  const provider = createOpenAiResponsesProvider({
+    apiKey: 'test-secret-value',
+    model: 'test-model',
+    fetchImpl: fakeFetch,
+  });
+  const result = await provider.execute(requestFixture(), {
+    clientRequestId: '11111111-1111-5111-8111-111111111111',
+  });
+  const headers = new Headers(capturedInit?.headers);
+  assert.equal(headers.get('x-client-request-id'), '11111111-1111-5111-8111-111111111111');
+  assert.equal(result.providerRequestId, 'req_server_456');
+  assert.equal(result.providerResponseId, 'resp_object_123');
 });

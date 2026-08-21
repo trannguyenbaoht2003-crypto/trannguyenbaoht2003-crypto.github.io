@@ -1,0 +1,12 @@
+import { randomUUID } from 'node:crypto';
+import { createPool } from './database/pool.js';
+import { readAiProviderExecutionStatus, type ReadAiProviderExecutionStatusOptions } from './modules/ai-provider-execution/read-ai-provider-execution-status.js';
+import { reconcileAiProviderExecution } from './modules/ai-provider-execution/reconcile-ai-provider-execution.js';
+import { recoverStaleAiProviderExecutions } from './modules/ai-provider-execution/recover-stale-ai-provider-executions.js';
+import type { AiProviderReconciliationDecision } from './modules/ai-provider-execution/types.js';
+function value(args:string[],name:string):string|undefined{const i=args.indexOf(name);return i>=0?args[i+1]:undefined;}
+function required(args:string[],name:string):string{const v=value(args,name);if(!v)throw new Error(`Missing ${name}`);return v;}
+function databaseUrl():string{const v=process.env.DATABASE_URL;if(!v)throw new Error('DATABASE_URL is required');return v;}
+function decision(v:string):AiProviderReconciliationDecision{if(v==='CONFIRMED_NOT_RECEIVED'||v==='CONFIRMED_RECEIVED'||v==='ABANDONED')return v;throw new Error('Invalid reconciliation decision');}
+export async function runAiProviderExecutionCli(args:string[]):Promise<unknown>{const action=args[0];const pool=createPool(databaseUrl());try{if(action==='status'){const options:ReadAiProviderExecutionStatusOptions={};const executionId=value(args,'--execution-id'),runId=value(args,'--run-id');if(executionId)options.executionId=executionId;if(runId)options.runId=runId;return await readAiProviderExecutionStatus(pool,options);}if(action==='recover'){const raw=value(args,'--limit');return await recoverStaleAiProviderExecutions(pool,raw?{limit:Number(raw)}:{});}if(action==='reconcile'){return await reconcileAiProviderExecution(pool,{actorId:process.env.AI_OPERATOR_ACTOR_ID??'private-ai-operator',correlationId:randomUUID(),attemptId:required(args,'--attempt'),decision:decision(required(args,'--decision')),reasonCode:required(args,'--reason-code'),evidenceReference:required(args,'--evidence-reference')});}throw new Error('Usage: ai-provider-execution status|recover|reconcile');}finally{await pool.end();}}
+if(process.argv[1]?.endsWith('ai-provider-execution-cli.js')){runAiProviderExecutionCli(process.argv.slice(2)).then(result=>process.stdout.write(`${JSON.stringify(result,null,2)}\n`)).catch(error=>{process.stderr.write(`${error instanceof Error?error.message:'AI provider execution command failed'}\n`);process.exitCode=1;});}

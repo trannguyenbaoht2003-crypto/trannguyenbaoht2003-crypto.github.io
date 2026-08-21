@@ -20,13 +20,18 @@ export interface AiProviderProposal {
 
 export interface AiProviderResult {
   providerRequestId: string | null;
+  providerResponseId?: string | null;
   outputText: string;
   proposals: AiProviderProposal[];
 }
 
+export interface AiProviderExecuteOptions {
+  clientRequestId: string;
+}
+
 export interface AiDiscoveryProvider {
   readonly providerKey: string;
-  execute(request: AiProviderRequest): Promise<AiProviderResult>;
+  execute(request: AiProviderRequest, options?: AiProviderExecuteOptions): Promise<AiProviderResult>;
 }
 
 export class AiProviderError extends Error {
@@ -34,6 +39,7 @@ export class AiProviderError extends Error {
     public readonly code: string,
     public readonly retryable: boolean,
     public readonly failureCode: string,
+    public readonly providerRequestId: string | null = null,
   ) {
     super(code);
     this.name = 'AiProviderError';
@@ -54,35 +60,33 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function hasExactKeys(record: Record<string, unknown>, expected: readonly string[]): boolean {
   const keys = Object.keys(record).sort();
-  const required = [...expected].sort();
-  return keys.length === required.length && keys.every((key, index) => key === required[index]);
+  const expectedKeys = [...expected].sort();
+  return keys.length === expectedKeys.length && keys.every((value, index) => value === expectedKeys[index]);
 }
 
-function failOutput(): never {
+function failOutput(providerRequestId: string | null = null): never {
   throw new AiProviderError(
     'AI_PROVIDER_OUTPUT_INVALID',
     false,
     'PROVIDER_RESPONSE_INVALID',
+    providerRequestId,
   );
 }
 
-function failAllowlist(): never {
+function failAllowlist(providerRequestId: string | null = null): never {
   throw new AiProviderError(
     'AI_PROVIDER_ALLOWLIST_VIOLATION',
     false,
     'PROVIDER_RESPONSE_INVALID',
+    providerRequestId,
   );
 }
 
 function failConfig(): never {
-  throw new AiProviderError(
-    'AI_PROVIDER_CONFIG_INVALID',
-    false,
-    'PROVIDER_REQUEST_REJECTED',
-  );
+  throw new AiProviderError('AI_PROVIDER_CONFIG_INVALID', false, 'PROVIDER_REQUEST_REJECTED');
 }
 
-function requireIdentifier(value: unknown): string {
+function requireIdentifier(value: unknown, providerRequestId: string | null): string {
   if (
     typeof value !== 'string'
     || value.length === 0
@@ -90,39 +94,49 @@ function requireIdentifier(value: unknown): string {
     || value !== value.trim()
     || !PRINTABLE_IDENTIFIER_PATTERN.test(value)
   ) {
-    return failOutput();
+    return failOutput(providerRequestId);
   }
   return value;
 }
 
 function compareAscii(left: string, right: string): number {
-  if (left < right) return -1;
-  if (left > right) return 1;
-  return 0;
+  return left < right ? -1 : left > right ? 1 : 0;
 }
 
-function requireSelectionIds(value: unknown): string[] {
-  if (!Array.isArray(value) || value.length > MAX_SELECTION_IDS) return failOutput();
-  const ids = value.map(requireIdentifier);
-  if (new Set(ids).size !== ids.length) return failOutput();
-  ids.sort(compareAscii);
-  return ids;
+function requireSelectionIds(value: unknown, providerRequestId: string | null): string[] {
+  if (!Array.isArray(value) || value.length > MAX_SELECTION_IDS) {
+    return failOutput(providerRequestId);
+  }
+  const ids = value.map((entry) => requireIdentifier(entry, providerRequestId));
+  if (new Set(ids).size !== ids.length) {
+    return failOutput(providerRequestId);
+  }
+  return ids.sort(compareAscii);
 }
 
-function requireRationale(value: unknown): string | null {
+function requireRationale(value: unknown, providerRequestId: string | null): string | null {
   if (value === null) return null;
-  if (typeof value !== 'string' || value.length > MAX_RATIONALE_LENGTH) return failOutput();
+  if (typeof value !== 'string' || value.length > MAX_RATIONALE_LENGTH) {
+    return failOutput(providerRequestId);
+  }
   return value;
 }
 
 function validateStructuredOutput(
   value: unknown,
   request: AiProviderRequest,
+  providerRequestId: string | null,
 ): AiProviderProposal[] {
-  if (!isRecord(value) || !hasExactKeys(value, ['proposals'])) return failOutput();
-  if (!Array.isArray(value.proposals) || value.proposals.length > MAX_PROPOSALS) return failOutput();
+  if (
+    !isRecord(value)
+    || !hasExactKeys(value, ['proposals'])
+    || !Array.isArray(value.proposals)
+    || value.proposals.length > MAX_PROPOSALS
+  ) {
+    return failOutput(providerRequestId);
+  }
 
-  const structurallyValid = value.proposals.map((proposal): AiProviderProposal => {
+  const valid = value.proposals.map((proposal): AiProviderProposal => {
     if (
       !isRecord(proposal)
       || !hasExactKeys(proposal, [
@@ -132,75 +146,89 @@ function validateStructuredOutput(
         'subjectExternalId',
       ])
     ) {
-      return failOutput();
+      return failOutput(providerRequestId);
     }
     return {
-      subjectExternalId: requireIdentifier(proposal.subjectExternalId),
-      augmentExternalIds: requireSelectionIds(proposal.augmentExternalIds),
-      itemExternalIds: requireSelectionIds(proposal.itemExternalIds),
-      rationale: requireRationale(proposal.rationale),
+      subjectExternalId: requireIdentifier(proposal.subjectExternalId, providerRequestId),
+      augmentExternalIds: requireSelectionIds(proposal.augmentExternalIds, providerRequestId),
+      itemExternalIds: requireSelectionIds(proposal.itemExternalIds, providerRequestId),
+      rationale: requireRationale(proposal.rationale, providerRequestId),
     };
   });
 
-  const subjects = new Map(
-    request.input.subjects.map((subject) => [subject.subjectExternalId, subject] as const),
-  );
-
-  for (const proposal of structurallyValid) {
+  const subjects = new Map(request.input.subjects.map((subject) => [subject.subjectExternalId, subject] as const));
+  for (const proposal of valid) {
     const subject = subjects.get(proposal.subjectExternalId);
-    if (!subject) return failAllowlist();
-    const augmentAllowlist = new Set(subject.allowedAugmentExternalIds);
-    const itemAllowlist = new Set(subject.allowedItemExternalIds);
-    if (proposal.augmentExternalIds.some((id) => !augmentAllowlist.has(id))) return failAllowlist();
-    if (proposal.itemExternalIds.some((id) => !itemAllowlist.has(id))) return failAllowlist();
+    if (!subject) return failAllowlist(providerRequestId);
+    const augments = new Set(subject.allowedAugmentExternalIds);
+    const items = new Set(subject.allowedItemExternalIds);
+    if (
+      proposal.augmentExternalIds.some((id) => !augments.has(id))
+      || proposal.itemExternalIds.some((id) => !items.has(id))
+    ) {
+      return failAllowlist(providerRequestId);
+    }
   }
-
-  return structurallyValid;
+  return valid;
 }
 
-function safeHttpError(status: number): AiProviderError {
+function safeHeader(value: string | null): string | null {
+  return value !== null
+    && value.length > 0
+    && value.length <= 256
+    && /^[\x20-\x7e]+$/u.test(value)
+    ? value
+    : null;
+}
+
+function safeHttpError(status: number, providerRequestId: string | null): AiProviderError {
   if (status === 401 || status === 403) {
-    return new AiProviderError('PROVIDER_AUTH_REJECTED', false, 'PROVIDER_AUTH_REJECTED');
+    return new AiProviderError('PROVIDER_AUTH_REJECTED', false, 'PROVIDER_AUTH_REJECTED', providerRequestId);
   }
   if (status === 408) {
-    return new AiProviderError('PROVIDER_TIMEOUT', true, 'PROVIDER_TIMEOUT');
+    return new AiProviderError('PROVIDER_TIMEOUT', true, 'PROVIDER_TIMEOUT', providerRequestId);
   }
   if (status === 429) {
-    return new AiProviderError('PROVIDER_RATE_LIMITED', true, 'PROVIDER_RATE_LIMITED');
+    return new AiProviderError('PROVIDER_RATE_LIMITED', true, 'PROVIDER_RATE_LIMITED', providerRequestId);
   }
-  if ([500, 502, 503, 504].includes(status)) {
-    return new AiProviderError('PROVIDER_UNAVAILABLE', true, 'PROVIDER_UNAVAILABLE');
+  if (status >= 500 && status <= 599) {
+    return new AiProviderError('PROVIDER_UNAVAILABLE', true, 'PROVIDER_UNAVAILABLE', providerRequestId);
   }
-  return new AiProviderError('PROVIDER_REQUEST_REJECTED', false, 'PROVIDER_REQUEST_REJECTED');
+  return new AiProviderError('PROVIDER_REQUEST_REJECTED', false, 'PROVIDER_REQUEST_REJECTED', providerRequestId);
 }
 
-function extractOutputText(value: unknown): { providerRequestId: string | null; outputText: string } {
+function extractOutputText(
+  value: unknown,
+  providerRequestId: string | null,
+): { providerResponseId: string | null; outputText: string } {
   if (!isRecord(value) || value.status !== 'completed' || !Array.isArray(value.output)) {
-    return failOutput();
+    return failOutput(providerRequestId);
   }
-
   const texts: string[] = [];
   for (const item of value.output) {
     if (!isRecord(item) || item.type !== 'message' || !Array.isArray(item.content)) continue;
     for (const content of item.content) {
-      if (!isRecord(content) || content.type !== 'output_text' || typeof content.text !== 'string') continue;
-      texts.push(content.text);
+      if (isRecord(content) && content.type === 'output_text' && typeof content.text === 'string') {
+        texts.push(content.text);
+      }
     }
   }
-
-  if (texts.length !== 1) return failOutput();
+  if (texts.length !== 1) return failOutput(providerRequestId);
   const outputText = texts[0]!;
-  if (Buffer.byteLength(outputText, 'utf8') > MAX_OUTPUT_TEXT_BYTES) return failOutput();
-
-  const providerRequestId = typeof value.id === 'string' && value.id.length > 0 && value.id.length <= 256
-    ? value.id
-    : null;
-  return { providerRequestId, outputText };
+  if (Buffer.byteLength(outputText, 'utf8') > MAX_OUTPUT_TEXT_BYTES) {
+    return failOutput(providerRequestId);
+  }
+  return {
+    providerResponseId: typeof value.id === 'string' && value.id.length > 0 && value.id.length <= 256
+      ? value.id
+      : null,
+    outputText,
+  };
 }
 
-function validateConfig(config: OpenAiResponsesProviderConfig): Required<
-  Pick<OpenAiResponsesProviderConfig, 'apiKey' | 'model' | 'endpoint' | 'timeoutMs' | 'fetchImpl'>
-> {
+function validateConfig(
+  config: OpenAiResponsesProviderConfig,
+): Required<Pick<OpenAiResponsesProviderConfig, 'apiKey' | 'model' | 'endpoint' | 'timeoutMs' | 'fetchImpl'>> {
   if (
     typeof config.apiKey !== 'string'
     || config.apiKey.length === 0
@@ -211,14 +239,12 @@ function validateConfig(config: OpenAiResponsesProviderConfig): Required<
   ) {
     return failConfig();
   }
-
   const endpoint = config.endpoint ?? DEFAULT_OPENAI_RESPONSES_ENDPOINT;
   try {
     new URL(endpoint);
   } catch {
     return failConfig();
   }
-
   const timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   if (
     !Number.isSafeInteger(timeoutMs)
@@ -227,7 +253,6 @@ function validateConfig(config: OpenAiResponsesProviderConfig): Required<
   ) {
     return failConfig();
   }
-
   return {
     apiKey: config.apiKey,
     model: config.model,
@@ -237,22 +262,35 @@ function validateConfig(config: OpenAiResponsesProviderConfig): Required<
   };
 }
 
-export function createOpenAiResponsesProvider(
-  config: OpenAiResponsesProviderConfig,
-): AiDiscoveryProvider {
-  const validated = validateConfig(config);
+function validateClientRequestId(value: string): string {
+  if (value.length === 0 || value.length > 512 || !/^[\x20-\x7e]+$/u.test(value)) {
+    throw new AiProviderError(
+      'AI_PROVIDER_CLIENT_REQUEST_ID_INVALID',
+      false,
+      'PROVIDER_REQUEST_REJECTED',
+    );
+  }
+  return value;
+}
 
+export function createOpenAiResponsesProvider(config: OpenAiResponsesProviderConfig): AiDiscoveryProvider {
+  const validated = validateConfig(config);
   return {
     providerKey: 'openai',
-    async execute(request: AiProviderRequest): Promise<AiProviderResult> {
+    async execute(request, options) {
       let response: Response;
+      const clientRequestId = options?.clientRequestId === undefined
+        ? null
+        : validateClientRequestId(options.clientRequestId);
       try {
+        const headers: Record<string, string> = {
+          Authorization: `Bearer ${validated.apiKey}`,
+          'Content-Type': 'application/json',
+        };
+        if (clientRequestId !== null) headers['X-Client-Request-Id'] = clientRequestId;
         response = await validated.fetchImpl(validated.endpoint, {
           method: 'POST',
-          headers: {
-            Authorization: `Bearer ${validated.apiKey}`,
-            'Content-Type': 'application/json',
-          },
+          headers,
           body: JSON.stringify({
             model: validated.model,
             input: request.messages,
@@ -270,37 +308,34 @@ export function createOpenAiResponsesProvider(
         });
       } catch (error) {
         if (error instanceof AiProviderError) throw error;
-        if (
-          error instanceof Error
-          && (error.name === 'AbortError' || error.name === 'TimeoutError')
-        ) {
+        if (error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError')) {
           throw new AiProviderError('PROVIDER_TIMEOUT', true, 'PROVIDER_TIMEOUT');
         }
-        throw new AiProviderError(
-          'PROVIDER_TRANSPORT_ERROR',
-          true,
-          'PROVIDER_TRANSPORT_ERROR',
-        );
+        throw new AiProviderError('PROVIDER_TRANSPORT_ERROR', true, 'PROVIDER_TRANSPORT_ERROR');
       }
 
-      if (!response.ok) throw safeHttpError(response.status);
+      const providerRequestId = safeHeader(response.headers.get('x-request-id'));
+      if (!response.ok) throw safeHttpError(response.status, providerRequestId);
 
-      let transportBody: unknown;
+      let body: unknown;
       try {
-        transportBody = await response.json();
+        body = await response.json();
       } catch {
-        return failOutput();
+        return failOutput(providerRequestId);
       }
-
-      const { providerRequestId, outputText } = extractOutputText(transportBody);
+      const { providerResponseId, outputText } = extractOutputText(body, providerRequestId);
       let structured: unknown;
       try {
         structured = JSON.parse(outputText);
       } catch {
-        return failOutput();
+        return failOutput(providerRequestId);
       }
-      const proposals = validateStructuredOutput(structured, request);
-      return { providerRequestId, outputText, proposals };
+      return {
+        providerRequestId,
+        providerResponseId,
+        outputText,
+        proposals: validateStructuredOutput(structured, request, providerRequestId),
+      };
     },
   };
 }

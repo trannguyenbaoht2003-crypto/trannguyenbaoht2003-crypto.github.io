@@ -44,7 +44,10 @@ test('Sprint 8D repository surface exists and remains private', async () => {
   assert.equal(backendPackage.scripts['start:ai-automation'], 'node dist/src/ai-automation-worker.js');
   assert.equal(backendPackage.scripts['ai-automation:status'], 'node dist/src/ai-automation-status-cli.js');
   assert.equal(rootPackage.scripts['test:ai-discovery-automation'], 'node --test tests/ai-discovery-automation-contract.test.mjs');
-  assert.match(rootPackage.scripts.test, /^npm run test:ai-discovery-automation &&/u);
+  assert.match(
+    rootPackage.scripts.test,
+    /^npm run test:ai-provider-execution-recovery && npm run test:ai-discovery-automation &&/u,
+  );
 });
 
 test('Sprint 8D scheduled graph stops at durable AI proposals', async () => {
@@ -60,9 +63,20 @@ test('Sprint 8D scheduled graph stops at durable AI proposals', async () => {
   ]) {
     assert.equal(source.includes(forbidden), false, `forbidden automation authority: ${forbidden}`);
   }
+
+  const [scheduledTick, governedRun, durablePreparation] = await Promise.all([
+    readFile('backend/src/modules/ai-automation/process-scheduled-ai-discovery-tick.ts', 'utf8'),
+    readFile('backend/src/modules/ai-operations/execute-policy-governed-ai-discovery-run.ts', 'utf8'),
+    readFile('backend/src/modules/ai-provider-execution/prepare-ai-provider-execution.ts', 'utf8'),
+  ]);
   assert.match(source, /executePolicyGovernedAiDiscoveryRun/u);
-  assert.match(source, /reserveAiOperationsRunBudgetWithFloor/u);
-  assert.match(source, /minimumIntervalFloorSeconds: SCHEDULED_INTERVAL_SECONDS/u);
+  assert.match(scheduledTick, /SCHEDULED_INTERVAL_SECONDS\s*=\s*3_600/u);
+  assert.match(
+    scheduledTick,
+    /minimumIntervalFloorSeconds\s*:\s*SCHEDULED_INTERVAL_SECONDS/u,
+  );
+  assert.match(governedRun, /processAiProviderExecution/u);
+  assert.match(durablePreparation, /reserveAiOperationsRunBudgetInTransaction/u);
 });
 
 test('Sprint 8D locks queue payload, cadence, disabled default, and secret isolation', async () => {

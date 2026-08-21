@@ -135,7 +135,9 @@ test('enabled policy reserves budget then delegates durable run recording to Spr
   assert.equal(result.replayed, false);
   assert.equal(result.aiOperationsPolicyRevisionId, policyId);
   assert.equal(result.budgetReplayed, false);
-  assert.match(result.aiOperationsRunBudgetReservationId, /^[0-9a-f-]{36}$/u);
+  const budgetReservationId = result.aiOperationsRunBudgetReservationId;
+  assert.ok(budgetReservationId);
+  assert.match(budgetReservationId, /^[0-9a-f-]{36}$/u);
 
   const runs = await pool.query(`select count(*)::int as count from ai_discovery_runs`);
   const proposals = await pool.query(`select count(*)::int as count from ai_candidate_proposals`);
