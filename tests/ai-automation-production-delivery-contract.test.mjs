@@ -120,3 +120,12 @@ test('Sprint 8F adds no public AI HTTP surface or downstream authority', async (
     /HumanReview|Moderation|Eligibility|PublicationVersion|publishCandidate|createPublication/i,
   );
 });
+
+test('Sprint 8F contracts are wired into the root regression', async () => {
+  const packageJson = JSON.parse(await readFile('package.json', 'utf8'));
+  assert.equal(
+    packageJson.scripts['test:ai-automation-production-delivery'],
+    'node --test tests/ai-automation-production-delivery-contract.test.mjs tests/verify-railway-deployment.test.mjs',
+  );
+  assert.match(packageJson.scripts.test, /npm run test:ai-automation-production-delivery/);
+});
