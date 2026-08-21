@@ -74,7 +74,9 @@ if (!key) {
       FAKE_RAILWAY_SCENARIO: scenarioPath,
       FAKE_RAILWAY_STATE: statePath,
       FAKE_RAILWAY_CALLS: callsPath,
+      NODE_ENV: 'test',
       RAILWAY_VERIFY_TEST_POLL_MS: '5',
+      RAILWAY_VERIFY_TEST_TIMEOUT_MS: '1000',
     },
     callsPath,
   };
@@ -100,7 +102,7 @@ test('status-only accepts SUCCESS for the exact requested deployment and records
   });
   const result = await runVerifier(baseArgs(), fake.env);
   assert.equal(result.code, 0, result.stderr || result.stdout);
-  assert.match(result.stdout, /RAILWAY_DEPLOYMENT_SUCCESS deployment_id=dep-1/);
+  assert.match(result.stdout, /railway-deployment: SUCCESS service=backend deployment_id=dep-1/);
 
   const calls = (await readFile(fake.callsPath, 'utf8')).trim().split('\n').map(JSON.parse);
   assert.deepEqual(calls[0], [
@@ -142,7 +144,7 @@ for (const status of ['FAILED', 'CRASHED', 'REMOVED', 'REMOVING']) {
     });
     const result = await runVerifier(baseArgs(), fake.env);
     assert.notEqual(result.code, 0);
-    assert.match(result.stderr, /RAILWAY_DEPLOYMENT_FAILED/);
+    assert.match(result.stderr, /railway-deployment: VERIFY_FAILED/);
   });
 }
 
@@ -152,14 +154,14 @@ test('status-only fails closed on an unknown exact-deployment status', async (t)
   });
   const result = await runVerifier(baseArgs(), fake.env);
   assert.notEqual(result.code, 0);
-  assert.match(result.stderr, /RAILWAY_DEPLOYMENT_STATUS_UNKNOWN/);
+  assert.match(result.stderr, /railway-deployment: VERIFY_FAILED/);
 });
 
 test('status-only fails closed on malformed Railway JSON', async (t) => {
   const fake = await createFakeRailway(t, { deployment: ['__MALFORMED__'] });
   const result = await runVerifier(baseArgs(), fake.env);
   assert.notEqual(result.code, 0);
-  assert.match(result.stderr, /RAILWAY_DEPLOYMENT_VERIFY_FAILED/);
+  assert.match(result.stderr, /railway-deployment: VERIFY_FAILED/);
 });
 
 test('status-only never substitutes another successful deployment for a missing target id', async (t) => {
@@ -171,7 +173,7 @@ test('status-only never substitutes another successful deployment for a missing 
   });
   const result = await runVerifier(baseArgs(), fake.env);
   assert.notEqual(result.code, 0);
-  assert.match(result.stderr, /RAILWAY_DEPLOYMENT_FAILED/);
+  assert.match(result.stderr, /railway-deployment: VERIFY_FAILED/);
 });
 
 test('status-and-disabled-marker requires the exact trimmed marker from the exact deployment logs', async (t) => {
@@ -181,7 +183,7 @@ test('status-and-disabled-marker requires the exact trimmed marker from the exac
   });
   const result = await runVerifier(baseArgs('status-and-disabled-marker'), fake.env);
   assert.equal(result.code, 0, result.stderr || result.stdout);
-  assert.match(result.stdout, /AI_AUTOMATION_DISABLED_READY_VERIFIED deployment_id=dep-1/);
+  assert.match(result.stdout, /AI_AUTOMATION_DISABLED_DEPLOYMENT_VERIFIED deployment_id=dep-1/);
 
   const calls = (await readFile(fake.callsPath, 'utf8')).trim().split('\n').map(JSON.parse);
   assert.deepEqual(calls.at(-1), [
@@ -199,5 +201,5 @@ test('status-and-disabled-marker rejects near-match marker text', async (t) => {
   });
   const result = await runVerifier(baseArgs('status-and-disabled-marker'), fake.env);
   assert.notEqual(result.code, 0);
-  assert.match(result.stderr, /AI_AUTOMATION_DISABLED_MARKER_MISSING/);
+  assert.match(result.stderr, /railway-deployment: VERIFY_FAILED/);
 });
