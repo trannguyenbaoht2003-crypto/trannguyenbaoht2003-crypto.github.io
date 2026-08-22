@@ -127,7 +127,7 @@ jobs:
 
       - name: Migrate test database
         shell: bash
-        run: DATABASE_URL="$TEST_DATABASE_URL" npm --prefix backend run migrate
+        run: DATABASE_URL="$TEST_DATABASE_URL" REDIS_URL="$TEST_REDIS_URL" npm --prefix backend run migrate
 
       - name: Compiled disabled runtime integration
         run: >-
