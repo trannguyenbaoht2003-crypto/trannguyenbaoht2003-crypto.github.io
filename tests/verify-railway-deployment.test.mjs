@@ -114,6 +114,14 @@ test('status-only accepts SUCCESS for the exact requested deployment and records
   ]);
 });
 
+test('CLI rejects bounded identifiers longer than 128 characters', async () => {
+  const args = baseArgs();
+  args[3] = 'p'.repeat(129);
+  const result = await runVerifier(args);
+  assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /railway-deployment: VERIFY_FAILED/);
+});
+
 test('status-only polls BUILDING until the exact deployment reaches SUCCESS', async (t) => {
   const fake = await createFakeRailway(t, {
     deployment: [
@@ -193,6 +201,16 @@ test('status-and-disabled-marker requires the exact trimmed marker from the exac
     '--environment', 'production',
     '--service', 'backend',
   ]);
+});
+
+test('status-and-disabled-marker ignores non-message fields even when they equal the marker', async (t) => {
+  const fake = await createFakeRailway(t, {
+    deployment: [[deployment('dep-1', 'SUCCESS')]],
+    logs: [[{ text: READY_MARKER }]],
+  });
+  const result = await runVerifier(baseArgs('status-and-disabled-marker'), fake.env);
+  assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /railway-deployment: VERIFY_FAILED/);
 });
 
 test('status-and-disabled-marker rejects near-match marker text', async (t) => {
