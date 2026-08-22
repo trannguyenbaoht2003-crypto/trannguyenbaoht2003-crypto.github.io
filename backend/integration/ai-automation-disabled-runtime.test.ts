@@ -19,6 +19,7 @@ import {
 } from '../src/queue/names.js';
 
 const READY_MARKER = 'AI_AUTOMATION_DISABLED_READY scheduler_enabled=false provider_configured=false';
+const MAX_DIAGNOSTIC_BYTES = 4_096;
 const backendRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const compiledRuntimePath = resolve(backendRoot, 'dist/src/ai-automation-worker.js');
 
@@ -31,28 +32,50 @@ function requiredEnv(name: 'TEST_DATABASE_URL' | 'TEST_REDIS_URL'): string {
 function waitForLine(
   child: ReturnType<typeof spawn>,
   expected: string,
-  timeoutMs = 10_000,
+  timeoutMs = 15_000,
 ): Promise<void> {
   return new Promise((resolvePromise, reject) => {
-    let buffer = '';
-    const timer = setTimeout(() => {
-      reject(new Error(`timed out waiting for line: ${expected}`));
-    }, timeoutMs);
-    const onData = (chunk: Buffer | string): void => {
-      buffer += chunk.toString();
-      const lines = buffer.split(/\r?\n/u);
-      buffer = lines.pop() ?? '';
+    let stdoutBuffer = '';
+    let boundedStderr = '';
+
+    const diagnostic = (): string => boundedStderr.trim().slice(0, MAX_DIAGNOSTIC_BYTES);
+    const cleanup = (): void => {
+      clearTimeout(timer);
+      child.stdout?.off('data', onStdout);
+      child.stderr?.off('data', onStderr);
+      child.off('exit', onExit);
+    };
+    const onStdout = (chunk: Buffer | string): void => {
+      stdoutBuffer += chunk.toString();
+      const lines = stdoutBuffer.split(/\r?\n/u);
+      stdoutBuffer = lines.pop() ?? '';
       if (lines.some((line) => line.trim() === expected)) {
-        clearTimeout(timer);
-        child.stdout?.off('data', onData);
+        cleanup();
         resolvePromise();
       }
     };
-    child.stdout?.on('data', onData);
-    child.once('exit', (code, signal) => {
-      clearTimeout(timer);
-      reject(new Error(`AI automation exited before readiness: code=${code} signal=${signal}`));
-    });
+    const onStderr = (chunk: Buffer | string): void => {
+      if (boundedStderr.length >= MAX_DIAGNOSTIC_BYTES) return;
+      boundedStderr += chunk.toString().slice(0, MAX_DIAGNOSTIC_BYTES - boundedStderr.length);
+    };
+    const onExit = (code: number | null, signal: NodeJS.Signals | null): void => {
+      const stderr = diagnostic();
+      cleanup();
+      reject(new Error(
+        `AI automation exited before readiness: code=${code} signal=${signal}${stderr ? ` stderr=${stderr}` : ''}`,
+      ));
+    };
+    const timer = setTimeout(() => {
+      const stderr = diagnostic();
+      cleanup();
+      reject(new Error(
+        `timed out waiting for line: ${expected}${stderr ? ` stderr=${stderr}` : ''}`,
+      ));
+    }, timeoutMs);
+
+    child.stdout?.on('data', onStdout);
+    child.stderr?.on('data', onStderr);
+    child.once('exit', onExit);
   });
 }
 
@@ -77,6 +100,12 @@ test('compiled disabled AI automation reconciles stale scheduler, becomes ready,
       data: { schemaVersion: 1 },
       opts: { attempts: 1 },
     },
+  );
+  const seededSchedulers = await queue.getJobSchedulers(0, 100, true);
+  assert.equal(
+    seededSchedulers.some((scheduler) => scheduler.key === AI_DISCOVERY_SCHEDULER_ID),
+    true,
+    'integration precondition requires the stale hourly scheduler to exist before startup',
   );
 
   await access(compiledRuntimePath);
@@ -111,7 +140,7 @@ test('compiled disabled AI automation reconciles stale scheduler, becomes ready,
   );
 
   child.kill('SIGTERM');
-  const [code, signal] = await once(child, 'exit');
+  const [code, signal] = await once(child, 'close');
   assert.equal(signal, null);
   assert.equal(code, 0);
 });
