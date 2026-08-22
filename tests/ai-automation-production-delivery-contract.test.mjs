@@ -109,6 +109,10 @@ test('Sprint 8F repository-only workflow validates the compiled inert runtime wi
   assert.match(workflow, /node-version:\s*22\.13\.0/);
   assert.match(workflow, /test:ai-automation-production-delivery/);
   assert.match(workflow, /integration\/ai-automation-disabled-runtime\.test\.ts/);
+  assert.match(
+    workflow,
+    /DATABASE_URL="\$TEST_DATABASE_URL"\s+REDIS_URL="\$TEST_REDIS_URL"\s+npm --prefix backend run migrate/,
+  );
   assert.match(workflow, /AI_AUTOMATION_PRODUCTION_REPO_READY/);
   assert.match(workflow, /^permissions:\n  contents: read$/m);
   assert.doesNotMatch(workflow, /RAILWAY_TOKEN|railway\s+up|OPENAI_API_KEY/);
