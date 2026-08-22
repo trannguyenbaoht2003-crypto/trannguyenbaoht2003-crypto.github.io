@@ -11,7 +11,7 @@ export const DISABLED_READY_MARKER =
 const NON_TERMINAL = new Set(['BUILDING', 'DEPLOYING', 'INITIALIZING', 'WAITING', 'QUEUED']);
 const FAIL_TERMINAL = new Set(['FAILED', 'CRASHED', 'REMOVING', 'REMOVED']);
 const MODES = new Set(['status-only', 'status-and-disabled-marker']);
-const BOUNDED_VALUE = /^[A-Za-z0-9._:@/-]{1,200}$/u;
+const BOUNDED_VALUE = /^[A-Za-z0-9._:@/-]{1,128}$/u;
 const MAX_OUTPUT_BYTES = 1024 * 1024;
 
 function fail() {
@@ -51,27 +51,35 @@ function defaultRunRailway(args) {
     const child = spawn('railway', args, {
       stdio: ['ignore', 'pipe', 'pipe'],
       env: process.env,
+      shell: false,
     });
     let stdout = '';
     let stderr = '';
-    let bytes = 0;
+    let stdoutBytes = 0;
+    let stderrBytes = 0;
+    let overflowed = false;
+
     const collect = (target) => (chunk) => {
-      bytes += Buffer.byteLength(chunk);
-      if (bytes > MAX_OUTPUT_BYTES) {
-        child.kill('SIGKILL');
-        reject(new Error('RAILWAY_DEPLOYMENT_VERIFY_FAILED'));
-        return;
+      const chunkBytes = Buffer.byteLength(chunk);
+      if (target === 'stdout') {
+        stdoutBytes += chunkBytes;
+        if (stdoutBytes > MAX_OUTPUT_BYTES) overflowed = true;
+        else stdout += chunk;
+      } else {
+        stderrBytes += chunkBytes;
+        if (stderrBytes > MAX_OUTPUT_BYTES) overflowed = true;
+        else stderr += chunk;
       }
-      if (target === 'stdout') stdout += chunk;
-      else stderr += chunk;
+      if (overflowed) child.kill('SIGKILL');
     };
+
     child.stdout.setEncoding('utf8');
     child.stderr.setEncoding('utf8');
     child.stdout.on('data', collect('stdout'));
     child.stderr.on('data', collect('stderr'));
     child.once('error', () => reject(new Error('RAILWAY_DEPLOYMENT_VERIFY_FAILED')));
     child.once('close', (code) => {
-      if (code !== 0) {
+      if (overflowed || code !== 0) {
         reject(new Error('RAILWAY_DEPLOYMENT_VERIFY_FAILED'));
         return;
       }
@@ -134,10 +142,7 @@ function parseLogRecords(text) {
 
 function recordMessage(record) {
   if (record === null || typeof record !== 'object' || Array.isArray(record)) return null;
-  for (const key of ['message', 'msg', 'log', 'text']) {
-    if (typeof record[key] === 'string') return record[key];
-  }
-  return null;
+  return typeof record.message === 'string' ? record.message : null;
 }
 
 async function verifyStatus(input, dependencies, timing) {
