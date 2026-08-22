@@ -1,0 +1,199 @@
+name: Sprint 8F AI automation production delivery gate
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "backend/railway.ai-automation.toml"
+      - "backend/src/ai-automation-worker.ts"
+      - "backend/src/ai-automation-config.ts"
+      - "backend/src/modules/ai-provider-execution/**"
+      - "backend/src/modules/ai-provider/**"
+      - "backend/src/modules/ai-automation/**"
+      - "backend/src/modules/ai-operations/**"
+      - "backend/src/queue/ai-discovery-automation-worker.ts"
+      - "backend/src/queue/ai-discovery-scheduler.ts"
+      - "backend/test/ai-discovery-automation-*.test.ts"
+      - "backend/test/ai-provider-execution-*.test.ts"
+      - "backend/test/openai-responses-provider.test.ts"
+      - "backend/integration/ai-automation-disabled-runtime.test.ts"
+      - "backend/package.json"
+      - "backend/package-lock.json"
+      - "deploy/production/production.env.example"
+      - "scripts/verify-railway-deployment.mjs"
+      - "tests/ai-automation-production-delivery-contract.test.mjs"
+      - "tests/verify-railway-deployment.test.mjs"
+      - "tests/production-delivery.test.mjs"
+      - "tests/ai-provider-execution-recovery-contract.test.mjs"
+      - "tests/ai-discovery-automation-contract.test.mjs"
+      - "tests/ai-operations-policy-contract.test.mjs"
+      - "tests/ai-provider-execution-contract.test.mjs"
+      - "tests/guarded-ai-discovery-contract.test.mjs"
+      - "tests/production-pr-validation.test.mjs"
+      - "tests/release-rehearsal-source.test.mjs"
+      - "docs/runbooks/production-delivery.md"
+      - "docs/runbooks/ai-discovery-automation.md"
+      - "docs/runbooks/ai-provider-execution-recovery.md"
+      - "docs/superpowers/specs/2026-08-21-ai-automation-production-delivery-readiness-design.md"
+      - "docs/superpowers/plans/2026-08-21-ai-automation-production-delivery-readiness.md"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/production-release-gate.yml"
+      - ".github/workflows/sprint-8f-ai-automation-production-delivery.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sprint-8f-ai-automation-production-delivery-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: verify inert AI automation production delivery package
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: hai_dau_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d hai_dau_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      NODE_ENV: test
+      TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/hai_dau_test
+      TEST_REDIS_URL: redis://127.0.0.1:6379
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.0
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            backend/package-lock.json
+
+      - name: Install root dependencies
+        run: npm ci --cache /tmp/sprint-8f-root-npm-cache
+
+      - name: Install backend dependencies
+        run: npm --prefix backend ci --cache /tmp/sprint-8f-backend-npm-cache
+
+      - name: Sprint 8F repository contract
+        run: npm run test:ai-automation-production-delivery
+
+      - name: Production delivery contract
+        run: npm run test:production-contract
+
+      - name: Backend typecheck
+        run: npm --prefix backend run typecheck
+
+      - name: Backend focused 8D and 8E automation tests
+        run: >-
+          cd backend && node --import tsx --test --test-concurrency=1
+          test/ai-discovery-automation-*.test.ts
+          test/ai-provider-execution-*.test.ts
+          test/openai-responses-provider.test.ts
+          test/execute-policy-governed-ai-discovery-run.test.ts
+
+      - name: Backend full tests
+        run: npm --prefix backend test
+
+      - name: Backend build
+        run: npm --prefix backend run build
+
+      - name: Migrate test database
+        shell: bash
+        run: DATABASE_URL="$TEST_DATABASE_URL" npm --prefix backend run migrate
+
+      - name: Compiled disabled runtime integration
+        run: >-
+          cd backend && node --import tsx --test --test-concurrency=1
+          integration/ai-automation-disabled-runtime.test.ts
+
+      - name: Sprint 8E recovery contract
+        run: npm run test:ai-provider-execution-recovery
+
+      - name: Sprint 8D automation contract
+        run: npm run test:ai-discovery-automation
+
+      - name: Sprint 8C policy contract
+        run: npm run test:ai-operations-policy
+
+      - name: Sprint 8B provider contract
+        run: npm run test:ai-provider-execution
+
+      - name: Sprint 8A guarded discovery contract
+        run: npm run test:guarded-ai-discovery
+
+      - name: Production PR validation
+        run: npm run test:production-pr-validation
+
+      - name: Release source contract
+        run: npm run test:release-source
+
+      - name: Frontend lint
+        run: npm run lint
+
+      - name: Repository cleanliness
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          status="$(git status --short)"
+          if [[ -n "$status" ]]; then
+            echo "Generated files changed the checkout:"
+            echo "$status"
+            exit 1
+          fi
+
+      - name: Deployment and secret guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          workflow=".github/workflows/sprint-8f-ai-automation-production-delivery.yml"
+          executable="$RUNNER_TEMP/sprint-8f-before-guard.yml"
+          sed '/- name: Deployment and secret guard/,$d' "$workflow" > "$executable"
+          ! grep -Eq '(contents|packages|pages|id-token):[[:space:]]*write' "$executable"
+          for token in \
+            "railway"" up" \
+            "railway"" redeploy" \
+            "wrangler"" deploy" \
+            "docker"" push" \
+            "kube""ctl" \
+            "terra""form" \
+            "pu""lumi"; do
+            ! grep -Fqi "$token" "$executable"
+          done
+          railway_secret="RAILWAY_""TOKEN"
+          provider_secret="OPENAI_""API_KEY"
+          scheduler_activation="AI_DISCOVERY_SCHEDULER_""ENABLED=true"
+          ! grep -Fq "$railway_secret" "$executable"
+          ! grep -Fq "$provider_secret" "$executable"
+          ! grep -Fq "$scheduler_activation" "$executable"
+
+      - name: Record repository readiness
+        run: echo "AI_AUTOMATION_PRODUCTION_REPO_READY head_sha=${GITHUB_SHA}"
