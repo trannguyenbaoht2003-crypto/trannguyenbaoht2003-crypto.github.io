@@ -10,7 +10,7 @@ The runtime ships disabled by default:
 AI_DISCOVERY_SCHEDULER_ENABLED=false
 ```
 
-No production credential provisioning or production activation is part of Sprint 8D. Enabling provider execution in production requires separate explicit authorization.
+Sprint 8F may deploy this 8D/8E-capable runtime to production in disabled mode, without provider credentials. That inert delivery is not activation. Enabling provider execution in production still requires separate explicit authorization, approved provider credentials/model configuration, and an explicit scheduler-enabled change.
 
 ## Disabled startup and inspection
 
@@ -27,7 +27,14 @@ The status command is read-only. It may inspect BullMQ scheduler inventory plus 
 
 ## Scheduled execution
 
-When separately authorized and configured, one BullMQ Job Scheduler with ID `ai-discovery-hourly-v1` emits at most one wake-up cadence every 3,600,000 ms. Job data is exactly `{ "schemaVersion": 1 }` and BullMQ attempts are fixed at 1. The provider layer retains its existing bounded internal transient retry behavior.
+When separately authorized and configured, one BullMQ Job Scheduler with ID `ai-discovery-hourly-v1` emits at most one wake-up cadence every 3,600,000 ms. Job data is exactly `{ "schemaVersion": 1 }` and BullMQ attempts are fixed at 1.
+
+Provider execution follows the durable Sprint 8E journal rules rather than a generic provider-internal transient retry policy:
+
+```text
+HTTP 429 -> durable bounded retry, maximum three attempts total.
+timeout / transport ambiguity / HTTP 408 / HTTP 5xx -> UNCERTAIN, no automatic replay.
+```
 
 Every delivered job must still pass all durable gates:
 
@@ -41,6 +48,16 @@ Every delivered job must still pass all durable gates:
 
 A successful or failed provider attempt stops at durable AI discovery run/proposals. Candidate materialization remains an explicit private operator action outside this runtime.
 
+## Sprint 8F inert production delivery
+
+The production delivery path may create and verify the private `ai-automation` Railway service while keeping `AI_DISCOVERY_SCHEDULER_ENABLED=false`. The exact disabled-ready marker is emitted only after stale provider-execution recovery, scheduler reconciliation to disabled, and BullMQ worker readiness:
+
+```text
+AI_AUTOMATION_DISABLED_READY scheduler_enabled=false provider_configured=false
+```
+
+This marker proves only that the disabled runtime is ready. It does not authorize a provider call and it does not grant Candidate, Human Review, Moderation, Eligibility, Evidence, or Publication authority. Production activation remains a separate explicit authorization.
+
 ## Activation gate
 
 Do not perform the following without separate explicit authorization. The later production activation procedure is:
@@ -49,23 +66,25 @@ Do not perform the following without separate explicit authorization. The later 
 2. verify public API/core worker health and public read independence;
 3. run read-only automation status with scheduler disabled;
 4. verify stale scheduler is absent and stale jobs no-op;
-5. provision the approved provider secret/model only to the dedicated automation runtime;
-6. activate the approved Sprint 8C AI operations policy;
-7. set `AI_DISCOVERY_SCHEDULER_ENABLED=true` and restart the dedicated automation runtime;
-8. verify scheduler inventory and the first durable tick/budget outcome.
+5. inspect unresolved Sprint 8E `UNCERTAIN` executions; unresolved uncertainty is an activation warning, not an inert-deployment blocker;
+6. provision the approved provider secret/model only to the dedicated automation runtime;
+7. activate the approved Sprint 8C AI operations policy;
+8. set `AI_DISCOVERY_SCHEDULER_ENABLED=true` and restart the dedicated automation runtime;
+9. verify scheduler inventory and the first durable tick/budget outcome.
 
 ## Rollback
 
 Primary rollback is operational and history-preserving:
 
-1. set `AI_DISCOVERY_SCHEDULER_ENABLED=false`;
+1. keep or set `AI_DISCOVERY_SCHEDULER_ENABLED=false`;
 2. restart the dedicated automation runtime so desired-state reconciliation removes `ai-discovery-hourly-v1`;
 3. run `ai-automation:status` and confirm the scheduler is absent;
 4. confirm any stale delivered job returns before creating a PostgreSQL tick/provider run;
-5. Do not delete PostgreSQL history.
+5. do not automatically replay `IN_FLIGHT` or `UNCERTAIN` provider execution history;
+6. Do not delete PostgreSQL history.
 
-Rollback must retain scheduled ticks, AI discovery runs/proposals, budget reservations, audit events, Candidate history, Human Reviews, Moderation/Eligibility decisions and Publication history.
+Rollback must retain scheduled ticks, AI discovery runs/proposals, provider execution/attempt/reconciliation history, budget reservations, audit events, Candidate history, Human Reviews, Moderation/Eligibility decisions and Publication history.
 
 ## Failure interpretation
 
-`NO_NEW_INPUT` means no eligible structured input or already budget-consumed identical content. Policy/cadence outcomes mean no provider call was authorized. `PROVIDER_FAILED` means the provider layer returned a durable failed AI discovery run after its bounded internal handling. `AMBIGUOUS_FAILURE` means the scheduled orchestration caught an unexpected failure; no BullMQ provider retry/backfill is requested. A hard process interruption can leave `PROCESSING`, which is visible through the read-only snapshot for operator investigation.
+`NO_NEW_INPUT` means no eligible structured input or already budget-consumed identical content. Policy/cadence outcomes mean no provider call was authorized. `PROVIDER_FAILED` means a known terminal provider outcome was recorded durably, including an exhausted third HTTP 429 attempt. `UNCERTAIN` covers timeout, transport ambiguity, HTTP 408, HTTP 5xx/gateway ambiguity, or other cases where receipt/outcome cannot be proved safely; there is no automatic replay. `AMBIGUOUS_FAILURE` means scheduled orchestration caught an unexpected failure and does not authorize a BullMQ provider retry/backfill. A hard process interruption can leave `PROCESSING`, which is visible through the read-only snapshot for operator investigation.

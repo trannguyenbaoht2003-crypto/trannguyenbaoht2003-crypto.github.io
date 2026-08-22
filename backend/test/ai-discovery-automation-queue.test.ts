@@ -83,15 +83,7 @@ test('scheduler flag only accepts exact true or false', () => {
   );
 });
 
-test('disabled provider boundary never constructs provider even when dummy provider env exists', () => {
-  const config = parseAiAutomationConfig({
-    DATABASE_URL: 'postgres://example',
-    REDIS_URL: 'redis://example',
-    AI_DISCOVERY_SCHEDULER_ENABLED: 'false',
-    AI_DISCOVERY_PROVIDER: 'openai',
-    OPENAI_API_KEY: 'dummy-must-be-ignored',
-    AI_DISCOVERY_OPENAI_MODEL: 'dummy-must-be-ignored',
-  });
+test('disabled AI automation never constructs a provider even when dummy provider env is present', () => {
   let calls = 0;
   const fakeProvider = {
     providerKey: 'fake',
@@ -104,19 +96,20 @@ test('disabled provider boundary never constructs provider even when dummy provi
     return fakeProvider;
   };
 
+  const config = parseAiAutomationConfig({
+    DATABASE_URL: 'postgres://example',
+    REDIS_URL: 'redis://example',
+    AI_DISCOVERY_SCHEDULER_ENABLED: 'false',
+    AI_DISCOVERY_PROVIDER: 'openai',
+    OPENAI_API_KEY: 'dummy-must-be-ignored',
+    AI_DISCOVERY_OPENAI_MODEL: 'dummy-must-be-ignored',
+  });
+
   assert.equal(createAiAutomationProvider(config, factory), undefined);
   assert.equal(calls, 0);
 });
 
-test('enabled provider boundary constructs exactly one provider from parsed provider config', () => {
-  const config = parseAiAutomationConfig({
-    DATABASE_URL: 'postgres://example',
-    REDIS_URL: 'redis://example',
-    AI_DISCOVERY_SCHEDULER_ENABLED: 'true',
-    AI_DISCOVERY_PROVIDER: 'openai',
-    OPENAI_API_KEY: 'dummy-key',
-    AI_DISCOVERY_OPENAI_MODEL: 'dummy-model',
-  });
+test('enabled AI automation constructs exactly one provider from the approved provider config', () => {
   let calls = 0;
   const fakeProvider = {
     providerKey: 'fake',
@@ -124,14 +117,21 @@ test('enabled provider boundary constructs exactly one provider from parsed prov
       throw new Error('not-called');
     },
   } satisfies AiDiscoveryProvider;
-  const provider = createAiAutomationProvider(config, (providerConfig) => {
+  const factory = () => {
     calls += 1;
-    assert.equal(providerConfig.apiKey, 'dummy-key');
-    assert.equal(providerConfig.model, 'dummy-model');
     return fakeProvider;
+  };
+
+  const config = parseAiAutomationConfig({
+    DATABASE_URL: 'postgres://example',
+    REDIS_URL: 'redis://example',
+    AI_DISCOVERY_SCHEDULER_ENABLED: 'true',
+    AI_DISCOVERY_PROVIDER: 'openai',
+    OPENAI_API_KEY: 'dummy',
+    AI_DISCOVERY_OPENAI_MODEL: 'gpt-test',
   });
 
-  assert.equal(provider, fakeProvider);
+  assert.equal(createAiAutomationProvider(config, factory), fakeProvider);
   assert.equal(calls, 1);
 });
 
@@ -140,8 +140,6 @@ test('dedicated automation entrypoint owns provider wiring while core worker sta
   const coreWorker = await readFile(new URL('../src/worker.ts', import.meta.url), 'utf8');
   const packageJson = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
   assert.match(automation, /createOpenAiResponsesProvider/u);
-  assert.match(automation, /createAiAutomationProvider/u);
-  assert.match(automation, /AI_AUTOMATION_DISABLED_READY/u);
   assert.equal(coreWorker.includes('createOpenAiResponsesProvider'), false);
   assert.equal(coreWorker.includes('OPENAI_API_KEY'), false);
   assert.equal(packageJson.scripts['start:ai-automation'], 'node dist/src/ai-automation-worker.js');

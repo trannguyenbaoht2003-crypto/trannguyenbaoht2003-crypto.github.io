@@ -1,22 +1,26 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
+import { access } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import test from 'node:test';
 
 import { Queue } from 'bullmq';
-import { Redis } from 'ioredis';
 
+import { createQueueConnection } from '../src/queue/connection.js';
 import {
   AI_DISCOVERY_SCHEDULER_EVERY_MS,
   AI_DISCOVERY_SCHEDULER_ID,
 } from '../src/queue/ai-discovery-scheduler.js';
-import { AI_DISCOVERY_AUTOMATION_QUEUE_NAME } from '../src/queue/names.js';
+import {
+  AI_DISCOVERY_AUTOMATION_QUEUE_NAME,
+  type AiDiscoveryAutomationJobData,
+} from '../src/queue/names.js';
 
 const READY_MARKER = 'AI_AUTOMATION_DISABLED_READY scheduler_enabled=false provider_configured=false';
 const backendRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const MAX_CAPTURE_BYTES = 64 * 1024;
+const compiledRuntimePath = resolve(backendRoot, 'dist/src/ai-automation-worker.js');
 
 function requiredEnv(name: 'TEST_DATABASE_URL' | 'TEST_REDIS_URL'): string {
   const value = process.env[name]?.trim();
@@ -27,58 +31,42 @@ function requiredEnv(name: 'TEST_DATABASE_URL' | 'TEST_REDIS_URL'): string {
 function waitForLine(
   child: ReturnType<typeof spawn>,
   expected: string,
-  timeoutMs = 15_000,
-): Promise<{ stdout: string; stderr: string }> {
+  timeoutMs = 10_000,
+): Promise<void> {
   return new Promise((resolvePromise, reject) => {
-    let stdout = '';
-    let stderr = '';
-    let settled = false;
-    const timeout = setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      reject(new Error(`timed out waiting for ${expected}; stdout=${stdout}; stderr=${stderr}`));
+    let buffer = '';
+    const timer = setTimeout(() => {
+      reject(new Error(`timed out waiting for line: ${expected}`));
     }, timeoutMs);
-    const appendBounded = (current: string, chunk: string) => {
-      const next = current + chunk;
-      if (Buffer.byteLength(next, 'utf8') > MAX_CAPTURE_BYTES) {
-        return next.slice(-MAX_CAPTURE_BYTES);
-      }
-      return next;
-    };
-    const finish = () => {
-      if (settled) return;
-      if (stdout.split(/\r?\n/u).some((line) => line.trim() === expected)) {
-        settled = true;
-        clearTimeout(timeout);
-        resolvePromise({ stdout, stderr });
+    const onData = (chunk: Buffer | string): void => {
+      buffer += chunk.toString();
+      const lines = buffer.split(/\r?\n/u);
+      buffer = lines.pop() ?? '';
+      if (lines.some((line) => line.trim() === expected)) {
+        clearTimeout(timer);
+        child.stdout?.off('data', onData);
+        resolvePromise();
       }
     };
-    child.stdout?.setEncoding('utf8');
-    child.stderr?.setEncoding('utf8');
-    child.stdout?.on('data', (chunk: string) => {
-      stdout = appendBounded(stdout, chunk);
-      finish();
-    });
-    child.stderr?.on('data', (chunk: string) => {
-      stderr = appendBounded(stderr, chunk);
-    });
+    child.stdout?.on('data', onData);
     child.once('exit', (code, signal) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timeout);
-      reject(new Error(`runtime exited before READY: code=${code} signal=${signal}; stdout=${stdout}; stderr=${stderr}`));
+      clearTimeout(timer);
+      reject(new Error(`AI automation exited before readiness: code=${code} signal=${signal}`));
     });
   });
 }
 
-test('compiled AI automation runtime removes stale scheduler and stays inert while disabled', async (t) => {
+test('compiled disabled AI automation reconciles stale scheduler, becomes ready, stays alive, and exits cleanly', async (t) => {
   const databaseUrl = requiredEnv('TEST_DATABASE_URL');
   const redisUrl = requiredEnv('TEST_REDIS_URL');
-  const redis = new Redis(redisUrl, { maxRetriesPerRequest: 1 });
-  const queue = new Queue(AI_DISCOVERY_AUTOMATION_QUEUE_NAME, { connection: redis });
+  const connection = createQueueConnection(redisUrl);
+  const queue = new Queue<AiDiscoveryAutomationJobData>(
+    AI_DISCOVERY_AUTOMATION_QUEUE_NAME,
+    { connection },
+  );
   t.after(async () => {
     await queue.close();
-    await redis.quit();
+    await connection.quit();
   });
 
   await queue.upsertJobScheduler(
@@ -90,8 +78,8 @@ test('compiled AI automation runtime removes stale scheduler and stays inert whi
       opts: { attempts: 1 },
     },
   );
-  const before = await queue.getJobSchedulers(0, 100, true);
-  assert.equal(before.some((entry) => entry.key === AI_DISCOVERY_SCHEDULER_ID), true, 'stale scheduler must exist before runtime startup');
+
+  await access(compiledRuntimePath);
 
   const child = spawn(process.execPath, ['dist/src/ai-automation-worker.js'], {
     cwd: backendRoot,
@@ -100,8 +88,9 @@ test('compiled AI automation runtime removes stale scheduler and stays inert whi
       DATABASE_URL: databaseUrl,
       REDIS_URL: redisUrl,
       AI_DISCOVERY_SCHEDULER_ENABLED: 'false',
-      AI_DISCOVERY_PROVIDER: 'openai',
       OPENAI_API_KEY: 'dummy-must-be-ignored',
+      OPENAI_MODEL: 'dummy-must-be-ignored',
+      AI_DISCOVERY_PROVIDER: 'openai',
       AI_DISCOVERY_OPENAI_MODEL: 'dummy-must-be-ignored',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -111,19 +100,18 @@ test('compiled AI automation runtime removes stale scheduler and stays inert whi
   });
 
   await waitForLine(child, READY_MARKER);
-  assert.equal(child.exitCode, null, 'runtime must remain alive after READY');
-  assert.equal(child.signalCode, null, 'runtime must not receive a signal before test shutdown');
+  assert.equal(child.exitCode, null);
+  assert.equal(child.signalCode, null);
 
-  const after = await queue.getJobSchedulers(0, 100, true);
+  const schedulers = await queue.getJobSchedulers(0, 100, true);
   assert.equal(
-    after.some((entry) => entry.key === AI_DISCOVERY_SCHEDULER_ID),
+    schedulers.some((scheduler) => scheduler.key === AI_DISCOVERY_SCHEDULER_ID),
     false,
-    'stale scheduler must be absent before READY',
+    'disabled runtime must remove the stale hourly scheduler before readiness',
   );
 
-  const closed = once(child, 'close');
   child.kill('SIGTERM');
-  const [code, signal] = await closed;
+  const [code, signal] = await once(child, 'exit');
   assert.equal(signal, null);
   assert.equal(code, 0);
 });

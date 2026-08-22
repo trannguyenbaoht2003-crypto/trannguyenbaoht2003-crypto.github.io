@@ -105,7 +105,7 @@ test('Sprint 8D workflow is read-only, fake-provider-only, and deployment guarde
   );
 });
 
-test('Sprint 8D runbook requires separate activation authorization and preserves history on rollback', async () => {
+test('Sprint 8D runbook requires separate activation authorization, durable retry semantics, and history-preserving rollback', async () => {
   const runbook = await readFile('docs/runbooks/ai-discovery-automation.md', 'utf8');
   for (const phrase of [
     'AI_DISCOVERY_SCHEDULER_ENABLED=false',
@@ -113,7 +113,11 @@ test('Sprint 8D runbook requires separate activation authorization and preserves
     'Do not delete PostgreSQL history',
     'does not materialize Candidates',
     'does not publish',
+    'HTTP 429',
+    'UNCERTAIN',
+    'no automatic replay',
   ]) {
     assert.ok(runbook.includes(phrase), `runbook missing safety contract: ${phrase}`);
   }
+  assert.doesNotMatch(runbook, /bounded internal transient retry behavior/i);
 });

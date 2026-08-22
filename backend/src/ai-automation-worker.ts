@@ -44,13 +44,13 @@ export async function startAiAutomationRuntime(
     AI_DISCOVERY_AUTOMATION_QUEUE_NAME,
     { connection: queueConnection },
   );
-  let worker: ReturnType<typeof createAiDiscoveryAutomationWorker> | null = null;
 
   try {
     await recoverStaleAiProviderExecutions(pool);
     await reconcileAiDiscoveryScheduler(queue, config.schedulerEnabled);
+
     const provider = createAiAutomationProvider(config, createOpenAiResponsesProvider);
-    worker = createAiDiscoveryAutomationWorker({
+    const worker = createAiDiscoveryAutomationWorker({
       connection: workerConnection,
       pool,
       schedulerEnabled: config.schedulerEnabled,
@@ -62,8 +62,8 @@ export async function startAiAutomationRuntime(
           }
         : {}),
     });
-    await worker.waitUntilReady();
 
+    await worker.waitUntilReady();
     if (!config.schedulerEnabled) {
       process.stdout.write(
         'AI_AUTOMATION_DISABLED_READY scheduler_enabled=false provider_configured=false\n',
@@ -74,7 +74,7 @@ export async function startAiAutomationRuntime(
     return {
       async close(): Promise<void> {
         closePromise ??= (async () => {
-          await worker!.close();
+          await worker.close();
           await queue.close();
           await Promise.all([workerConnection.quit(), queueConnection.quit()]);
           await pool.end();
@@ -83,9 +83,6 @@ export async function startAiAutomationRuntime(
       },
     };
   } catch (error) {
-    if (worker) {
-      await Promise.allSettled([worker.close()]);
-    }
     await Promise.allSettled([
       queue.close(),
       workerConnection.quit(),
@@ -115,6 +112,7 @@ async function main(): Promise<void> {
       process.exitCode = 1;
     });
   };
+
   process.once('SIGINT', shutdown);
   process.once('SIGTERM', shutdown);
 }

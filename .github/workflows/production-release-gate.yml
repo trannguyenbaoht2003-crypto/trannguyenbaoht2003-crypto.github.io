@@ -172,11 +172,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for name in \
-            RAILWAY_TOKEN RAILWAY_PROJECT_ID RAILWAY_ENVIRONMENT \
-            RAILWAY_BACKEND_SERVICE RAILWAY_WORKER_SERVICE \
-            RAILWAY_COLLECTOR_SERVICE RAILWAY_AI_AUTOMATION_SERVICE \
-            RAILWAY_GATEWAY_SERVICE PRODUCTION_BASE_URL; do
+          for name in RAILWAY_TOKEN RAILWAY_PROJECT_ID RAILWAY_ENVIRONMENT RAILWAY_BACKEND_SERVICE RAILWAY_WORKER_SERVICE RAILWAY_COLLECTOR_SERVICE RAILWAY_AI_AUTOMATION_SERVICE RAILWAY_GATEWAY_SERVICE PRODUCTION_BASE_URL; do
             if [ -z "${!name:-}" ]; then
               echo "production-release: required Railway/GitHub binding is missing: ${name}" >&2
               exit 1
