@@ -5,7 +5,7 @@ Sprint 8E makes external AI-provider execution recoverable without granting AI a
 ## Safety boundary
 
 - `AI_DISCOVERY_SCHEDULER_ENABLED=false` remains the default.
-- Sprint 8E did not itself authorize production activation. Sprint 8F may deploy the 8E-capable runtime to production in disabled mode as inert infrastructure, while activation remains separately authorized.
+- No production deployment is authorized by Sprint 8E itself. Sprint 8F may separately package and, only with separate explicit authorization, deploy the 8E-capable runtime to production in disabled mode as inert infrastructure; activation remains separately authorized.
 - No production OpenAI credential is required for Sprint 8F inert delivery, CI, status, recovery, or reconciliation.
 - AI remains advisory. This path does not automatically materialize Candidate data, complete Human Review, mutate Moderation/Eligibility, create Evidence, or create/activate Publication.
 - Never delete or rewrite execution, attempt, or reconciliation history to make a run retryable.
