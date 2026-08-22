@@ -210,15 +210,22 @@ test('production release workflow is exact-SHA gated, exact-deployment verified,
 
   const orderedSteps = [
     'Deploy backend from exact tree',
+    'Verify backend exact deployment',
     'Deploy worker from exact tree',
+    'Verify worker exact deployment',
     'Deploy collector from exact tree',
+    'Verify collector exact deployment',
     'Deploy AI automation from exact tree',
+    'Verify AI automation exact disabled deployment',
     'Deploy gateway from exact tree',
+    'Verify gateway exact deployment',
+    'Production HTTP smoke',
+    'Production browser smoke',
   ];
   let cursor = -1;
   for (const step of orderedSteps) {
     const next = workflow.indexOf(step, cursor + 1);
-    assert.ok(next > cursor, `production workflow deployment order is missing or invalid at: ${step}`);
+    assert.ok(next > cursor, `production workflow release sequence is missing or invalid at: ${step}`);
     cursor = next;
   }
 
