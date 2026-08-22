@@ -101,12 +101,20 @@ test('production release gate uses exact deployment IDs and verified sequential 
   );
 });
 
-test('Sprint 8F repository-only workflow cannot deploy Railway or activate the provider', async () => {
+test('Sprint 8F repository-only workflow validates the compiled inert runtime without deployment authority', async () => {
   const workflow = await readRequired('.github/workflows/sprint-8f-ai-automation-production-delivery.yml');
 
+  assert.match(workflow, /postgres:17/);
+  assert.match(workflow, /redis:7/);
+  assert.match(workflow, /node-version:\s*22\.13\.0/);
+  assert.match(workflow, /test:ai-automation-production-delivery/);
+  assert.match(workflow, /integration\/ai-automation-disabled-runtime\.test\.ts/);
   assert.match(workflow, /AI_AUTOMATION_PRODUCTION_REPO_READY/);
-  assert.doesNotMatch(workflow, /railway up|railway redeploy|workflow_dispatch[\s\S]*AI_DISCOVERY_SCHEDULER_ENABLED/i);
-  assert.doesNotMatch(workflow, /OPENAI_API_KEY|AI_DISCOVERY_OPENAI_MODEL|AI_DISCOVERY_OPENAI_ENDPOINT/);
+  assert.match(workflow, /^permissions:\n  contents: read$/m);
+  assert.doesNotMatch(workflow, /RAILWAY_TOKEN|railway\s+up|OPENAI_API_KEY/);
+  assert.doesNotMatch(workflow, /(contents|packages|pages|id-token):\s*write/);
+  assert.doesNotMatch(workflow, /railway redeploy|workflow_dispatch[\s\S]*AI_DISCOVERY_SCHEDULER_ENABLED/i);
+  assert.doesNotMatch(workflow, /AI_DISCOVERY_OPENAI_MODEL|AI_DISCOVERY_OPENAI_ENDPOINT/);
   assert.doesNotMatch(workflow, /AI_AUTOMATION_DISABLED_DELIVERY_READY|AI_DISCOVERY_PRODUCTION_ACTIVE/);
 });
 
