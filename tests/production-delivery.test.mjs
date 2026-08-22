@@ -180,7 +180,7 @@ test('production smoke rejects non-HTTPS remote origins before network access', 
   assert.match(result.stderr, /PRODUCTION_BASE_URL_MUST_BE_HTTPS/);
 });
 
-test('production release workflow is exact-SHA gated and cannot create Railway infrastructure', async () => {
+test('production release workflow is exact-SHA gated, exact-deployment verified, and cannot create Railway infrastructure', async () => {
   const workflow = await readRequired('.github/workflows/production-release-gate.yml');
 
   assert.match(workflow, /workflow_dispatch:/);
@@ -191,13 +191,43 @@ test('production release workflow is exact-SHA gated and cannot create Railway i
   assert.match(workflow, /needs:\s*verify/);
   assert.match(workflow, /environment:\s*production/);
   assert.match(workflow, /@railway\/cli@5\.30\.1/);
-  assert.match(workflow, /railway up --ci/);
+  assert.match(workflow, /timeout-minutes:\s*90/);
+  assert.match(workflow, /railway up --detach --json/);
+  assert.match(workflow, /verify-railway-deployment\.mjs/);
+  assert.match(workflow, /RAILWAY_BACKEND_SERVICE/);
+  assert.match(workflow, /RAILWAY_WORKER_SERVICE/);
+  assert.match(workflow, /RAILWAY_COLLECTOR_SERVICE/);
+  assert.match(workflow, /RAILWAY_AI_AUTOMATION_SERVICE/);
+  assert.match(workflow, /RAILWAY_GATEWAY_SERVICE/);
+  assert.match(workflow, /status-and-disabled-marker/);
   assert.match(workflow, /--project "\$RAILWAY_PROJECT_ID"/);
   assert.match(workflow, /--environment "\$RAILWAY_ENVIRONMENT"/);
-  assert.match(workflow, /--service "\$RAILWAY_BACKEND_SERVICE"/);
-  assert.match(workflow, /--service "\$RAILWAY_GATEWAY_SERVICE"/);
   assert.match(workflow, /PRODUCTION_DEPLOYED_AND_SMOKE_VERIFIED/);
   assert.doesNotMatch(workflow, /PRODUCTION_DELIVERY_READY/);
+  assert.doesNotMatch(workflow, /railway up --ci/);
+  assert.doesNotMatch(workflow, /--latest|railway logs --latest/);
+  assert.doesNotMatch(workflow, /OPENAI_API_KEY|AI_DISCOVERY_SCHEDULER_ENABLED\s*=\s*true/);
+
+  const orderedSteps = [
+    'Deploy backend from exact tree',
+    'Verify backend exact deployment',
+    'Deploy worker from exact tree',
+    'Verify worker exact deployment',
+    'Deploy collector from exact tree',
+    'Verify collector exact deployment',
+    'Deploy AI automation from exact tree',
+    'Verify AI automation exact disabled deployment',
+    'Deploy gateway from exact tree',
+    'Verify gateway exact deployment',
+    'Production HTTP smoke',
+    'Production browser smoke',
+  ];
+  let cursor = -1;
+  for (const step of orderedSteps) {
+    const next = workflow.indexOf(step, cursor + 1);
+    assert.ok(next > cursor, `production workflow release sequence is missing or invalid at: ${step}`);
+    cursor = next;
+  }
 
   for (const forbidden of [
     '--new',

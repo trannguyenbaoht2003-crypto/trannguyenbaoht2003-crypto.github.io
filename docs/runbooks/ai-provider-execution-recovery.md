@@ -5,8 +5,8 @@ Sprint 8E makes external AI-provider execution recoverable without granting AI a
 ## Safety boundary
 
 - `AI_DISCOVERY_SCHEDULER_ENABLED=false` remains the default.
-- No production deployment is authorized by Sprint 8E.
-- No production OpenAI credential is provisioned or required by Sprint 8E CI/status/recovery/reconciliation.
+- No production deployment is authorized by Sprint 8E itself. Sprint 8F may separately package and, only with separate explicit authorization, deploy the 8E-capable runtime to production in disabled mode as inert infrastructure; activation remains separately authorized.
+- No production OpenAI credential is required for Sprint 8F inert delivery, CI, status, recovery, or reconciliation.
 - AI remains advisory. This path does not automatically materialize Candidate data, complete Human Review, mutate Moderation/Eligibility, create Evidence, or create/activate Publication.
 - Never delete or rewrite execution, attempt, or reconciliation history to make a run retryable.
 
@@ -28,7 +28,7 @@ A provider call is forbidden before both the execution and current attempt are d
 
 Automatic retry is permitted for **only HTTP 429** / `PROVIDER_RATE_LIMITED`, because that response proves the request reached a known rate-limit outcome. The next attempt is created as a durable `PREPARED` row before any retry delay or subsequent provider call. Delays remain bounded at 500 ms and 1500 ms. There is no attempt 4.
 
-Timeouts, transport ambiguity, HTTP 408, HTTP 5xx/gateway errors, process crashes while `IN_FLIGHT`, and post-provider persistence ambiguity become `UNCERTAIN`. They are never automatically replayed.
+Timeouts, transport ambiguity, HTTP 408, HTTP 5xx/gateway errors, process crashes while `IN_FLIGHT`, and post-provider persistence ambiguity become `UNCERTAIN`. They have no automatic replay.
 
 ## Request tracing
 
@@ -57,6 +57,8 @@ Recovery uses the PostgreSQL clock and a bounded batch:
 
 The AI automation runtime performs a DB-only recovery sweep before scheduler reconciliation. An enabled scheduled job also sweeps before scheduled processing. A scheduler-disabled stale job returns `SCHEDULER_DISABLED` before recovery/provider work.
 
+During Sprint 8F inert production startup, the same DB-only recovery sweep runs before scheduler reconciliation and before the disabled-ready marker. Existing execution and reconciliation history remains immutable; no `UNCERTAIN` execution is replayed merely because code was deployed or rolled back.
+
 ## Inspecting status
 
 Status is DB-only and safe for private operator use:
@@ -70,7 +72,7 @@ The status reader may return execution/attempt/reconciliation IDs, states, times
 
 The aggregate AI operations snapshot additionally exposes only counts/timestamps: `prepared`, `inFlight`, `completed`, `failed`, `uncertain`, `stalePrepared`, `staleInFlight`, `attemptsToday`, `safeRetriesToday`, `uncertainExecutions`, `unreconciledUncertain`, and `lastExecutionAt`.
 
-`unreconciledUncertain > 0` is an operational warning and must be surfaced before any later production-activation decision.
+`unreconciledUncertain > 0` is an operational warning before any later production-activation decision. It is not an inert-deployment blocker while the scheduler remains disabled and no provider configuration is provisioned.
 
 ## Reconciliation authority
 
@@ -115,13 +117,13 @@ A historical pre-8E budget reservation without a durable AI discovery run is tre
 Code rollback must not delete journal/history. The safe rollback posture is:
 
 1. keep `AI_DISCOVERY_SCHEDULER_ENABLED=false`;
-2. stop the dedicated AI automation runtime if it was started in a non-production test environment;
+2. stop or redeploy the dedicated AI automation runtime only through the separately authorized production delivery path;
 3. revert application code to the previously approved release while preserving migration/history unless a separately reviewed database rollback procedure explicitly proves safety;
-4. do not replay `IN_FLIGHT`/`UNCERTAIN` rows during rollback;
+4. do not replay `IN_FLIGHT` or `UNCERTAIN` rows during rollback;
 5. inspect unresolved state with the DB-only status/recovery commands before any later reactivation.
 
-Because Sprint 8E does not activate production, no production scheduler, credential, or deployment rollback is part of this sprint.
+Sprint 8F may deploy or roll back the runtime in disabled mode. That operational action does not authorize a scheduler, provider credential, or provider call, and it does not rewrite or automatically replay historical execution/reconciliation state.
 
 ## Review and release gate
 
-Sprint 8E is complete only when the dedicated 8E workflow, inherited 8D/8C/8B/8A gates, backend full tests/typecheck/build, authority/security checks, and release regressions are green on the exact PR head. The PR remains draft and must not be merged, deployed, provisioned with production credentials, or used to enable the scheduler without separate explicit authorization.
+Sprint 8E recovery invariants remain binding when Sprint 8F packages the runtime for inert production delivery. The dedicated 8F repository workflow and inherited 8D/8C/8B/8A gates must be green on the exact PR head. The PR remains draft and must not be merged, actually deployed to Railway, provisioned with production credentials, or used to enable the scheduler without separate explicit authorization.
