@@ -88,7 +88,8 @@ test('Railway production config preserves same-origin and private-backend bounda
 
   assert.match(envExample, /BACKEND_ORIGIN=http:\/\/\$\{\{backend\.RAILWAY_PRIVATE_DOMAIN\}\}:3001/);
   assert.match(envExample, /DATABASE_URL=\$\{\{Postgres\.DATABASE_URL\}\}/);
-  assert.match(envExample, /REDIS_URL=\$\{\{Redis\.REDIS_URL\}\}/);
+  assert.match(envExample, /^REDIS_URL=<AIVEN_VALKEY_SERVICE_URI_SECRET>$/m);
+  assert.doesNotMatch(envExample, /\$\{\{Redis\.REDIS_URL\}\}/);
   assert.doesNotMatch(envExample, /password\s*=|token\s*=|BEGIN (RSA|OPENSSH|EC) PRIVATE KEY/i);
 });
 
@@ -272,7 +273,7 @@ test('production delivery package scripts are wired into root regression', async
   const packageJson = JSON.parse(await readFile('package.json', 'utf8'));
   assert.equal(
     packageJson.scripts?.['test:production-contract'],
-    'node --test tests/production-delivery.test.mjs',
+    'node --test tests/production-delivery.test.mjs tests/valkey-production-contract.test.mjs',
   );
   assert.equal(packageJson.scripts?.['production:smoke'], 'node scripts/production-smoke.mjs');
   assert.equal(packageJson.scripts?.['production:browser-smoke'], 'node scripts/production-browser-smoke.mjs');
