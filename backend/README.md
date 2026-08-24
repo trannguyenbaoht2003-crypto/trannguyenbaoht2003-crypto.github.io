@@ -5,9 +5,10 @@ Sprint 3A deterministic normalization and Candidate Registry, Sprint 3B Evidence
 v3 and Human Review, Sprint 4A Moderation and Eligibility, Sprint 4B Publication
 authority, and the Sprint 5A Read-only Publication HTTP boundary.
 
-PostgreSQL is the system of record. Redis 7 and BullMQ are delivery
-infrastructure; they never own catalog, Candidate, trust, Eligibility,
-Publication, or public API truth.
+PostgreSQL is the system of record. BullMQ uses Redis-compatible delivery
+infrastructure; Redis 7 is the local/CI fixture, while production uses Aiven
+Valkey through the same `REDIS_URL` contract. Queue infrastructure never owns
+catalog, Candidate, trust, Eligibility, Publication, or public API truth.
 
 ## Prerequisites and test environment
 
@@ -48,6 +49,24 @@ The HTTP process exposes:
 
 Workers start separately with `npm --prefix backend run start:worker`. There is
 no continuous production scheduler. Production supervision remains deferred.
+
+## Production queue backend
+
+Production uses **Aiven Valkey** as the Redis-compatible BullMQ backend. The
+application contract remains `REDIS_URL`; production must supply the Aiven
+service URI as a Railway secret using the TLS-capable `rediss://` scheme.
+Resolved URIs and passwords must never be committed or printed in release
+evidence.
+
+`backend`, `worker`, and private `ai-automation` must receive the same production
+`REDIS_URL` to avoid producer/consumer split-brain. `collector` does not require
+a queue connection. Redis 7 remains intentionally local/CI-only so tests require
+no production credential or external Aiven dependency.
+
+Provider choice does not change authority: PostgreSQL owns durable domain,
+audit, outbox, Eligibility, and Publication state. Valkey transports queue/job
+identity and delivery only. See `docs/adr/0003-production-queue-backend-valkey.md`
+and `docs/runbooks/production-delivery.md` for production operations.
 
 ## Source Policy and delivery recovery
 
@@ -205,9 +224,10 @@ npm run backend:build
 git diff --check
 ```
 
-The workflow uses PostgreSQL 17 and Redis 7, keeps `contents: read`, requires a
-clean checkout, and scans for deployment commands and credential material. The
-separate deployment workflow is dry-run only.
+The CI workflow uses PostgreSQL 17 and Redis 7, keeps `contents: read`, requires
+a clean checkout, and scans for deployment commands and credential material.
+The separate deployment workflow is dry-run only. Production's Aiven Valkey
+credential is never required by this gate.
 
 ## CI contract index
 
