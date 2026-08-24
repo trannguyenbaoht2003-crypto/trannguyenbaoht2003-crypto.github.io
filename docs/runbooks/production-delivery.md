@@ -1,28 +1,29 @@
 # Production Delivery Runbook
 
-This runbook is the operational boundary for Sprint 6A, the governed community-ingestion extension in Sprint 6B, and the Sprint 8F inert AI-automation delivery extension. Repository validation can establish `PRODUCTION_REPO_READY` and, for Sprint 8F, `AI_AUTOMATION_PRODUCTION_REPO_READY`; only a separately authorized real Railway environment deployment plus the required live verification can establish delivery markers.
+This runbook is the operational boundary for Sprint 6A, the governed community-ingestion extension in Sprint 6B, the Sprint 8F inert AI-automation delivery extension, and the 2026-08-24 production queue-backend cutover to Aiven Valkey. Repository validation can establish `PRODUCTION_REPO_READY` and, for Sprint 8F, `AI_AUTOMATION_PRODUCTION_REPO_READY`; only a separately authorized real Railway environment deployment plus the required live verification can establish delivery markers.
 
 `PRODUCTION_DELIVERY_READY` cannot be emitted by CI-only validation. Likewise, `AI_AUTOMATION_DISABLED_DELIVERY_READY` cannot be claimed by repository-only CI.
 
 ## One-time Railway bootstrap
 
-The initial Railway account/project binding is intentionally external to the repository. Do not simulate it with test data and do not commit resolved credentials, service IDs, private domains, or database URLs.
+The initial Railway account/project binding is intentionally external to the repository. Do not simulate it with test data and do not commit resolved credentials, service IDs, private domains, database URLs, or queue-backend credentials.
 
-Create one Railway project with a `production` environment and these seven services:
+Create one Railway project with a `production` environment and the application/data services required by the current deployment:
 
 1. `gateway` — sourced from this GitHub repository, repository Root Directory `/`, Config File `/deploy/production/railway.gateway.toml`.
 2. `backend` — sourced from this GitHub repository, Root Directory `/backend`, Config File `/backend/railway.toml`.
 3. `worker` — sourced from this GitHub repository, Root Directory `/backend`, Config File `/backend/railway.worker.toml`.
 4. `collector` — sourced from this GitHub repository, Root Directory `/`, Config File `/deploy/production/railway.collector.toml`.
 5. `ai-automation` — sourced from this GitHub repository, Root Directory `/backend`, Config File `/backend/railway.ai-automation.toml`. It reuses `backend/Dockerfile` and starts exactly `node dist/src/ai-automation-worker.js`.
-6. `Postgres` — Railway PostgreSQL service.
-7. `Redis` — Railway Redis service.
+6. `Postgres` — Railway PostgreSQL service when Railway PostgreSQL is the selected database binding.
+
+Production BullMQ delivery uses **Aiven Valkey**, not a newly provisioned Railway Redis service. The Aiven service is external to Railway and is injected through `REDIS_URL` as a Railway secret.
 
 The `ai-automation` service bootstrap is external infrastructure setup. Creating it or running the real production release workflow requires separate explicit authorization; repository readiness does not authorize Railway mutation.
 
 ### Gateway is the only public service
 
-Generate a Railway public domain for `gateway` only. Do not generate a public domain for `backend`, `worker`, `collector`, `ai-automation`, Postgres, or Redis. `ai-automation` has no HTTP health/status endpoint and no public domain.
+Generate a Railway public domain for `gateway` only. Do not generate a public domain for `backend`, `worker`, `collector`, `ai-automation`, or Postgres. Aiven Valkey is a managed external data service, not a public application endpoint. `ai-automation` has no HTTP health/status endpoint and no public domain.
 
 Set gateway variables using Railway references:
 
@@ -40,7 +41,7 @@ NODE_ENV=production
 HOST=0.0.0.0
 PORT=3001
 DATABASE_URL=${{Postgres.DATABASE_URL}}
-REDIS_URL=${{Redis.REDIS_URL}}
+REDIS_URL=<AIVEN_VALKEY_SERVICE_URI_SECRET>
 ```
 
 Set worker variables:
@@ -48,7 +49,7 @@ Set worker variables:
 ```text
 NODE_ENV=production
 DATABASE_URL=${{Postgres.DATABASE_URL}}
-REDIS_URL=${{Redis.REDIS_URL}}
+REDIS_URL=<AIVEN_VALKEY_SERVICE_URI_SECRET>
 ```
 
 Set collector variables:
@@ -63,11 +64,34 @@ Set `ai-automation` variables for inert delivery only:
 ```text
 NODE_ENV=production
 DATABASE_URL=${{Postgres.DATABASE_URL}}
-REDIS_URL=${{Redis.REDIS_URL}}
+REDIS_URL=<AIVEN_VALKEY_SERVICE_URI_SECRET>
 AI_DISCOVERY_SCHEDULER_ENABLED=false
 ```
 
-Do not provision an OpenAI API key, provider model, provider endpoint override, or any scheduler-true value as part of Sprint 8F inert delivery. PostgreSQL remains Publication authority. Redis is delivery infrastructure and is not a public-read authority.
+`<AIVEN_VALKEY_SERVICE_URI_SECRET>` means the full Aiven Service URI stored in Railway secret configuration, not a literal committed value. Production must use the TLS-capable `rediss://` form supplied for the Aiven Valkey service. `backend`, `worker`, and `ai-automation` must receive the same resolved URI during a cutover or credential rotation so producers and consumers never split across two queue backends.
+
+Do not provision an OpenAI API key, provider model, provider endpoint override, or any scheduler-true value as part of Sprint 8F inert delivery. PostgreSQL remains Publication authority. Aiven Valkey is delivery infrastructure and is not a public-read authority.
+
+## Production queue backend — Aiven Valkey
+
+The 2026-08-24 production cutover moved the queue clients behind `REDIS_URL` from the legacy Railway Redis instance to Aiven Valkey. The environment-variable name remains `REDIS_URL` because it is the established Redis-compatible BullMQ/ioredis interface; provider migration does not justify a code-level rename.
+
+Operational rules:
+
+1. require `rediss://` TLS connectivity in production;
+2. store the resolved Service URI only as a secret and never in source, workflow output, issue text, release evidence, or logs;
+3. update `backend`, `worker`, and `ai-automation` coherently before redeployment;
+4. keep `collector` independent because it does not consume the queue directly;
+5. verify backend readiness plus worker/AI logs for authentication, TLS, reconnect, or BullMQ errors after each change;
+6. keep PostgreSQL/outbox state as the recovery authority when Valkey is unavailable;
+7. perform credential rotation after any credential exposure, then verify all consumers on the replacement secret before invalidating the old credential;
+8. retire the legacy Railway Redis service only after no production consumer references it and the observation window is clean.
+
+The initial Aiven plan is single-node and therefore not high availability. Monitor memory and queue health; review the plan before workload criticality or throughput grows materially. The queue backend uses `noeviction` semantics so memory exhaustion should fail writes rather than silently evict queue state.
+
+The repository deliberately continues to use Redis 7 for local and CI tests. CI uses `TEST_REDIS_URL` and must not need production Aiven credentials.
+
+See `docs/adr/0003-production-queue-backend-valkey.md` for the durable architecture decision.
 
 ## Disable GitHub autodeploy
 
@@ -98,7 +122,7 @@ RAILWAY_GATEWAY_SERVICE
 PRODUCTION_BASE_URL=https://<gateway-public-domain>
 ```
 
-Use the exact project/service identifiers from the bootstrapped Railway project. Missing `RAILWAY_AI_AUTOMATION_SERVICE`, or any other required binding, must fail closed before the first Railway mutation. Never place `RAILWAY_TOKEN` in source code, an example env file, workflow output, issue text, or release evidence.
+Use the exact project/service identifiers from the bootstrapped Railway project. Missing `RAILWAY_AI_AUTOMATION_SERVICE`, or any other required binding, must fail closed before the first Railway mutation. Never place `RAILWAY_TOKEN`, the resolved Aiven Service URI, or any other credential in source code, an example env file, workflow output, issue text, or release evidence.
 
 ## No rehearsal Publication seed
 
@@ -135,7 +159,7 @@ The legacy registry field `autoPublish` is ignored by the backend bridge. It doe
 
 The importer stores only bounded provenance metadata plus the canonical normalization snapshot. Raw page HTML, full title text, subtitle/transcript bodies, comment text, and image bytes are not written by the bridge.
 
-The `worker` runs the durable outbox dispatcher together with Normalization, Eligibility, and Publication projection consumers. PostgreSQL remains authority; Redis/BullMQ transports event identity and delivery only.
+The `worker` runs the durable outbox dispatcher together with Normalization, Eligibility, and Publication projection consumers. PostgreSQL remains authority; Aiven Valkey/BullMQ transports event identity and delivery only.
 
 The `collector` is a private cron service with schedule:
 
@@ -273,6 +297,8 @@ A real Railway rollback must be rehearsed before production delivery is declared
 8. Run `npm run production:smoke` and `npm run production:browser-smoke` against the public gateway again.
 9. Confirm the Publication read contract remains valid and no database restore was required.
 
+Queue-backend rollback is independent from an application-code rollback: if an Aiven credential rotation or Valkey outage breaks queue connectivity, restore one known-good Redis-compatible `REDIS_URL` coherently across `backend`, `worker`, and `ai-automation`, then verify readiness/logs. Do not mutate PostgreSQL Publication state just to recover queue transport.
+
 Do not substitute a redeploy of the current/latest deployment for this historical rollback proof. Rollback must not replay Sprint 8E `IN_FLIGHT` or `UNCERTAIN` provider-execution history. If a schema change makes A incompatible with the migrated schema, stop and redesign the release using an expand/migrate/contract sequence before claiming rollback readiness.
 
 ## Evidence and readiness states
@@ -314,13 +340,14 @@ public_smoke=PASS
 browser_smoke=PASS
 ```
 
-Never include secret values, private service domains, database URLs, Redis URLs, or tokens in this evidence.
+Never include secret values, private service domains, database URLs, Valkey/Redis URLs, or tokens in this evidence.
 
 ## Failure handling
 
 - Backend unavailable: gateway remains static-available; API returns sanitized 5xx; browser uses static fallback.
 - PostgreSQL unavailable: backend and AI runtime cannot become ready; do not expose private services publicly as a workaround.
-- Redis unavailable: readiness/lifecycle may fail, but PostgreSQL remains Publication authority and pending outbox work remains durable in PostgreSQL.
+- Aiven Valkey unavailable: queue readiness/lifecycle may fail, but PostgreSQL remains Publication authority and pending outbox work remains durable in PostgreSQL.
+- Valkey authentication/TLS failure: verify the Railway `REDIS_URL` secret and `rediss://` URI; do not disable TLS as a workaround.
 - Worker unavailable: public read remains available from PostgreSQL; new asynchronous Candidate/Eligibility/projection processing pauses until the worker recovers.
 - Collector unavailable: no new community Observations are imported; existing Publication/public-read state remains unchanged.
 - `ai-automation` unavailable while disabled: no provider call is authorized; public read and core worker paths remain independent. Restore the prior private disabled runtime rather than exposing it publicly.
