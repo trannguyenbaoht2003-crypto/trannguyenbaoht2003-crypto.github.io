@@ -11,6 +11,7 @@ import type {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const evaluatedAt = new Date('2026-08-25T00:00:00.000Z');
+const freshEvidenceAt = new Date(evaluatedAt.getTime() - DAY_MS);
 
 function confidenceInput(
   overrides: Partial<CandidateConfidenceInput> = {},
@@ -26,10 +27,19 @@ function confidenceInput(
   };
 }
 
+function supportedInput(
+  overrides: Partial<CandidateConfidenceInput> = {},
+): CandidateConfidenceInput {
+  return confidenceInput({
+    newestSupportingEvidenceAt: freshEvidenceAt,
+    supportingSourceCount: 1,
+    ...overrides,
+  });
+}
+
 test('confidence scoring is deterministic for identical explicit input', () => {
-  const input = confidenceInput({
+  const input = supportedInput({
     hasExactPatchSupport: true,
-    newestSupportingEvidenceAt: new Date(evaluatedAt.getTime() - DAY_MS),
     provenanceQuality: 30,
     supportingSourceCount: 2,
   });
@@ -70,17 +80,17 @@ test('Evidence diversity scores 0, 10, and 25 for zero, one, and multiple source
     0,
   );
   assert.equal(
-    computeCandidateConfidence(confidenceInput({ supportingSourceCount: 1 }))
+    computeCandidateConfidence(supportedInput({ supportingSourceCount: 1 }))
       .components.evidenceDiversityScore,
     10,
   );
   assert.equal(
-    computeCandidateConfidence(confidenceInput({ supportingSourceCount: 2 }))
+    computeCandidateConfidence(supportedInput({ supportingSourceCount: 2 }))
       .components.evidenceDiversityScore,
     25,
   );
   assert.equal(
-    computeCandidateConfidence(confidenceInput({ supportingSourceCount: 8 }))
+    computeCandidateConfidence(supportedInput({ supportingSourceCount: 8 }))
       .components.evidenceDiversityScore,
     25,
   );
@@ -88,20 +98,20 @@ test('Evidence diversity scores 0, 10, and 25 for zero, one, and multiple source
 
 test('exact patch support outranks governed revalidated cross-patch support', () => {
   assert.equal(
-    computeCandidateConfidence(confidenceInput({
+    computeCandidateConfidence(supportedInput({
       hasExactPatchSupport: true,
       hasRevalidatedCrossPatchSupport: true,
     })).components.patchAlignmentScore,
     20,
   );
   assert.equal(
-    computeCandidateConfidence(confidenceInput({
+    computeCandidateConfidence(supportedInput({
       hasRevalidatedCrossPatchSupport: true,
     })).components.patchAlignmentScore,
     10,
   );
   assert.equal(
-    computeCandidateConfidence(confidenceInput())
+    computeCandidateConfidence(supportedInput())
       .components.patchAlignmentScore,
     0,
   );
@@ -109,9 +119,8 @@ test('exact patch support outranks governed revalidated cross-patch support', ()
 
 test('freshness boundaries are strict before 7 days and inclusive through 30 days', () => {
   const scoreAtAge = (ageMs: number) => computeCandidateConfidence(
-    confidenceInput({
+    supportedInput({
       newestSupportingEvidenceAt: new Date(evaluatedAt.getTime() - ageMs),
-      supportingSourceCount: 1,
     }),
   ).components.freshnessScore;
 
@@ -123,9 +132,8 @@ test('freshness boundaries are strict before 7 days and inclusive through 30 day
 
 test('future Evidence timestamps are rejected instead of receiving freshness credit', () => {
   assert.throws(
-    () => computeCandidateConfidence(confidenceInput({
+    () => computeCandidateConfidence(supportedInput({
       newestSupportingEvidenceAt: new Date(evaluatedAt.getTime() + 1),
-      supportingSourceCount: 1,
     })),
     /CONFIDENCE_EVIDENCE_TIMESTAMP_IN_FUTURE/,
   );
@@ -157,5 +165,11 @@ test('invalid normalized scoring inputs are rejected', () => {
       evaluatedAt: new Date(Number.NaN),
     })),
     /CONFIDENCE_EVALUATED_AT_INVALID/,
+  );
+  assert.throws(
+    () => computeCandidateConfidence(confidenceInput({
+      hasExactPatchSupport: true,
+    })),
+    /CONFIDENCE_EVIDENCE_FACTS_INCONSISTENT/,
   );
 });
