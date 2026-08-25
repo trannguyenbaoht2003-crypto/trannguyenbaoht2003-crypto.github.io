@@ -8,6 +8,8 @@ import { resetDatabase, tableCount } from './helpers/database.js';
 import { seedTrustCandidate } from './helpers/trust.js';
 
 const VERSION = 'candidate-confidence-v1';
+const evaluatedAt = new Date('2026-08-25T00:00:00.000Z');
+const evidenceAt = new Date('2026-08-24T00:00:00.000Z');
 
 async function insertValidConfidenceFixture(
   pool: Awaited<ReturnType<typeof resetDatabase>>,
@@ -15,7 +17,6 @@ async function insertValidConfidenceFixture(
   const inputSnapshotId = randomUUID();
   const scoreId = randomUUID();
   const inputHash = 'a'.repeat(64);
-  const evaluatedAt = new Date('2026-08-25T00:00:00.000Z');
 
   await pool.query(
     `insert into candidate_confidence_input_snapshots
@@ -25,7 +26,7 @@ async function insertValidConfidenceFixture(
        has_exact_patch_support, has_revalidated_cross_patch_support,
        newest_supporting_evidence_at, evaluated_at, input_hash, created_by)
      values ($1, $2, $3, $4, $5, $6, 20, 1, true, false,
-             null, $7, $8, 'confidence-migration-test')`,
+             $7, $8, $9, 'confidence-migration-test')`,
     [
       inputSnapshotId,
       CANDIDATE_IDS.candidateId,
@@ -33,6 +34,7 @@ async function insertValidConfidenceFixture(
       CATALOG_IDS.patchId,
       CATALOG_IDS.catalogRevisionId,
       VERSION,
+      evidenceAt,
       evaluatedAt,
       inputHash,
     ],
@@ -112,7 +114,6 @@ test('database rejects inconsistent confidence score totals and bands', async ()
   await seedTrustCandidate(pool);
   const inputSnapshotId = randomUUID();
   const inputHash = 'b'.repeat(64);
-  const evaluatedAt = new Date('2026-08-25T00:00:00.000Z');
 
   await pool.query(
     `insert into candidate_confidence_input_snapshots
@@ -122,7 +123,7 @@ test('database rejects inconsistent confidence score totals and bands', async ()
        has_exact_patch_support, has_revalidated_cross_patch_support,
        newest_supporting_evidence_at, evaluated_at, input_hash, created_by)
      values ($1, $2, $3, $4, $5, $6, 20, 1, true, false,
-             null, $7, $8, 'confidence-migration-test')`,
+             $7, $8, $9, 'confidence-migration-test')`,
     [
       inputSnapshotId,
       CANDIDATE_IDS.candidateId,
@@ -130,6 +131,7 @@ test('database rejects inconsistent confidence score totals and bands', async ()
       CATALOG_IDS.patchId,
       CATALOG_IDS.catalogRevisionId,
       VERSION,
+      evidenceAt,
       evaluatedAt,
       inputHash,
     ],
@@ -214,7 +216,7 @@ test('database rejects a confidence snapshot for a mismatched candidate graph', 
         CATALOG_IDS.patchId,
         CATALOG_IDS.catalogRevisionId,
         VERSION,
-        new Date('2026-08-25T00:00:00.000Z'),
+        evaluatedAt,
         'c'.repeat(64),
       ],
     ),
