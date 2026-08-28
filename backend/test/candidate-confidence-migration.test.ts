@@ -13,10 +13,17 @@ const evidenceAt = new Date('2026-08-24T00:00:00.000Z');
 
 async function insertValidConfidenceFixture(
   pool: Awaited<ReturnType<typeof resetDatabase>>,
+  options: {
+    evaluatedAt?: Date;
+    evidenceAt?: Date;
+    inputHash?: string;
+  } = {},
 ) {
   const inputSnapshotId = randomUUID();
   const scoreId = randomUUID();
-  const inputHash = 'a'.repeat(64);
+  const fixtureEvaluatedAt = options.evaluatedAt ?? evaluatedAt;
+  const fixtureEvidenceAt = options.evidenceAt ?? evidenceAt;
+  const inputHash = options.inputHash ?? 'a'.repeat(64);
 
   await pool.query(
     `insert into candidate_confidence_input_snapshots
@@ -34,8 +41,8 @@ async function insertValidConfidenceFixture(
       CATALOG_IDS.patchId,
       CATALOG_IDS.catalogRevisionId,
       VERSION,
-      evidenceAt,
-      evaluatedAt,
+      fixtureEvidenceAt,
+      fixtureEvaluatedAt,
       inputHash,
     ],
   );
@@ -61,7 +68,7 @@ async function insertValidConfidenceFixture(
       CATALOG_IDS.catalogRevisionId,
       VERSION,
       inputHash,
-      evaluatedAt,
+      fixtureEvaluatedAt,
     ],
   );
 
@@ -191,6 +198,91 @@ test('database rejects inconsistent confidence score totals and bands', async ()
       ],
     ),
     /candidate_confidence_scores_band_check/,
+  );
+
+  await assert.rejects(
+    pool.query(
+      `insert into candidate_confidence_scores
+        (candidate_confidence_score_id,
+         candidate_confidence_input_snapshot_id, candidate_id,
+         candidate_revision_id, patch_id, catalog_revision_id,
+         scoring_version, input_hash, evaluated_at,
+         provenance_quality_score, evidence_diversity_score,
+         patch_alignment_score, freshness_score, score, band,
+         reason, actor_id, correlation_id)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9,
+               30, 10, 20, 5, 65, 'medium',
+               'mismatched snapshot result', 'test', 'test')`,
+      [
+        randomUUID(),
+        inputSnapshotId,
+        CANDIDATE_IDS.candidateId,
+        CANDIDATE_IDS.candidateRevisionId,
+        CATALOG_IDS.patchId,
+        CATALOG_IDS.catalogRevisionId,
+        VERSION,
+        inputHash,
+        evaluatedAt,
+      ],
+    ),
+    /candidate confidence score result mismatch/,
+  );
+  await pool.end();
+});
+
+test('current confidence pointer rejects deletion and direct rollback', async () => {
+  const pool = await resetDatabase();
+  await seedTrustCandidate(pool);
+  const older = await insertValidConfidenceFixture(pool, {
+    evaluatedAt: new Date('2026-08-24T00:00:00.000Z'),
+    evidenceAt: new Date('2026-08-23T00:00:00.000Z'),
+    inputHash: 'd'.repeat(64),
+  });
+  const newer = await insertValidConfidenceFixture(pool, {
+    evaluatedAt: new Date('2026-08-25T00:00:00.000Z'),
+    evidenceAt: new Date('2026-08-24T00:00:00.000Z'),
+    inputHash: 'e'.repeat(64),
+  });
+
+  await pool.query(
+    `insert into current_candidate_confidence_scores
+      (candidate_revision_id, candidate_id, patch_id, catalog_revision_id,
+       candidate_confidence_score_id, scoring_version, input_hash,
+       evaluated_at, score_sequence)
+     select candidate_revision_id, candidate_id, patch_id,
+            catalog_revision_id, candidate_confidence_score_id,
+            scoring_version, input_hash, evaluated_at, score_sequence
+       from candidate_confidence_scores
+      where candidate_confidence_score_id = $1`,
+    [newer.scoreId],
+  );
+
+  await assert.rejects(
+    pool.query(
+      `delete from current_candidate_confidence_scores
+        where candidate_revision_id = $1`,
+      [CANDIDATE_IDS.candidateRevisionId],
+    ),
+    /current candidate confidence score cannot be deleted/,
+  );
+  await assert.rejects(
+    pool.query(
+      `update current_candidate_confidence_scores current_score
+          set candidate_confidence_score_id = historical.score_id,
+              input_hash = historical.input_hash,
+              evaluated_at = historical.evaluated_at,
+              score_sequence = historical.score_sequence,
+              updated_at = clock_timestamp()
+         from (
+           select candidate_confidence_score_id as score_id,
+                  input_hash, evaluated_at, score_sequence
+             from candidate_confidence_scores
+            where candidate_confidence_score_id = $1
+         ) historical
+        where current_score.candidate_revision_id = $2`,
+      [older.scoreId, CANDIDATE_IDS.candidateRevisionId],
+    ),
+    /current candidate confidence score cannot move backward/,
   );
   await pool.end();
 });
