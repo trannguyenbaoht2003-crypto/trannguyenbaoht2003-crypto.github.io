@@ -199,6 +199,106 @@ create table current_candidate_confidence_scores (
   )
 );
 
+create or replace function enforce_candidate_confidence_score_result()
+returns trigger
+language plpgsql
+as $$
+declare
+  snapshot candidate_confidence_input_snapshots%rowtype;
+  expected_evidence_diversity_score integer;
+  expected_freshness_score integer;
+  expected_patch_alignment_score integer;
+begin
+  select *
+    into snapshot
+    from candidate_confidence_input_snapshots
+   where candidate_confidence_input_snapshot_id =
+         new.candidate_confidence_input_snapshot_id;
+  if not found then
+    raise exception 'candidate confidence input snapshot missing'
+      using errcode = '23514';
+  end if;
+
+  expected_evidence_diversity_score := case
+    when snapshot.supporting_source_count >= 2 then 25
+    when snapshot.supporting_source_count = 1 then 10
+    else 0
+  end;
+  expected_patch_alignment_score := case
+    when snapshot.has_exact_patch_support then 20
+    when snapshot.has_revalidated_cross_patch_support then 10
+    else 0
+  end;
+  expected_freshness_score := case
+    when snapshot.newest_supporting_evidence_at is null then 0
+    when snapshot.evaluated_at
+           - snapshot.newest_supporting_evidence_at
+         < interval '7 days' then 15
+    when snapshot.evaluated_at
+           - snapshot.newest_supporting_evidence_at
+         <= interval '30 days' then 5
+    else 0
+  end;
+
+  if new.provenance_quality_score <> snapshot.provenance_quality
+     or new.evidence_diversity_score <>
+        expected_evidence_diversity_score
+     or new.patch_alignment_score <> expected_patch_alignment_score
+     or new.freshness_score <> expected_freshness_score then
+    raise exception 'candidate confidence score result mismatch'
+      using errcode = '23514';
+  end if;
+  return new;
+end;
+$$;
+
+create or replace function enforce_current_candidate_confidence_score()
+returns trigger
+language plpgsql
+as $$
+begin
+  if tg_op = 'DELETE' then
+    raise exception 'current candidate confidence score cannot be deleted'
+      using errcode = '23514';
+  end if;
+
+  if tg_op = 'UPDATE'
+     and (
+       new.candidate_revision_id <> old.candidate_revision_id
+       or new.candidate_id <> old.candidate_id
+       or new.patch_id <> old.patch_id
+       or new.catalog_revision_id <> old.catalog_revision_id
+       or new.scoring_version <> old.scoring_version
+     ) then
+    raise exception 'current candidate confidence score identity is immutable'
+      using errcode = '23514';
+  end if;
+
+  if tg_op = 'UPDATE'
+     and new.candidate_confidence_score_id <>
+         old.candidate_confidence_score_id
+     and (
+       new.evaluated_at < old.evaluated_at
+       or (
+         new.evaluated_at = old.evaluated_at
+         and new.score_sequence <= old.score_sequence
+       )
+     ) then
+    raise exception 'current candidate confidence score cannot move backward'
+      using errcode = '23514';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger candidate_confidence_score_result_guard
+before insert or update on candidate_confidence_scores
+for each row execute function enforce_candidate_confidence_score_result();
+
+create trigger current_candidate_confidence_score_guard
+before insert or update or delete on current_candidate_confidence_scores
+for each row execute function enforce_current_candidate_confidence_score();
+
 create trigger candidate_confidence_input_snapshots_immutable
 before update or delete on candidate_confidence_input_snapshots
 for each row execute function reject_immutable_change();
