@@ -91,6 +91,7 @@ create table candidate_confidence_scores (
     check (freshness_score in (0, 5, 15)),
   score integer not null check (score between 0 and 90),
   band text not null
+    constraint candidate_confidence_scores_band_domain_check
     check (band in ('low', 'medium', 'high', 'very_high')),
   reason text not null check (octet_length(reason) between 1 and 1024),
   actor_id text not null check (octet_length(actor_id) between 1 and 256),
