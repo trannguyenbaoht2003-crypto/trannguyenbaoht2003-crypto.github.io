@@ -4,12 +4,19 @@ import test from 'node:test';
 import {
   evaluateCandidateConfidence,
 } from '../src/modules/confidence/evaluate-candidate-confidence.js';
+import {
+  recordClaimEvidenceDecision,
+} from '../src/modules/trust/record-claim-evidence-decision.js';
 import type {
   EvaluateCandidateConfidenceCommand,
 } from '../src/modules/confidence/types.js';
 import { CANDIDATE_IDS } from './helpers/candidate.js';
 import { resetDatabase, tableCount } from './helpers/database.js';
-import { seedTrustReviewContext } from './helpers/trust.js';
+import {
+  evidenceDecisionCommand,
+  seedTrustReviewContext,
+  TRUST_IDS,
+} from './helpers/trust.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -59,6 +66,38 @@ test('authoritative current supported Evidence produces the expected confidence 
     ['confidence-evaluation-v1'],
   );
   assert.equal(Number(audit.rows[0]?.count ?? 0), 1);
+  await pool.end();
+});
+
+test('historical supported Evidence is excluded after the current decision becomes insufficient', async () => {
+  const pool = await resetDatabase();
+  await seedTrustReviewContext(pool);
+  await recordClaimEvidenceDecision(pool, evidenceDecisionCommand({
+    associations: [],
+    correlationId: 'confidence-current-insufficient',
+    decision: 'insufficient',
+    decisionId: TRUST_IDS.reevaluationDecisionId,
+    evaluatedAt: '2026-07-29T02:00:00.000Z',
+    evidenceInputSnapshotId: TRUST_IDS.reevaluationInputSnapshotId,
+    idempotencyKey: 'confidence-current-insufficient',
+    reason: 'The current Evidence decision no longer supports the Claim.',
+  }));
+
+  const result = await evaluateCandidateConfidence(
+    pool,
+    command(new Date(Date.now() + 1_000), {
+      correlationId: 'confidence-after-insufficient',
+    }),
+  );
+
+  assert.deepEqual(result.components, {
+    evidenceDiversityScore: 0,
+    freshnessScore: 0,
+    patchAlignmentScore: 0,
+    provenanceQualityScore: 20,
+  });
+  assert.equal(result.score, 20);
+  assert.equal(result.band, 'low');
   await pool.end();
 });
 
