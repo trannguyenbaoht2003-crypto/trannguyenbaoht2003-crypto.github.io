@@ -28,7 +28,8 @@ test('operator runtime composes PostgreSQL-only loopback server and dedicated sc
   assert.match(source, /SIGTERM/);
   assert.match(source, /pool\.end\s*\(/);
 
-  assert.doesNotMatch(source, /ioredis|bullmq|Redis|Queue|Worker/);
+  assert.doesNotMatch(source, /from ['"](?:ioredis|bullmq)(?:\/[^'"]*)?['"]/);
+  assert.doesNotMatch(source, /\bnew\s+(?:Queue|Worker)(?:<[^>]+>)?\s*\(/);
   assert.doesNotMatch(source, /from ['"]\.\/server\.js['"]/);
   assert.doesNotMatch(source, /feedbackFingerprintSecret|REDIS_URL|redisUrl/);
   assert.doesNotMatch(source, /error\.message|String\(error\)|console\.error\(error/);

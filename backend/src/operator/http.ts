@@ -1,9 +1,13 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 
 import type {
+  OperatorCandidateReviewQueue,
+  OperatorCandidateReviewQueueOptions,
+  OperatorSnapshot,
+} from '../modules/operator/types.js';
+import type {
   ReadOperatorPublicationSignalsOptions,
 } from '../modules/operator/read-operator-publication-signals.js';
-import type { OperatorSnapshot } from '../modules/operator/types.js';
 import {
   OPERATOR_CSS,
   OPERATOR_HTML,
@@ -17,8 +21,15 @@ export type OperatorSnapshotRequestOptions = Required<
   >
 >;
 
+export type OperatorCandidateQueueRequestOptions = Required<
+  Pick<OperatorCandidateReviewQueueOptions, 'limit' | 'now'>
+>;
+
 export interface BuildOperatorAppOptions {
   readSnapshot(options: OperatorSnapshotRequestOptions): Promise<OperatorSnapshot>;
+  readCandidateQueue(
+    options: OperatorCandidateQueueRequestOptions,
+  ): Promise<OperatorCandidateReviewQueue>;
   checkPostgres(): Promise<boolean>;
   now?: () => Date;
   logger?: boolean;
@@ -54,7 +65,22 @@ const SNAPSHOT_UNAVAILABLE = {
   },
 } as const;
 
+const INVALID_CANDIDATE_QUEUE_QUERY = {
+  error: {
+    code: 'INVALID_OPERATOR_CANDIDATE_QUEUE_QUERY',
+    message: 'Invalid operator candidate queue query',
+  },
+} as const;
+
+const CANDIDATE_QUEUE_UNAVAILABLE = {
+  error: {
+    code: 'OPERATOR_CANDIDATE_QUEUE_UNAVAILABLE',
+    message: 'Operator candidate queue is temporarily unavailable',
+  },
+} as const;
+
 const QUERY_KEYS = new Set(['sinceHours', 'limit', 'detailSampleLimit']);
+const CANDIDATE_QUEUE_QUERY_KEYS = new Set(['limit']);
 
 function strictInteger(
   value: unknown,
@@ -85,6 +111,21 @@ function parseSnapshotQuery(
     sinceHours: strictInteger(query.sinceHours, 168, 1, 720),
     limit: strictInteger(query.limit, 50, 1, 100),
     detailSampleLimit: strictInteger(query.detailSampleLimit, 3, 0, 5),
+    now,
+  };
+}
+
+function parseCandidateQueueQuery(
+  query: Record<string, unknown>,
+  now: Date,
+): OperatorCandidateQueueRequestOptions {
+  for (const key of Object.keys(query)) {
+    if (!CANDIDATE_QUEUE_QUERY_KEYS.has(key)) {
+      throw new Error('INVALID_OPERATOR_CANDIDATE_QUEUE_QUERY');
+    }
+  }
+  return {
+    limit: strictInteger(query.limit, 50, 1, 100),
     now,
   };
 }
@@ -133,6 +174,30 @@ export function buildOperatorApp(
         'operator snapshot read failed',
       );
       return reply.code(503).send(SNAPSHOT_UNAVAILABLE);
+    }
+  });
+
+  app.get<{
+    Querystring: Record<string, unknown>;
+  }>('/api/operator/v1/candidate-review-queue', async (request, reply) => {
+    let queueOptions: OperatorCandidateQueueRequestOptions;
+    try {
+      queueOptions = parseCandidateQueueQuery(
+        request.query,
+        (options.now ?? (() => new Date()))(),
+      );
+    } catch {
+      return reply.code(400).send(INVALID_CANDIDATE_QUEUE_QUERY);
+    }
+
+    try {
+      return await options.readCandidateQueue(queueOptions);
+    } catch {
+      app.log.error(
+        { code: 'OPERATOR_CANDIDATE_QUEUE_READ_FAILED' },
+        'operator candidate queue read failed',
+      );
+      return reply.code(503).send(CANDIDATE_QUEUE_UNAVAILABLE);
     }
   });
 
