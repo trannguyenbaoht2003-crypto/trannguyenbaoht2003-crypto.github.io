@@ -1,6 +1,9 @@
 import { Pool } from 'pg';
 
 import {
+  readOperatorCandidateReviewQueue,
+} from './modules/operator/read-candidate-review-queue.js';
+import {
   readOperatorPublicationSignals,
 } from './modules/operator/read-operator-publication-signals.js';
 import { parseOperatorConfig } from './operator/config.js';
@@ -11,6 +14,8 @@ async function main(): Promise<void> {
   const pool = new Pool({ connectionString: config.databaseUrl });
 
   const app = buildOperatorApp({
+    readCandidateQueue: (options) =>
+      readOperatorCandidateReviewQueue(pool, options),
     readSnapshot: (options) => readOperatorPublicationSignals(pool, options),
     checkPostgres: async () => {
       try {

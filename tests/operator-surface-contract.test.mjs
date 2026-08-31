@@ -45,6 +45,9 @@ test('Railway and production deployment files do not expose operator runtime', a
 
 test('operator assets are self-contained and render untrusted text safely', async () => {
   const assets = await text('backend/src/operator/assets.ts');
+  assert.match(assets, /\/api\/operator\/v1\/candidate-review-queue/);
+  assert.match(assets, /Candidate review/);
+  assert.match(assets, /Monitoring &amp; feedback/);
   assert.match(assets, /textContent/);
   assert.doesNotMatch(assets, /innerHTML/);
   assert.doesNotMatch(assets, /setInterval|localStorage|sessionStorage/);
@@ -59,6 +62,10 @@ test('operator runbook locks private read-only operating boundary', async () => 
     'Never set `OPERATOR_HOST=0.0.0.0`',
     'never expose the operator port through Caddy or Railway',
     'PostgreSQL is the only runtime dependency',
+    'GET /api/operator/v1/candidate-review-queue',
+    '`limit=1..100`',
+    'never evaluated on read',
+    '`unscored`',
     'textContent',
     'Production delivery remains a separate gate',
   ]) {

@@ -21,12 +21,17 @@ async function collectTypeScript(relativeDirectory: string): Promise<string[]> {
 }
 
 function importSpecifiers(source: string): string[] {
-  return [...source.matchAll(/\bfrom\s+['"]([^'"]+)['"]/g)].map((match) => match[1] ?? '');
+  return [
+    ...source.matchAll(/\b(?:from\s+|import\s*)['"]([^'"]+)['"]/g),
+  ].map((match) => match[1] ?? '');
 }
 
 const FORBIDDEN_IMPORT = new RegExp(
-  '(?:^|/)(?:publish-candidate-revision|rollback-publication|submit-publication-feedback|evaluate-publication-monitoring|evidence(?:/|-)|human-review|moderation(?:/|-)|eligibility(?:/|-)|queue(?:/|-))(?:$|\\.|/)',
+  '(?:^|/)(?:publish-candidate-revision|rollback-publication|submit-publication-feedback|evaluate-publication-monitoring|evaluate-candidate-confidence|record-claim-evidence-decision|complete-human-review|record-candidate-moderation-decision|evaluate-candidate-eligibility|evidence|human-review|moderation|eligibility|ai-provider|ai-discovery|materializ(?:e|ation)|collector|scheduler|worker|outbox|queue)(?:$|[./-])',
 );
+
+const FORBIDDEN_WRITE_ROUTE =
+  /\bapp\.(?:post|put|patch|delete)(?:<[^>]+>)?\s*\(/i;
 
 test('operator production modules import only read-side PostgreSQL boundaries', async () => {
   const productionFiles = [
@@ -52,8 +57,16 @@ test('operator production modules import only read-side PostgreSQL boundaries', 
       );
     }
 
-    assert.doesNotMatch(source, /\b(?:POST|PUT|PATCH|DELETE)\b\s*['"`]/i, relativePath);
+    assert.doesNotMatch(source, FORBIDDEN_WRITE_ROUTE, relativePath);
   }
+});
+
+test('operator authority guards recognize write routes and infrastructure imports', () => {
+  assert.match("app.post('/operator', handler)", FORBIDDEN_WRITE_ROUTE);
+  assert.match("app.patch<{ Body: unknown }>('/operator', handler)", FORBIDDEN_WRITE_ROUTE);
+  assert.match('../modules/ai-provider/execute.js', FORBIDDEN_IMPORT);
+  assert.match('../worker/outbox.js', FORBIDDEN_IMPORT);
+  assert.deepEqual(importSpecifiers("import 'bullmq';"), ['bullmq']);
 });
 
 test('operator surface has no direct publication/trust mutation call names', async () => {
@@ -72,7 +85,11 @@ test('operator surface has no direct publication/trust mutation call names', asy
     'submitPublicationFeedback',
     'evaluatePublicationMonitoring',
     'createHumanReview',
+    'completeHumanReview',
     'recordModeration',
+    'recordClaimEvidenceDecision',
+    'recordCandidateModerationDecision',
+    'evaluateCandidateConfidence',
     'evaluateCandidateEligibility',
   ]) {
     assert.doesNotMatch(source, new RegExp(`\\b${forbidden}\\b`), forbidden);
