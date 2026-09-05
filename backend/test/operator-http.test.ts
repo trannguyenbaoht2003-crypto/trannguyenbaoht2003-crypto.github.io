@@ -9,6 +9,7 @@ import {
 } from '../src/operator/assets.js';
 import { buildOperatorApp } from '../src/operator/http.js';
 import type {
+  OperatorCandidateReviewDossier,
   OperatorCandidateReviewQueue,
   OperatorSnapshot,
 } from '../src/modules/operator/types.js';
@@ -39,6 +40,40 @@ const EMPTY_CANDIDATE_QUEUE: OperatorCandidateReviewQueue = {
   items: [],
 };
 
+const DOSSIER_ID = 'a2000000-0000-4000-8000-000000000001';
+const DOSSIER: OperatorCandidateReviewDossier = {
+  schemaVersion: 1,
+  generatedAt: '2026-09-03T01:00:00.000Z',
+  activeReviewPolicyRevisionId: 'a2000000-0000-4000-8000-000000000002',
+  candidate: {
+    candidateId: 'a2000000-0000-4000-8000-000000000003',
+    candidateRevisionId: DOSSIER_ID,
+    revision: 1,
+    patchId: 'a2000000-0000-4000-8000-000000000004',
+    patchKey: '26.18',
+    catalogRevisionId: 'a2000000-0000-4000-8000-000000000005',
+    subjectExternalId: 'samira',
+    selection: {
+      augmentExternalIds: ['1194'],
+      itemExternalIds: ['3006', '6672'],
+    },
+    createdAt: '2026-09-03T00:00:00.000Z',
+  },
+  review: {
+    state: 'unreviewed',
+    confirmedCount: 0,
+    requiredCount: 2,
+  },
+  confidence: null,
+  claimSet: {
+    claimSetSealId: 'a2000000-0000-4000-8000-000000000006',
+    claimSetHash: 'a'.repeat(64),
+    claimCount: 1,
+  },
+  provenance: [],
+  claims: [],
+};
+
 function expectedSecurityHeaders(headers: OutgoingHttpHeaders) {
   assert.equal(headers['cache-control'], 'no-store');
   assert.equal(headers['x-content-type-options'], 'nosniff');
@@ -55,6 +90,7 @@ test('operator snapshot route returns a closed snapshot and passes strict bounde
   const app = buildOperatorApp({
     logger: false,
     checkPostgres: async () => true,
+    readCandidateDossier: async () => null,
     readCandidateQueue: async () => EMPTY_CANDIDATE_QUEUE,
     readSnapshot: async (options) => {
       observedOptions = options;
@@ -93,6 +129,7 @@ test('operator snapshot route applies exact defaults', async () => {
   const app = buildOperatorApp({
     logger: false,
     checkPostgres: async () => true,
+    readCandidateDossier: async () => null,
     readCandidateQueue: async () => EMPTY_CANDIDATE_QUEUE,
     readSnapshot: async (options) => {
       observedOptions = options;
@@ -121,6 +158,7 @@ test('operator snapshot rejects malformed, out-of-range, duplicate, and unknown 
   const app = buildOperatorApp({
     logger: false,
     checkPostgres: async () => true,
+    readCandidateDossier: async () => null,
     readCandidateQueue: async () => EMPTY_CANDIDATE_QUEUE,
     readSnapshot: async () => {
       reads += 1;
@@ -158,6 +196,7 @@ test('operator snapshot failure is sanitized and write methods are absent', asyn
   const app = buildOperatorApp({
     logger: false,
     checkPostgres: async () => true,
+    readCandidateDossier: async () => null,
     readCandidateQueue: async () => EMPTY_CANDIDATE_QUEUE,
     readSnapshot: async () => {
       throw new Error('postgres://secret-user:secret-password@database/internal');
@@ -189,6 +228,7 @@ test('operator readiness checks PostgreSQL only and shell assets stay available'
       checks += 1;
       return false;
     },
+    readCandidateDossier: async () => null,
     readCandidateQueue: async () => EMPTY_CANDIDATE_QUEUE,
     readSnapshot: async () => EMPTY_SNAPSHOT,
   });
@@ -225,15 +265,24 @@ test('operator assets are self-contained, manual-refresh only, and render untrus
   assert.match(OPERATOR_JS, /Làm mới/);
   assert.match(OPERATOR_JS, /\/api\/operator\/v1\/snapshot/);
   assert.match(OPERATOR_JS, /\/api\/operator\/v1\/candidate-review-queue/);
+  assert.match(OPERATOR_JS, /candidate-review-dossiers/);
+  assert.match(OPERATOR_JS, /Xem hồ sơ/);
   assert.match(OPERATOR_HTML, /Candidate review/);
   assert.match(OPERATOR_HTML, /Monitoring &amp; feedback/);
+  assert.match(OPERATOR_HTML, /Quay lại hàng đợi/);
+  assert.match(OPERATOR_HTML, /Làm mới hồ sơ/);
   assert.match(OPERATOR_HTML, /review-state/);
   assert.match(OPERATOR_HTML, /confidence-band/);
   assert.match(OPERATOR_JS, /provenanceQualityScore/);
   assert.match(OPERATOR_JS, /evidenceDiversityScore/);
   assert.match(OPERATOR_JS, /patchAlignmentScore/);
   assert.match(OPERATOR_JS, /freshnessScore/);
+  assert.match(OPERATOR_JS, /createTextNode/);
+  assert.match(OPERATOR_JS, /target = '_blank'/);
+  assert.match(OPERATOR_JS, /rel = 'noopener noreferrer'/);
+  assert.match(OPERATOR_JS, /referrerPolicy = 'no-referrer'/);
   assert.doesNotMatch(assets, /\b(?:approve|decline|rollback)\b/i);
+  assert.doesNotMatch(OPERATOR_HTML, /Phê duyệt|Từ chối|Xuất bản/);
 });
 
 test('a stale candidate failure cannot overwrite the active monitoring view', async () => {
@@ -292,6 +341,8 @@ test('a stale candidate failure cannot overwrite the active monitoring view', as
     'refresh',
     'candidate-summary',
     'candidate-items',
+    'candidate-queue-panel', 'candidate-dossier', 'dossier-back', 'dossier-refresh',
+    'dossier-status', 'dossier-summary', 'dossier-provenance', 'dossier-claims',
     'review-state',
     'confidence-band',
     'candidate-search',
@@ -389,11 +440,119 @@ test('a stale candidate failure cannot overwrite the active monitoring view', as
   assert.match(elements.get('generated')!.textContent, /2026-08-30T05:00/);
 });
 
+test('dossier controls render literal text and safe links, clear failures, and ignore late responses', async () => {
+  class Element {
+    children: Element[] = [];
+    textContent = '';
+    value = 'all';
+    hidden = false;
+    disabled = false;
+    href = '';
+    target = '';
+    rel = '';
+    referrerPolicy = '';
+    listeners = new Map<string, () => void>();
+    addEventListener(event: string, listener: () => void) { this.listeners.set(event, listener); }
+    click() { this.listeners.get('click')?.(); }
+    appendChild(child: Element) { this.children.push(child); return child; }
+    get firstChild(): Element | null { return this.children[0] ?? null; }
+    removeChild(child: Element) { this.children.splice(this.children.indexOf(child), 1); }
+    setAttribute() {}
+    all(): Element[] { return [this, ...this.children.flatMap((child) => child.all())]; }
+  }
+  const elements = new Map<string, Element>();
+  const get = (id: string) => {
+    if (!elements.has(id)) elements.set(id, new Element());
+    return elements.get(id)!;
+  };
+  get('candidate-search').value = '';
+  get('search').value = '';
+  const queue = {
+    ...EMPTY_CANDIDATE_QUEUE,
+    items: [{ ...DOSSIER.candidate, review: DOSSIER.review, confidence: null }],
+  };
+  type Response = { ok: boolean; status: number; json(): Promise<unknown> };
+  const pending: Array<(response: Response) => void> = [];
+  const requests: string[] = [];
+  const fetch = (url: string) => {
+    requests.push(url);
+    if (url.endsWith('/candidate-review-queue')) return Promise.resolve({ ok: true, json: async () => queue });
+    if (url.endsWith('/snapshot')) return Promise.resolve({ ok: true, json: async () => EMPTY_SNAPSHOT });
+    return new Promise<Response>((resolve) => pending.push(resolve));
+  };
+  const flush = async () => { for (let i = 0; i < 5; i++) await Promise.resolve(); };
+  const resolve = (status: number, value: unknown) => pending.shift()!({ ok: status === 200, status, json: async () => value });
+  const open = () => get('candidate-items').all().find((element) => element.textContent === 'Xem hồ sơ')!.click();
+  const content = (id: string) => get(id).all().map((element) => element.textContent).join('\n');
+  Function('document', 'fetch', OPERATOR_JS)({
+    createElement: () => new Element(), getElementById: get,
+    createTextNode: (text: string) => Object.assign(new Element(), { textContent: text }),
+  }, fetch);
+  await flush();
+  open();
+  assert.equal(get('candidate-queue-panel').hidden, true);
+  assert.equal(get('dossier-refresh').disabled, true);
+  const statement = '<img src=x onerror=alert(1)>';
+  const value = {
+    ...DOSSIER,
+    provenance: [{
+      candidateProvenanceId: 'provenance-id', origin: 'editorial', observedAt: null, collectedAt: DOSSIER.generatedAt,
+      source: { sourceId: 'source-id', sourceKey: 'editorial', displayName: statement, status: 'suspended', sourcePolicyRevisionId: 'policy-id', storagePermission: 'reference_only' },
+      reference: { url: 'https://example.com/source', platform: 'example', author: statement, publishedAt: null, sourceContentId: null },
+    }],
+    claims: [
+      { claimId: 'one', claimKey: 'one', claimType: 'performance', importance: 'critical', statement, statementHash: 'a'.repeat(64), decision: null },
+      { claimId: 'two', claimKey: 'two', claimType: 'performance', importance: 'critical', statement: 'Second claim', statementHash: 'b'.repeat(64), decision: { decisionId: 'decision-id', evidencePolicyRevisionId: 'policy-id', outcome: 'insufficient', reason: statement, evaluatedAt: DOSSIER.generatedAt, evidence: [] } },
+    ],
+  };
+  resolve(200, value);
+  await flush();
+  assert.ok(content('dossier-claims').includes(statement));
+  assert.match(content('dossier-claims'), /Chưa có quyết định Evidence hiện hành/);
+  assert.match(content('dossier-claims'), /Quyết định hiện hành không gắn Evidence/);
+  const link = get('dossier-provenance').all().find((element) => element.href)!;
+  assert.equal(link.href, value.provenance[0]!.reference.url);
+  assert.equal(link.target, '_blank');
+  assert.equal(link.rel, 'noopener noreferrer');
+  assert.equal(link.referrerPolicy, 'no-referrer');
+  assert.ok(requests.every((url) => url.startsWith('/api/operator/v1/')));
+
+  get('dossier-refresh').click();
+  assert.equal(get('dossier-claims').children.length, 0);
+  resolve(503, { private: 'secret' });
+  await flush();
+  assert.match(get('dossier-status').textContent, /Không thể tải hồ sơ/);
+  assert.equal(get('dossier-summary').children.length, 0);
+  get('dossier-refresh').click();
+  get('dossier-back').click();
+  open();
+  resolve(200, value); // Previous request for the same candidate must stay invisible.
+  await flush();
+  assert.equal(get('dossier-summary').children.length, 0);
+  resolve(404, null);
+  await flush();
+  assert.match(get('dossier-status').textContent, /không còn trong hàng đợi/);
+  const before = requests.length;
+  get('dossier-back').click();
+  await flush();
+  assert.equal(requests.length, before + 1);
+  assert.ok(requests.at(-1)!.endsWith('/candidate-review-queue'));
+  open();
+  get('view-signals').click();
+  await flush();
+  resolve(200, value);
+  await flush();
+  assert.match(get('generated').textContent, /2026-08-17/);
+  assert.equal(get('status').textContent, '');
+  assert.equal(get('refresh').disabled, false);
+});
+
 test('candidate queue route returns a closed queue and passes a strict bounded limit', async () => {
   let observedOptions: unknown;
   const app = buildOperatorApp({
     logger: false,
     checkPostgres: async () => true,
+    readCandidateDossier: async () => null,
     readSnapshot: async () => EMPTY_SNAPSHOT,
     readCandidateQueue: async (options) => {
       observedOptions = options;
@@ -431,6 +590,7 @@ test('candidate queue route defaults to 50 and rejects every non-closed query be
   const app = buildOperatorApp({
     logger: false,
     checkPostgres: async () => true,
+    readCandidateDossier: async () => null,
     readSnapshot: async () => EMPTY_SNAPSHOT,
     readCandidateQueue: async (options) => {
       reads += 1;
@@ -475,6 +635,7 @@ test('candidate queue failures are sanitized and write methods remain absent', a
   const app = buildOperatorApp({
     logger: false,
     checkPostgres: async () => true,
+    readCandidateDossier: async () => null,
     readSnapshot: async () => EMPTY_SNAPSHOT,
     readCandidateQueue: async () => {
       throw new Error('postgres://secret-user:secret-password@database/internal');
@@ -499,6 +660,112 @@ test('candidate queue failures are sanitized and write methods remain absent', a
       method,
       url: '/api/operator/v1/candidate-review-queue',
     });
+    assert.equal(response.statusCode, 404, method);
+  }
+  await app.close();
+});
+
+test('candidate dossier route returns the closed dossier and exact request options', async () => {
+  const observed: unknown[] = [];
+  const app = buildOperatorApp({
+    logger: false,
+    checkPostgres: async () => true,
+    readSnapshot: async () => EMPTY_SNAPSHOT,
+    readCandidateQueue: async () => EMPTY_CANDIDATE_QUEUE,
+    readCandidateDossier: async (options) => {
+      observed.push(options);
+      return DOSSIER;
+    },
+    now: () => new Date('2026-09-03T01:00:00.000Z'),
+  });
+
+  const response = await app.inject({
+    method: 'GET',
+    url: `/api/operator/v1/candidate-review-dossiers/${DOSSIER_ID}`,
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json(), DOSSIER);
+  assert.deepEqual(observed, [{
+    candidateRevisionId: DOSSIER_ID,
+    now: new Date('2026-09-03T01:00:00.000Z'),
+  }]);
+  expectedSecurityHeaders(response.headers);
+  await app.close();
+});
+
+test('candidate dossier rejects noncanonical IDs and every query key before reading', async () => {
+  let reads = 0;
+  const app = buildOperatorApp({
+    logger: false,
+    checkPostgres: async () => true,
+    readSnapshot: async () => EMPTY_SNAPSHOT,
+    readCandidateQueue: async () => EMPTY_CANDIDATE_QUEUE,
+    readCandidateDossier: async () => {
+      reads += 1;
+      return DOSSIER;
+    },
+  });
+  const invalidUrls = [
+    `/api/operator/v1/candidate-review-dossiers/${DOSSIER_ID.toUpperCase()}`,
+    '/api/operator/v1/candidate-review-dossiers/a2000000-0000-6000-8000-000000000001',
+    '/api/operator/v1/candidate-review-dossiers/not-a-uuid',
+    `/api/operator/v1/candidate-review-dossiers/${DOSSIER_ID}?limit=1`,
+    `/api/operator/v1/candidate-review-dossiers/${DOSSIER_ID}?x=1&x=2`,
+  ];
+
+  for (const url of invalidUrls) {
+    const response = await app.inject({ method: 'GET', url });
+    assert.equal(response.statusCode, 400, url);
+    assert.deepEqual(response.json(), {
+      error: {
+        code: 'INVALID_OPERATOR_CANDIDATE_DOSSIER_REQUEST',
+        message: 'Invalid operator candidate dossier request',
+      },
+    });
+  }
+  assert.equal(reads, 0);
+  await app.close();
+});
+
+test('candidate dossier maps not-found and failures without registering writes', async () => {
+  let fail = false;
+  const app = buildOperatorApp({
+    logger: false,
+    checkPostgres: async () => true,
+    readSnapshot: async () => EMPTY_SNAPSHOT,
+    readCandidateQueue: async () => EMPTY_CANDIDATE_QUEUE,
+    readCandidateDossier: async () => {
+      if (fail) {
+        throw new Error('postgres://secret-user:secret-password@database/internal');
+      }
+      return null;
+    },
+  });
+  const url = `/api/operator/v1/candidate-review-dossiers/${DOSSIER_ID}`;
+
+  const missing = await app.inject({ method: 'GET', url });
+  assert.equal(missing.statusCode, 404);
+  assert.deepEqual(missing.json(), {
+    error: {
+      code: 'OPERATOR_CANDIDATE_DOSSIER_NOT_FOUND',
+      message: 'Operator candidate dossier not found',
+    },
+  });
+
+  fail = true;
+  const unavailable = await app.inject({ method: 'GET', url });
+  assert.equal(unavailable.statusCode, 503);
+  assert.deepEqual(unavailable.json(), {
+    error: {
+      code: 'OPERATOR_CANDIDATE_DOSSIER_UNAVAILABLE',
+      message: 'Operator candidate dossier is temporarily unavailable',
+    },
+  });
+  assert.doesNotMatch(unavailable.body, /secret|postgres:\/\//i);
+
+  for (const method of ['POST', 'PUT', 'PATCH', 'DELETE'] as const) {
+    const response = await app.inject({ method, url });
     assert.equal(response.statusCode, 404, method);
   }
   await app.close();

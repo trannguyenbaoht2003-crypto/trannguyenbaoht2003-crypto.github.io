@@ -46,6 +46,12 @@ test('Railway and production deployment files do not expose operator runtime', a
 test('operator assets are self-contained and render untrusted text safely', async () => {
   const assets = await text('backend/src/operator/assets.ts');
   assert.match(assets, /\/api\/operator\/v1\/candidate-review-queue/);
+  assert.match(assets, /\/api\/operator\/v1\/candidate-review-dossiers/);
+  for (const required of ['Xem hồ sơ', 'Quay lại hàng đợi', 'Làm mới hồ sơ', 'noopener noreferrer', "referrerPolicy = 'no-referrer'"]) {
+    assert.ok(assets.includes(required), `dossier asset missing: ${required}`);
+  }
+  assert.doesNotMatch(assets, /method:\s*['"](?:POST|PUT|PATCH|DELETE)['"]/i);
+  assert.doesNotMatch(assets, /insertAdjacentHTML|EventSource|WebSocket/);
   assert.match(assets, /Candidate review/);
   assert.match(assets, /Monitoring &amp; feedback/);
   assert.match(assets, /textContent/);

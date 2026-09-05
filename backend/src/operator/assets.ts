@@ -25,6 +25,7 @@ export const OPERATOR_HTML = `<!doctype html>
     <p id="status" class="status" role="status"></p>
 
     <section id="candidate-view" aria-label="Candidate review queue">
+      <div id="candidate-queue-panel">
       <section id="candidate-summary" class="summary" aria-label="Tóm tắt candidate"></section>
 
       <section class="controls candidate-controls" aria-label="Bộ lọc candidate">
@@ -54,6 +55,17 @@ export const OPERATOR_HTML = `<!doctype html>
       </section>
 
       <section id="candidate-items" class="signals" aria-label="Candidate review items"></section>
+      </div>
+      <section id="candidate-dossier" hidden aria-label="Candidate evidence dossier">
+        <div class="toolbar">
+          <button id="dossier-back" type="button">Quay lại hàng đợi</button>
+          <button id="dossier-refresh" type="button">Làm mới hồ sơ</button>
+        </div>
+        <p id="dossier-status" class="status" role="status"></p>
+        <section id="dossier-summary" aria-label="Dossier summary"></section>
+        <section id="dossier-provenance" aria-label="Candidate provenance"></section>
+        <section id="dossier-claims" class="signals" aria-label="Claims and evidence"></section>
+      </section>
     </section>
 
     <section id="signal-view" aria-label="Monitoring and feedback" hidden>
@@ -130,6 +142,13 @@ input, select { width: 100%; border: 1px solid #343b4a; border-radius: 9px; back
 .reason-list, .detail-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .detail { border-left: 2px solid #343b4a; padding-left: 9px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .empty { border: 1px dashed #343b4a; border-radius: 14px; padding: 28px; color: #9aa4b7; text-align: center; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 12px; margin: 20px 0; }
+#candidate-dossier { overflow-wrap: anywhere; }
+#candidate-dossier h2 { font-size: 20px; }
+.evidence-row { border-left: 2px solid #477eb5; margin-top: 16px; padding: 4px 14px; }
+.claim-statement { white-space: pre-wrap; }
+a { color: #a8caff; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid #a8caff; outline-offset: 4px; }
 @media (max-width: 760px) { .summary { grid-template-columns: repeat(2,1fr); } .controls, .candidate-controls, .grid { grid-template-columns: 1fr; } .header { align-items: stretch; flex-direction: column; } }
 `;
 
@@ -142,6 +161,14 @@ export const OPERATOR_JS = `(() => {
   const signalTab = document.getElementById('view-signals');
   const candidateSummaryNode = document.getElementById('candidate-summary');
   const candidateItemsNode = document.getElementById('candidate-items');
+  const queuePanel = document.getElementById('candidate-queue-panel');
+  const dossierPanel = document.getElementById('candidate-dossier');
+  const dossierBack = document.getElementById('dossier-back');
+  const dossierRefresh = document.getElementById('dossier-refresh');
+  const dossierStatus = document.getElementById('dossier-status');
+  const dossierSummary = document.getElementById('dossier-summary');
+  const dossierProvenance = document.getElementById('dossier-provenance');
+  const dossierClaims = document.getElementById('dossier-claims');
   const reviewStateSelect = document.getElementById('review-state');
   const confidenceBandSelect = document.getElementById('confidence-band');
   const candidateSearchInput = document.getElementById('candidate-search');
@@ -158,6 +185,9 @@ export const OPERATOR_JS = `(() => {
   let activeView = 'candidates';
   let candidateRequestVersion = 0;
   let snapshotRequestVersion = 0;
+  let activeDossierCandidateRevisionId = null;
+  let dossierRequestVersion = 0;
+  let dossierStale = false;
 
   refreshButton.textContent = 'Làm mới';
 
@@ -279,7 +309,154 @@ export const OPERATOR_JS = `(() => {
     grid.appendChild(selectionPanel(item));
     grid.appendChild(confidencePanel(item.confidence));
     card.appendChild(grid);
+    const open = node('button', '', 'Xem hồ sơ');
+    open.type = 'button';
+    open.addEventListener('click', () => loadCandidateDossier(item.candidateRevisionId));
+    card.appendChild(open);
     return card;
+  }
+
+  function externalReference(reference) {
+    if (!reference) return document.createTextNode('Không có liên kết nguồn');
+    const link = node('a', '', 'Mở nguồn');
+    link.href = reference.url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.referrerPolicy = 'no-referrer';
+    return link;
+  }
+
+  function sourcePanel(value) {
+    const panel = node('section', 'panel');
+    const source = value.source;
+    panel.appendChild(node('p', '', source.displayName + ' · ' + source.status));
+    panel.appendChild(node('p', 'ids', 'Source: ' + source.sourceId + ' · ' + source.sourceKey));
+    panel.appendChild(node('p', 'ids', 'Policy: ' + source.sourcePolicyRevisionId + ' · ' + source.storagePermission));
+    panel.appendChild(node('p', 'muted', 'Observed: ' + (value.observedAt || 'n/a') + ' · Collected: ' + value.collectedAt));
+    panel.appendChild(externalReference(value.reference));
+    if (value.reference) {
+      for (const key of ['platform', 'author', 'publishedAt', 'sourceContentId']) {
+        if (value.reference[key] !== null) panel.appendChild(node('p', 'detail', key + ': ' + value.reference[key]));
+      }
+    }
+    return panel;
+  }
+
+  function renderCandidateDossier(value) {
+    const candidate = value.candidate;
+    const summary = node('article', 'card');
+    summary.appendChild(node('h2', '', 'Hồ sơ Candidate · ' + candidate.subjectExternalId));
+    for (const [label, text] of [
+      ['Candidate', candidate.candidateId], ['Revision', candidate.candidateRevisionId + ' (#' + candidate.revision + ')'],
+      ['Patch', candidate.patchKey + ' · ' + candidate.patchId], ['Catalog', candidate.catalogRevisionId],
+      ['Created', candidate.createdAt], ['Review policy', value.activeReviewPolicyRevisionId],
+      ['Claim set seal', value.claimSet.claimSetSealId], ['Claim set hash', value.claimSet.claimSetHash],
+    ]) summary.appendChild(node('p', 'ids', label + ': ' + text));
+    summary.appendChild(node('p', '', 'Review: ' + value.review.state + ' · ' + value.review.confirmedCount + ' / ' + value.review.requiredCount));
+    summary.appendChild(node('p', '', 'Claims: ' + value.claimSet.claimCount));
+    const grid = node('div', 'grid');
+    grid.appendChild(selectionPanel(candidate));
+    grid.appendChild(confidencePanel(value.confidence));
+    if (value.confidence) grid.appendChild(node('p', '', 'Confidence band: ' + value.confidence.band));
+    summary.appendChild(grid);
+    replaceChildren(dossierSummary, [summary]);
+
+    const provenance = [node('h2', '', 'Candidate provenance')];
+    for (const origin of ['collector_detected', 'community_submitted', 'editorial', 'ai_generated']) {
+      const members = value.provenance.filter((entry) => entry.origin === origin);
+      if (!members.length) continue;
+      const group = node('section', 'card');
+      group.appendChild(node('h3', '', origin));
+      for (const entry of members) {
+        group.appendChild(node('p', 'ids', entry.candidateProvenanceId));
+        group.appendChild(sourcePanel(entry));
+      }
+      provenance.push(group);
+    }
+    if (!value.provenance.length) provenance.push(node('p', 'empty', 'Chưa có Candidate provenance.'));
+    replaceChildren(dossierProvenance, provenance);
+
+    const claims = [node('h2', '', 'Claims & Evidence')];
+    for (const claim of value.claims) {
+      const card = node('article', 'card');
+      card.appendChild(node('h3', '', claim.claimKey));
+      card.appendChild(node('p', 'ids', claim.claimId + ' · ' + claim.statementHash));
+      const badges = node('div', 'badges');
+      badges.appendChild(node('span', 'badge', claim.importance));
+      badges.appendChild(node('span', 'badge', claim.claimType));
+      card.appendChild(badges);
+      card.appendChild(node('p', 'claim-statement', claim.statement));
+      if (!claim.decision) {
+        card.appendChild(node('p', 'muted', 'Chưa có quyết định Evidence hiện hành'));
+      } else {
+        const decision = claim.decision;
+        card.appendChild(node('h4', '', 'Current decision: ' + decision.outcome));
+        card.appendChild(node('p', 'detail', decision.reason));
+        card.appendChild(node('p', 'ids', 'Decision: ' + decision.decisionId + ' · Policy: ' + decision.evidencePolicyRevisionId));
+        card.appendChild(node('p', 'muted', 'Evaluated: ' + decision.evaluatedAt));
+        if (!decision.evidence.length) card.appendChild(node('p', 'muted', 'Quyết định hiện hành không gắn Evidence'));
+        for (const evidence of decision.evidence) {
+          const row = node('section', 'evidence-row');
+          row.appendChild(node('h4', '', 'Evidence · ' + evidence.stance));
+          row.appendChild(node('p', 'ids', evidence.evidenceId + ' · Association: ' + evidence.evidenceAssociationId));
+          row.appendChild(node('p', '', 'Patch: ' + evidence.evidencePatchKey + ' · ' + evidence.evidencePatchId));
+          row.appendChild(node('p', '', 'Cross-patch revalidated: ' + String(evidence.crossPatchRevalidated)));
+          if (evidence.revalidationReason) row.appendChild(node('p', 'detail', evidence.revalidationReason));
+          row.appendChild(node('p', 'muted', 'Created: ' + evidence.evidenceCreatedAt));
+          row.appendChild(sourcePanel(evidence));
+          card.appendChild(row);
+        }
+      }
+      claims.push(card);
+    }
+    if (!value.claims.length) claims.push(node('p', 'empty', 'Không có Claim trong hồ sơ.'));
+    replaceChildren(dossierClaims, claims);
+    generatedNode.textContent = 'Dossier snapshot: ' + value.generatedAt;
+  }
+
+  function closeDossier() {
+    ++dossierRequestVersion;
+    activeDossierCandidateRevisionId = null;
+    dossierPanel.hidden = true;
+    queuePanel.hidden = false;
+    refreshButton.hidden = false;
+  }
+
+  async function loadCandidateDossier(candidateRevisionId) {
+    activeDossierCandidateRevisionId = candidateRevisionId;
+    const version = ++dossierRequestVersion;
+    const isCurrent = () => version === dossierRequestVersion
+      && activeDossierCandidateRevisionId === candidateRevisionId && activeView === 'candidates';
+    dossierStale = false;
+    queuePanel.hidden = true;
+    dossierPanel.hidden = false;
+    refreshButton.hidden = true;
+    statusNode.textContent = '';
+    generatedNode.textContent = '';
+    dossierRefresh.disabled = true;
+    dossierStatus.textContent = 'Đang tải hồ sơ…';
+    for (const section of [dossierSummary, dossierProvenance, dossierClaims]) replaceChildren(section, []);
+    try {
+      const response = await fetch('/api/operator/v1/candidate-review-dossiers/' + encodeURIComponent(candidateRevisionId), { method: 'GET', cache: 'no-store' });
+      if (!isCurrent()) return;
+      if (response.status === 404) {
+        dossierStale = true;
+        dossierStatus.textContent = 'Candidate không còn trong hàng đợi hiện hành. Quay lại để làm mới hàng đợi.';
+        return;
+      }
+      if (!response.ok) throw new Error('dossier unavailable');
+      const value = await response.json();
+      if (!isCurrent()) return;
+      renderCandidateDossier(value);
+      dossierStatus.textContent = '';
+    } catch {
+      if (isCurrent()) {
+        for (const section of [dossierSummary, dossierProvenance, dossierClaims]) replaceChildren(section, []);
+        dossierStatus.textContent = 'Không thể tải hồ sơ. Vui lòng thử làm mới hồ sơ.';
+      }
+    } finally {
+      if (isCurrent()) dossierRefresh.disabled = false;
+    }
   }
 
   function renderCandidateItems() {
@@ -426,7 +603,7 @@ export const OPERATOR_JS = `(() => {
 
   async function loadCandidateQueue() {
     const requestVersion = ++candidateRequestVersion;
-    if (activeView === 'candidates') {
+    if (activeView === 'candidates' && !activeDossierCandidateRevisionId) {
       refreshButton.disabled = true;
       statusNode.textContent = 'Đang tải candidate review queue…';
     }
@@ -436,22 +613,23 @@ export const OPERATOR_JS = `(() => {
       const value = await response.json();
       if (requestVersion !== candidateRequestVersion) return;
       candidateQueue = value;
-      if (activeView === 'candidates') {
+      if (activeView === 'candidates' && !activeDossierCandidateRevisionId) {
         renderCandidateQueue(candidateQueue);
         statusNode.textContent = '';
       }
     } catch {
-      if (activeView === 'candidates' && requestVersion === candidateRequestVersion) {
+      if (activeView === 'candidates' && !activeDossierCandidateRevisionId && requestVersion === candidateRequestVersion) {
         statusNode.textContent = 'Không thể tải candidate review queue. Kiểm tra PostgreSQL và thử lại.';
       }
     } finally {
-      if (activeView === 'candidates' && requestVersion === candidateRequestVersion) {
+      if (activeView === 'candidates' && !activeDossierCandidateRevisionId && requestVersion === candidateRequestVersion) {
         refreshButton.disabled = false;
       }
     }
   }
 
   function setActiveView(view) {
+    closeDossier();
     activeView = view;
     const candidatesActive = view === 'candidates';
     candidateView.hidden = !candidatesActive;
@@ -473,6 +651,16 @@ export const OPERATOR_JS = `(() => {
   refreshButton.addEventListener('click', () => {
     if (activeView === 'candidates') loadCandidateQueue();
     else loadSnapshot();
+  });
+  dossierRefresh.addEventListener('click', () => {
+    if (activeDossierCandidateRevisionId) loadCandidateDossier(activeDossierCandidateRevisionId);
+  });
+  dossierBack.addEventListener('click', () => {
+    const refreshQueue = dossierStale;
+    closeDossier();
+    refreshButton.disabled = false;
+    if (candidateQueue) renderCandidateQueue(candidateQueue);
+    if (refreshQueue) loadCandidateQueue();
   });
   candidateTab.addEventListener('click', () => setActiveView('candidates'));
   signalTab.addEventListener('click', () => setActiveView('signals'));
