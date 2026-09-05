@@ -7,6 +7,7 @@ import type {
   PublicationMonitoringEligibilityOutcome,
   PublicationMonitoringSeverity,
 } from '../monitoring/types.js';
+import type { ClaimImportance, ClaimType } from '../trust/types.js';
 
 export type OperatorPriority = 'critical' | 'warning' | 'feedback';
 
@@ -113,4 +114,103 @@ export type OperatorCandidateReviewQueue = {
 export type OperatorCandidateReviewQueueOptions = {
   limit?: number;
   now?: Date;
+};
+
+export type OperatorCandidateReviewDossierOptions = {
+  now?: Date;
+};
+
+export type OperatorDossierReference = {
+  url: string;
+  platform: string | null;
+  author: string | null;
+  publishedAt: string | null;
+  sourceContentId: string | null;
+};
+
+export type OperatorDossierSource = {
+  sourceId: string;
+  sourceKey: string;
+  displayName: string;
+  status: 'active' | 'suspended' | 'retired';
+  sourcePolicyRevisionId: string;
+  storagePermission: 'blob_allowed' | 'reference_only' | 'aggregate_only';
+};
+
+export type OperatorCandidateReviewProvenance = {
+  candidateProvenanceId: string;
+  origin:
+    | 'collector_detected'
+    | 'community_submitted'
+    | 'editorial'
+    | 'ai_generated';
+  source: OperatorDossierSource;
+  reference: OperatorDossierReference | null;
+  observedAt: string | null;
+  collectedAt: string;
+};
+
+export type OperatorCandidateReviewEvidence = {
+  evidenceAssociationId: string;
+  evidenceId: string;
+  stance: 'supports' | 'contradicts' | 'context_only';
+  crossPatchRevalidated: boolean;
+  revalidationReason: string | null;
+  evidencePatchId: string;
+  evidencePatchKey: string;
+  source: OperatorDossierSource;
+  reference: OperatorDossierReference | null;
+  observedAt: string | null;
+  collectedAt: string;
+  evidenceCreatedAt: string;
+};
+
+export type OperatorCandidateReviewClaim = {
+  claimId: string;
+  claimKey: string;
+  claimType: ClaimType;
+  importance: ClaimImportance;
+  statement: string;
+  statementHash: string;
+  decision: null | {
+    decisionId: string;
+    evidencePolicyRevisionId: string;
+    outcome: 'supported' | 'insufficient' | 'contradicted';
+    reason: string;
+    evaluatedAt: string;
+    evidence: OperatorCandidateReviewEvidence[];
+  };
+};
+
+export type OperatorCandidateReviewDossier = {
+  schemaVersion: 1;
+  generatedAt: string;
+  activeReviewPolicyRevisionId: string;
+  candidate: {
+    candidateId: string;
+    candidateRevisionId: string;
+    revision: number;
+    patchId: string;
+    patchKey: string;
+    catalogRevisionId: string;
+    subjectExternalId: string;
+    selection: {
+      augmentExternalIds: string[];
+      itemExternalIds: string[];
+    };
+    createdAt: string;
+  };
+  review: {
+    state: OperatorCandidateReviewState;
+    confirmedCount: number;
+    requiredCount: number;
+  };
+  confidence: OperatorCandidateConfidence | null;
+  claimSet: {
+    claimSetSealId: string;
+    claimSetHash: string;
+    claimCount: number;
+  };
+  provenance: OperatorCandidateReviewProvenance[];
+  claims: OperatorCandidateReviewClaim[];
 };

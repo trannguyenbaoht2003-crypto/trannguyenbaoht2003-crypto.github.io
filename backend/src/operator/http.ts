@@ -1,6 +1,7 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 
 import type {
+  OperatorCandidateReviewDossier,
   OperatorCandidateReviewQueue,
   OperatorCandidateReviewQueueOptions,
   OperatorSnapshot,
@@ -25,11 +26,19 @@ export type OperatorCandidateQueueRequestOptions = Required<
   Pick<OperatorCandidateReviewQueueOptions, 'limit' | 'now'>
 >;
 
+export type OperatorCandidateDossierRequestOptions = {
+  candidateRevisionId: string;
+  now: Date;
+};
+
 export interface BuildOperatorAppOptions {
   readSnapshot(options: OperatorSnapshotRequestOptions): Promise<OperatorSnapshot>;
   readCandidateQueue(
     options: OperatorCandidateQueueRequestOptions,
   ): Promise<OperatorCandidateReviewQueue>;
+  readCandidateDossier(
+    options: OperatorCandidateDossierRequestOptions,
+  ): Promise<OperatorCandidateReviewDossier | null>;
   checkPostgres(): Promise<boolean>;
   now?: () => Date;
   logger?: boolean;
@@ -79,8 +88,31 @@ const CANDIDATE_QUEUE_UNAVAILABLE = {
   },
 } as const;
 
+const INVALID_CANDIDATE_DOSSIER_REQUEST = {
+  error: {
+    code: 'INVALID_OPERATOR_CANDIDATE_DOSSIER_REQUEST',
+    message: 'Invalid operator candidate dossier request',
+  },
+} as const;
+
+const CANDIDATE_DOSSIER_NOT_FOUND = {
+  error: {
+    code: 'OPERATOR_CANDIDATE_DOSSIER_NOT_FOUND',
+    message: 'Operator candidate dossier not found',
+  },
+} as const;
+
+const CANDIDATE_DOSSIER_UNAVAILABLE = {
+  error: {
+    code: 'OPERATOR_CANDIDATE_DOSSIER_UNAVAILABLE',
+    message: 'Operator candidate dossier is temporarily unavailable',
+  },
+} as const;
+
 const QUERY_KEYS = new Set(['sinceHours', 'limit', 'detailSampleLimit']);
 const CANDIDATE_QUEUE_QUERY_KEYS = new Set(['limit']);
+const CANONICAL_UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 function strictInteger(
   value: unknown,
@@ -200,6 +232,37 @@ export function buildOperatorApp(
       return reply.code(503).send(CANDIDATE_QUEUE_UNAVAILABLE);
     }
   });
+
+  app.get<{
+    Params: { candidateRevisionId: string };
+    Querystring: Record<string, unknown>;
+  }>(
+    '/api/operator/v1/candidate-review-dossiers/:candidateRevisionId',
+    async (request, reply) => {
+      if (
+        !CANONICAL_UUID_PATTERN.test(request.params.candidateRevisionId)
+        || Object.keys(request.query).length !== 0
+      ) {
+        return reply.code(400).send(INVALID_CANDIDATE_DOSSIER_REQUEST);
+      }
+      try {
+        const dossier = await options.readCandidateDossier({
+          candidateRevisionId: request.params.candidateRevisionId,
+          now: (options.now ?? (() => new Date()))(),
+        });
+        if (dossier === null) {
+          return reply.code(404).send(CANDIDATE_DOSSIER_NOT_FOUND);
+        }
+        return dossier;
+      } catch {
+        app.log.error(
+          { code: 'OPERATOR_CANDIDATE_DOSSIER_READ_FAILED' },
+          'operator candidate dossier read failed',
+        );
+        return reply.code(503).send(CANDIDATE_DOSSIER_UNAVAILABLE);
+      }
+    },
+  );
 
   app.get('/', async (_request, reply) =>
     reply.type('text/html; charset=utf-8').send(OPERATOR_HTML));
