@@ -89,8 +89,7 @@ jobs:
         run: npm --prefix backend run typecheck
 
       - name: Backend tests
-        # Full gate command: npm --prefix backend test
-        run: cd backend && node --import tsx --test --test-concurrency=1 --test-name-pattern='real CLI retries before' test/human-review-cli-integration.test.ts
+        run: npm --prefix backend test
 
       - name: Backend build
         run: npm --prefix backend run build
