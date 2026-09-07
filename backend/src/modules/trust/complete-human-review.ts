@@ -340,9 +340,9 @@ async function loadReviewPointerSeed(
   candidateRevisionId: string,
 ): Promise<ReviewPointerSeed> {
   const result = await client.query<ReviewPointerSeed>(
-    `select revision.patch_id,
-            revision.catalog_revision_id,
-            candidate.game_mode_external_id
+    `select revision.patch_id as "patchId",
+            revision.catalog_revision_id as "catalogRevisionId",
+            candidate.game_mode_external_id as "gameModeExternalId"
        from candidate_revisions revision
        join candidates candidate
          on candidate.candidate_id = revision.candidate_id
