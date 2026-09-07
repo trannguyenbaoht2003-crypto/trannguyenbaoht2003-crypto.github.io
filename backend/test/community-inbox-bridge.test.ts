@@ -114,6 +114,21 @@ test('a canonical selection change creates a new observation identity', () => {
   assert.notEqual(first.idempotencyKey, second.idempotencyKey);
 });
 
+test('a stateless collector rediscovery keeps content identity when its collection hint changes', () => {
+  const first = buildCommunityObservationBatch(batchInput([candidate()])).commands[0]!;
+  const nextDay = buildCommunityObservationBatch(batchInput([
+    candidate({ firstSeenAt: '2026-08-14' }),
+  ])).commands[0]!;
+
+  assert.notEqual(first.collectedAt.toISOString(), nextDay.collectedAt.toISOString());
+  assert.equal(first.idempotencyKey, nextDay.idempotencyKey);
+  assert.equal(first.observationId, nextDay.observationId);
+  const retry = buildCommunityObservationBatch(batchInput([
+    candidate({ firstSeenAt: '2026-08-14' }),
+  ])).commands[0]!;
+  assert.deepEqual(nextDay, retry);
+});
+
 test('skips rows that must not be coerced into backend candidates', () => {
   const result = buildCommunityObservationBatch(batchInput([
     candidate({ id: 'wrong-mode', modeValid: false }),

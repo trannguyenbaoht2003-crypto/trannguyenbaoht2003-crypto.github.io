@@ -24,6 +24,17 @@ export type {
   CompleteHumanReviewResult,
 } from './types.js';
 
+export interface CompleteHumanReviewOptions {
+  requireActiveReviewPolicy?: boolean;
+  /**
+   * Private adapters may use a stable reviewer-input identity while keeping
+   * generated trust record IDs unique inside the command. The default remains
+   * the exact command hash and legacy scope.
+   */
+  idempotencyPayloadHash?: string;
+  idempotencyScope?: string;
+}
+
 const COMMAND_KEYS = [
   'actorId',
   'candidateId',
@@ -250,6 +261,147 @@ async function loadReviewPolicy(
   return row;
 }
 
+async function assertActiveReviewPolicy(
+  client: PoolClient,
+  candidateId: string,
+  candidateRevisionId: string,
+  reviewPolicyRevisionId: string,
+): Promise<void> {
+  const result = await client.query<{
+    candidate_id: unknown;
+    review_policy_revision_id: unknown;
+  }>(
+    `with active_policy as (
+         select policy.review_policy_revision_id
+           from active_eligibility_policy_revision active
+           join eligibility_policy_revisions eligibility_policy
+             on eligibility_policy.eligibility_policy_revision_id =
+                active.eligibility_policy_revision_id
+           join review_policy_revisions policy
+             on policy.review_policy_revision_id =
+                eligibility_policy.review_policy_revision_id
+          where active.scope = 'candidate_revision'
+       ), latest_active_revisions as (
+         select revision.candidate_id,
+                revision.candidate_revision_id,
+                row_number() over (
+                  partition by revision.candidate_id
+                  order by revision.revision desc,
+                           revision.candidate_revision_id::text collate "C" desc
+                ) as candidate_rank
+           from candidate_revisions revision
+           join candidates candidate
+             on candidate.candidate_id = revision.candidate_id
+           join active_catalog_revisions active_catalog
+             on active_catalog.patch_id = revision.patch_id
+            and active_catalog.game_mode_external_id =
+                candidate.game_mode_external_id
+            and active_catalog.catalog_revision_id =
+                revision.catalog_revision_id
+       )
+       select revision.candidate_id,
+              active_policy.review_policy_revision_id
+         from latest_active_revisions revision
+         join candidate_claim_set_seals seal
+           on seal.candidate_revision_id = revision.candidate_revision_id
+         cross join active_policy
+        where revision.candidate_id = $1
+          and revision.candidate_revision_id = $2
+          and revision.candidate_rank = 1`,
+    [candidateId, candidateRevisionId],
+  );
+  if (
+    result.rows.length !== 1
+    || result.rows[0]?.candidate_id !== candidateId
+    || result.rows[0]?.review_policy_revision_id !== reviewPolicyRevisionId
+  ) {
+    throw new Error('REVIEW_INPUT_STALE');
+  }
+}
+
+interface ReviewPointerSeed {
+  patchId: string;
+  catalogRevisionId: string;
+  gameModeExternalId: string;
+}
+
+async function loadReviewPointerSeed(
+  client: PoolClient,
+  candidateId: string,
+  candidateRevisionId: string,
+): Promise<ReviewPointerSeed> {
+  const result = await client.query<ReviewPointerSeed>(
+    `select revision.patch_id,
+            revision.catalog_revision_id,
+            candidate.game_mode_external_id
+       from candidate_revisions revision
+       join candidates candidate
+         on candidate.candidate_id = revision.candidate_id
+      where revision.candidate_id = $1
+        and revision.candidate_revision_id = $2`,
+    [candidateId, candidateRevisionId],
+  );
+  const row = result.rows[0];
+  if (!row) {
+    throw new Error('REVIEW_INPUT_STALE');
+  }
+  return row;
+}
+
+async function lockCurrentAuthorityPointers(
+  client: PoolClient,
+  seed: ReviewPointerSeed,
+): Promise<void> {
+  // Catalog activation locks the patch before changing its active pointer.
+  // Hold a conflicting share lock through this review transaction so the
+  // currentness check cannot become stale before commit.
+  const patch = await client.query(
+    `select patch_id
+       from patches
+      where patch_id = $1
+      for share`,
+    [seed.patchId],
+  );
+  if (patch.rowCount !== 1) {
+    throw new Error('REVIEW_INPUT_STALE');
+  }
+  const catalog = await client.query<{ catalog_revision_id: string }>(
+    `select catalog_revision_id
+       from active_catalog_revisions
+      where patch_id = $1
+        and game_mode_external_id = $2
+      for share`,
+    [seed.patchId, seed.gameModeExternalId],
+  );
+  if (
+    catalog.rows.length !== 1
+    || catalog.rows[0]?.catalog_revision_id !== seed.catalogRevisionId
+  ) {
+    throw new Error('REVIEW_INPUT_STALE');
+  }
+
+  // Eligibility policy activation serializes through this advisory lock.
+  // It also protects the (possibly empty) pointer row from a concurrent
+  // first activation.
+  await client.query(
+    `select pg_advisory_xact_lock(
+       hashtextextended(
+         'active_eligibility_policy_revision:candidate_revision',
+         0
+       )
+     )`,
+  );
+  const policy = await client.query(
+    `select eligibility_policy_revision_id
+       from active_eligibility_policy_revision
+      where scope = 'candidate_revision'
+      for share`,
+  );
+  if (policy.rowCount !== 1) {
+    throw new Error('REVIEW_INPUT_STALE');
+  }
+}
+
 async function loadProvenance(
   client: PoolClient,
   candidateRevisionId: string,
@@ -453,16 +605,53 @@ function isDuplicateReviewer(error: unknown): error is ConstraintError {
 export async function completeHumanReview(
   pool: Pool,
   input: CompleteHumanReviewCommand,
+  options: CompleteHumanReviewOptions = {},
 ): Promise<CompleteHumanReviewResult> {
   const command = normalizeCommand(input);
-  const payloadHash = commandPayloadHash(command);
+  const payloadHash = options.idempotencyPayloadHash
+    ?? commandPayloadHash(command);
+  const idempotencyScope = options.idempotencyScope
+    ?? 'human_review_completion';
   try {
     return await withTransaction(pool, async (client) => {
+      // Reserve/replay before currentness checks. A lost acknowledgement must
+      // remain replayable even after quorum or a later pointer activation.
+      const replay = await beginIdempotentCommand<
+        CompleteHumanReviewResult
+      >(
+        client,
+        idempotencyScope,
+        command.idempotencyKey,
+        payloadHash,
+      );
+      if (replay) {
+        return {
+          ...replay,
+          replayed: true,
+        };
+      }
+
+      if (options.requireActiveReviewPolicy === true) {
+        const seed = await loadReviewPointerSeed(
+          client,
+          command.candidateId,
+          command.candidateRevisionId,
+        );
+        await lockCurrentAuthorityPointers(client, seed);
+      }
       const authority = await lockCandidateRevisionAuthority(
         client,
         command.candidateId,
         command.candidateRevisionId,
       );
+      if (options.requireActiveReviewPolicy === true) {
+        await assertActiveReviewPolicy(
+          client,
+          authority.candidateId,
+          authority.candidateRevisionId,
+          command.reviewPolicyRevisionId,
+        );
+      }
       const claims = await lockClaims(
         client,
         authority.candidateRevisionId,
@@ -475,21 +664,6 @@ export async function completeHumanReview(
         client,
         command.reviewPolicyRevisionId,
       );
-      const replay = await beginIdempotentCommand<
-        CompleteHumanReviewResult
-      >(
-        client,
-        'human_review_completion',
-        command.idempotencyKey,
-        payloadHash,
-      );
-      if (replay) {
-        return {
-          ...replay,
-          replayed: true,
-        };
-      }
-
       const provenance = await loadProvenance(
         client,
         authority.candidateRevisionId,
@@ -685,7 +859,7 @@ export async function completeHumanReview(
       };
       await completeIdempotentCommand(
         client,
-        'human_review_completion',
+        idempotencyScope,
         command.idempotencyKey,
         result,
       );

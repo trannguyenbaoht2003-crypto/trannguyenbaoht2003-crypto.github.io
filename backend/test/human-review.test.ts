@@ -12,6 +12,7 @@ import {
   humanReviewCommand,
   seedTrustReviewContext,
 } from './helpers/trust.js';
+import { seedActivatedGateContext } from './helpers/gate.js';
 import {
   recordClaimEvidenceDecision,
 } from '../src/modules/trust/record-claim-evidence-decision.js';
@@ -197,6 +198,25 @@ test('same reviewer cannot complete the same exact input twice', async () => {
         TRUST_IDS.secondReviewQuorumEvaluationId,
     })),
     /REVIEW_ALREADY_COMPLETED/,
+  );
+  assert.deepEqual(await reviewCounts(pool), before);
+  await pool.end();
+});
+
+test('active-policy enforcement rejects a review pinned to a stale policy', async () => {
+  const pool = await resetDatabase();
+  await seedActivatedGateContext(pool);
+  const before = await reviewCounts(pool);
+
+  await assert.rejects(
+    completeHumanReview(
+      pool,
+      humanReviewCommand({
+        reviewPolicyRevisionId: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+      }),
+      { requireActiveReviewPolicy: true },
+    ),
+    /REVIEW_INPUT_STALE/,
   );
   assert.deepEqual(await reviewCounts(pool), before);
   await pool.end();

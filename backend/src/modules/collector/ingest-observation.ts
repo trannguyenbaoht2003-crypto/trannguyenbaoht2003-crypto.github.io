@@ -41,6 +41,8 @@ interface IdempotencyRow {
   state: string;
 }
 
+const COMMUNITY_BRIDGE_ADAPTER = 'community-collector-bridge-v1';
+
 export async function ingestObservation(
   pool: Pool,
   command: IngestObservationCommand,
@@ -85,7 +87,12 @@ export async function ingestObservation(
       actorId: command.actorId,
       adapterVersion: command.adapterVersion,
       aggregateMetadata: aggregateMetadata ?? null,
-      collectedAt: command.collectedAt,
+      // The community bridge key is content-derived. Collection time is an
+      // arrival hint and may differ when an old inbox is replayed after an
+      // image update, so it must not invalidate that replay.
+      ...(command.adapterVersion === COMMUNITY_BRIDGE_ADAPTER
+        ? {}
+        : { collectedAt: command.collectedAt }),
       correlationId: command.correlationId,
       externalReference: (
         referenceStored ? command.externalReference ?? null : null
@@ -113,6 +120,17 @@ export async function ingestObservation(
         [command.idempotencyKey],
       );
       const record = existing.rows[0];
+      if (
+        record
+        && record.payload_hash !== payloadHash
+        && command.adapterVersion === COMMUNITY_BRIDGE_ADAPTER
+        && record.state === 'completed'
+        && record.result !== null
+      ) {
+        // Legacy community records included collectedAt in their hash. The
+        // bounded content digest in the idempotency key still proves identity.
+        return { ...record.result, replayed: true };
+      }
       if (!record || record.payload_hash !== payloadHash) {
         throw new Error('IDEMPOTENCY_PAYLOAD_CONFLICT');
       }
