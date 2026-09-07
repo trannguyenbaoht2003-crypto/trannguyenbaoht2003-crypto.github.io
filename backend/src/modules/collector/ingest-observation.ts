@@ -83,16 +83,10 @@ export async function ingestObservation(
         ? normalizeObservationAggregateMetadata(command.aggregateMetadata)
         : undefined
     );
-    const payloadHash = hashCanonicalJson({
+    const payload = {
       actorId: command.actorId,
       adapterVersion: command.adapterVersion,
       aggregateMetadata: aggregateMetadata ?? null,
-      // The community bridge key is content-derived. Collection time is an
-      // arrival hint and may differ when an old inbox is replayed after an
-      // image update, so it must not invalidate that replay.
-      ...(command.adapterVersion === COMMUNITY_BRIDGE_ADAPTER
-        ? {}
-        : { collectedAt: command.collectedAt }),
       correlationId: command.correlationId,
       externalReference: (
         referenceStored ? command.externalReference ?? null : null
@@ -101,7 +95,20 @@ export async function ingestObservation(
       observationId: command.observationId,
       rawBlob: blobStored ? command.rawBlob : null,
       sourceId: command.sourceId,
-    });
+    };
+    // The community bridge key is content-derived. Collection time is an
+    // arrival hint and may differ when an old inbox is replayed after an
+    // image update, so it must not invalidate that replay.
+    const payloadHash = hashCanonicalJson(
+      command.adapterVersion === COMMUNITY_BRIDGE_ADAPTER
+        ? payload
+        : { ...payload, collectedAt: command.collectedAt },
+    );
+    const legacyCommunityPayloadHash = (
+      command.adapterVersion === COMMUNITY_BRIDGE_ADAPTER
+        ? hashCanonicalJson({ ...payload, collectedAt: command.collectedAt })
+        : null
+    );
 
     const inserted = await client.query(
       `insert into idempotency_records
@@ -123,12 +130,13 @@ export async function ingestObservation(
       if (
         record
         && record.payload_hash !== payloadHash
-        && command.adapterVersion === COMMUNITY_BRIDGE_ADAPTER
+        && legacyCommunityPayloadHash !== null
+        && record.payload_hash === legacyCommunityPayloadHash
         && record.state === 'completed'
         && record.result !== null
       ) {
-        // Legacy community records included collectedAt in their hash. The
-        // bounded content digest in the idempotency key still proves identity.
+        // Legacy community records included collectedAt in their hash. Only
+        // that exact compatibility difference is replayable.
         return { ...record.result, replayed: true };
       }
       if (!record || record.payload_hash !== payloadHash) {

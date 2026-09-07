@@ -175,6 +175,16 @@ test('community content identity replays across a changed collection timestamp',
   });
   assert.equal(first.replayed, false);
   assert.equal(replay.replayed, true);
+  await assert.rejects(
+    ingestObservation(pool, {
+      ...communityCommand,
+      adapterVersion: 'community-collector-bridge-v1',
+      idempotencyKey: 'community:candidate:content-digest',
+      collectedAt: new Date('2026-07-24T01:00:00Z'),
+      rawBlob: 'unexpected payload change',
+    }),
+    /IDEMPOTENCY_PAYLOAD_CONFLICT/,
+  );
   assert.equal(await tableCount(pool, 'raw_observations'), 1);
   await pool.end();
 });
