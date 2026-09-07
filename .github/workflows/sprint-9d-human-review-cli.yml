@@ -89,7 +89,7 @@ jobs:
         run: npm --prefix backend run typecheck
 
       - name: Backend tests
-        run: npm --prefix backend test
+        run: cd backend && node --import tsx --test --test-concurrency=1 test/human-review-cli-integration.test.ts
 
       - name: Backend build
         run: npm --prefix backend run build

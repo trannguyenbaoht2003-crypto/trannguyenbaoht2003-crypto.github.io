@@ -27,8 +27,48 @@ function args(actor = 'cli-reviewer-a', key = 'cli-review-a', reason = 'Reviewed
   ];
 }
 
+function debugPool(databaseUrl: string): Pool {
+  const pool = new Pool({ connectionString: databaseUrl });
+  const connect = pool.connect.bind(pool);
+  pool.connect = (async () => {
+    const client = await connect();
+    const query = client.query.bind(client);
+    client.query = (async (...queryArgs: unknown[]) => {
+      const result = await Reflect.apply(query, client, queryArgs);
+      const sql = typeof queryArgs[0] === 'string' ? queryArgs[0].replace(/\s+/g, ' ').trim() : '';
+      if (/from (active_|candidate_|review_|eligibility_|patches|candidates)/i.test(sql)) {
+        console.error('DEBUG_QUERY ' + JSON.stringify({ sql, rows: result.rows }));
+      }
+      return result;
+    }) as typeof client.query;
+    return client;
+  }) as typeof pool.connect;
+  return pool;
+}
+
 function run(command = args()) {
-  return runHumanReviewCli(command, { DATABASE_URL: testDatabaseUrl() });
+  return runHumanReviewCli(command, { DATABASE_URL: testDatabaseUrl() }, {
+    createPool: debugPool,
+    resolveContext: async (pool, candidateRevisionId) => {
+      try {
+        const context = await resolveHumanReviewContext(pool, candidateRevisionId);
+        console.error('DEBUG_CONTEXT ' + JSON.stringify(context));
+        return context;
+      } catch (error) {
+        console.error('DEBUG_CONTEXT_ERROR ' + (error instanceof Error ? error.message : String(error)));
+        throw error;
+      }
+    },
+    completeReview: async (pool, commandInput, options) => {
+      console.error('DEBUG_COMMAND ' + JSON.stringify(commandInput));
+      try {
+        return await completeHumanReview(pool, commandInput, options);
+      } catch (error) {
+        console.error('DEBUG_COMPLETE_ERROR ' + (error instanceof Error ? error.message : String(error)));
+        throw error;
+      }
+    },
+  });
 }
 
 async function counts(pool: Pool) {
