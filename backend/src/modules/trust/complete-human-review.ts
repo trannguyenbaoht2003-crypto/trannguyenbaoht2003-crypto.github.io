@@ -301,13 +301,22 @@ async function assertActiveReviewPolicy(
        )
        select revision.candidate_id,
               active_policy.review_policy_revision_id
-         from latest_active_revisions revision
-         join candidate_claim_set_seals seal
-           on seal.candidate_revision_id = revision.candidate_revision_id
-         cross join active_policy
+       from latest_active_revisions revision
+       join candidate_claim_set_seals seal
+         on seal.candidate_revision_id = revision.candidate_revision_id
+       cross join active_policy
+       left join current_review_quorum_evaluations current_review
+         on current_review.candidate_revision_id =
+            revision.candidate_revision_id
+        and current_review.review_policy_revision_id =
+            active_policy.review_policy_revision_id
+       left join review_quorum_evaluations review
+         on review.review_quorum_evaluation_id =
+            current_review.review_quorum_evaluation_id
         where revision.candidate_id = $1
           and revision.candidate_revision_id = $2
-          and revision.candidate_rank = 1`,
+          and revision.candidate_rank = 1
+          and coalesce(review.quorum_satisfied, false) = false`,
     [candidateId, candidateRevisionId],
   );
   if (

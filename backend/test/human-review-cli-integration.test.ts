@@ -61,6 +61,10 @@ test('real CLI retries before and after quorum preserve the original receipt and
   assert.equal(completedRetry.exitCode, 0, completedRetry.stderr);
   assert.deepEqual(JSON.parse(completedRetry.stdout), { ...JSON.parse(second.stdout), replayed: true });
   assert.deepEqual(await counts(pool), completedCounts);
+
+  const afterQuorum = await run(args('cli-reviewer-c', 'cli-review-c'));
+  assert.equal(afterQuorum.exitCode, 3);
+  assert.deepEqual(await counts(pool), completedCounts);
 });
 
 test('real concurrent CLI retries commit one review and return one replay', databaseTest, async (t) => {
