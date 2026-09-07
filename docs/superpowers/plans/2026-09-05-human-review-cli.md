@@ -203,7 +203,7 @@ Expected: the new race/output cases fail.
 
 - [ ] **Step 3: Add the active-policy guard**
 
-Immediately after `lockCandidateRevisionAuthority` and before loading the policy snapshot, query the active `candidate_revision` policy and require exactly one row whose `review_policy_revision_id` equals `command.reviewPolicyRevisionId`. Throw `REVIEW_INPUT_STALE` for zero, multiple, malformed, or mismatched rows. Keep the idempotency lookup after this guard so a replay cannot succeed against an inactive policy.
+After reserving or replaying the CLI receipt, query the active `candidate_revision` policy and require exactly one row whose `review_policy_revision_id` equals `command.reviewPolicyRevisionId`. For a new receipt, perform this check after catalog/policy pointer locks and CandidateRevision authority locking; throw `REVIEW_INPUT_STALE` for zero, multiple, malformed, or mismatched rows. A committed replay returns before currentness checks, so a lost acknowledgement remains replayable after an authority pointer moves.
 
 - [ ] **Step 4: Implement command construction and sanitized execution**
 
@@ -216,15 +216,22 @@ const result = await completeReview(pool, {
   candidateId: context.candidateId,
   candidateRevisionId: input.candidateRevisionId,
   completedAt: new Date().toISOString(),
-  correlationId: input.correlationId ?? randomUUID(),
-  humanReviewId: randomUUID(),
+  correlationId: input.correlationId
+    ?? deterministicUuid(`human-review-cli:correlation:${input.idempotencyKey}`),
+  humanReviewId: deterministicUuid(
+    `human-review-cli:review:${input.candidateRevisionId}:${input.idempotencyKey}`,
+  ),
   idempotencyKey: input.idempotencyKey,
   outcome: input.outcome,
   permissionUsed: 'reviewer',
   reason: input.reason,
-  reviewInputSnapshotId: randomUUID(),
+  reviewInputSnapshotId: deterministicUuid(
+    `human-review-cli:snapshot:${input.candidateRevisionId}:${input.idempotencyKey}`,
+  ),
   reviewPolicyRevisionId: context.reviewPolicyRevisionId,
-  reviewQuorumEvaluationId: randomUUID(),
+  reviewQuorumEvaluationId: deterministicUuid(
+    `human-review-cli:quorum:${input.candidateRevisionId}:${input.idempotencyKey}`,
+  ),
 });
 ```
 

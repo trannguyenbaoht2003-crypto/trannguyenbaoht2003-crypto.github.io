@@ -65,9 +65,12 @@ Success writes one JSON object to stdout and no diagnostic text:
 }
 ```
 
-`replayed: true` means the same idempotency key and exact command payload had
-already committed. It does not create another review, quorum evaluation,
-audit event, or outbox event.
+`replayed: true` means the same idempotency key and reviewer input receipt had
+already committed. The receipt hash covers the candidate revision, actor,
+outcome, reason, and correlation ID; generated record IDs, completion time, and
+the active policy pointer do not change a retry into a different receipt. A
+replay does not create another review, quorum evaluation, audit event, or
+outbox event.
 
 The adapter derives its internal review, snapshot, and quorum identifiers from
 the idempotency key. This makes an acknowledgement retry address the same
@@ -90,13 +93,13 @@ traces, connection strings, actor IDs, reasons, correlation IDs, or secrets.
 
 ## Retry and correction
 
-Retry an uncertain acknowledgement with the exact same flags and idempotency
-key. A different payload under the same key remains rejected by the existing
-idempotency guard. If the policy or revision is stale, obtain a new current
-revision context before retrying. There is no rollback command: Human Review
-history is append-only, and a correction requires a new valid review under the
-current policy and a new idempotency key, normally by another authorized
-reviewer when the duplicate-review constraint applies.
+Retry an uncertain acknowledgement with the exact same reviewer inputs and
+idempotency key. A different reviewer input under the same key remains rejected
+by the idempotency guard. If the policy or revision is stale, obtain a new
+current revision context before starting a new review. There is no rollback
+command: Human Review history is append-only, and a correction requires a new
+valid review under the current policy and a new idempotency key, normally by
+another authorized reviewer when the duplicate-review constraint applies.
 
 ## Prohibited operations
 

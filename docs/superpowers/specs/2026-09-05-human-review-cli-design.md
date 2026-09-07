@@ -140,9 +140,13 @@ candidate, historical policy, or precomputed trust record.
    `HumanReviewCompleted` outbox behavior.
 7. Return a closed JSON result; never return raw database errors.
 
-The idempotency key is evaluated by the existing command payload hash. A retry
-with the same key and payload is exit-code 0 with `replayed: true`; a different
-payload using the same key remains rejected by the existing idempotency guard.
+The CLI uses the existing idempotency table with a stable adapter receipt hash
+over the reviewer inputs (candidate revision, actor, outcome, reason, and
+correlation ID). Generated record IDs, completion time, and the active policy
+pointer are excluded so a lost acknowledgement remains replayable. A retry
+with the same key and reviewer inputs is exit-code 0 with `replayed: true`; a
+different reviewer input using the same key remains rejected by the existing
+idempotency guard.
 
 ## 7. Output and errors
 
