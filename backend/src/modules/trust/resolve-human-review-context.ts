@@ -43,6 +43,7 @@ export async function resolveHumanReviewContext(
              on policy.review_policy_revision_id =
                 eligibility_policy.review_policy_revision_id
           where active.scope = 'candidate_revision'
+            and policy.review_authority = 'human'
        )
        select revision.candidate_id,
               active_policy.review_policy_revision_id
