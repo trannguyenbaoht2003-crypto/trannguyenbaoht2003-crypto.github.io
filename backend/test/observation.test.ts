@@ -157,6 +157,38 @@ test('same idempotency key and payload replays without duplicate side effects', 
   await pool.end();
 });
 
+test('community content identity replays across a changed collection timestamp', async () => {
+  const pool = await seedPolicy('blob_allowed');
+  const { rawBlob: _rawBlob, ...communityCommand } = command();
+  void _rawBlob;
+  const first = await ingestObservation(pool, {
+    ...communityCommand,
+    adapterVersion: 'community-collector-bridge-v1',
+    idempotencyKey: 'community:candidate:content-digest',
+    collectedAt: new Date('2026-07-23T01:00:00Z'),
+  });
+  const replay = await ingestObservation(pool, {
+    ...communityCommand,
+    adapterVersion: 'community-collector-bridge-v1',
+    idempotencyKey: 'community:candidate:content-digest',
+    collectedAt: new Date('2026-07-24T01:00:00Z'),
+  });
+  assert.equal(first.replayed, false);
+  assert.equal(replay.replayed, true);
+  await assert.rejects(
+    ingestObservation(pool, {
+      ...communityCommand,
+      adapterVersion: 'community-collector-bridge-v1',
+      idempotencyKey: 'community:candidate:content-digest',
+      collectedAt: new Date('2026-07-24T01:00:00Z'),
+      rawBlob: 'unexpected payload change',
+    }),
+    /IDEMPOTENCY_PAYLOAD_CONFLICT/,
+  );
+  assert.equal(await tableCount(pool, 'raw_observations'), 1);
+  await pool.end();
+});
+
 test('same idempotency key with a different payload is rejected', async () => {
   const pool = await seedPolicy('blob_allowed');
   await ingestObservation(pool, command());
