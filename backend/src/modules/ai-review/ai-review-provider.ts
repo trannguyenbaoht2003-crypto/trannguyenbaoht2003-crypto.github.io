@@ -20,7 +20,7 @@ const ALLOWED_SOURCE_SITES = [
 ] as const;
 const TRACKING_QUERY_KEYS = new Set([
   '_openstat', 'fbclid', 'gclid', 'igshid', 'mc_cid', 'mc_eid', 'msclkid',
-  'ref', 'ref_src', 'source', 'spm', 'yclid',
+  'ref', 'ref_src', 'share_source', 'source', 'spm', 'spm_id_from', 'vd_source', 'yclid',
 ]);
 
 export interface AiReviewRequest {
@@ -325,6 +325,9 @@ function validatedConfig(config: {
     return fail('AI_REVIEW_PROVIDER_CONFIG_INVALID');
   }
   const apiKey = boundedText(config.apiKey, 4_096);
+  if (apiKey !== apiKey.trim() || !PRINTABLE.test(apiKey)) {
+    return fail('AI_REVIEW_PROVIDER_CONFIG_INVALID');
+  }
   const model = identifier(config.model);
   const timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs < MIN_TIMEOUT_MS || timeoutMs > MAX_TIMEOUT_MS) {

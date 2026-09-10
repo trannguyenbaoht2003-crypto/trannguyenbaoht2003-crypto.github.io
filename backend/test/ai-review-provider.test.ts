@@ -5,6 +5,7 @@ import {
   AiReviewProviderError,
   createAiReviewProvider,
   hashAiReviewRequest,
+  normalizePublicSourceUrl,
   type AiReviewDecision,
   type AiReviewRequest,
   validateAiReviewDecision,
@@ -187,6 +188,24 @@ test('two subdomains of one source site do not satisfy confirmed citation divers
   );
 });
 
+test('public source URL normalization strips platform tracking parameters', () => {
+  assert.deepEqual(
+    normalizePublicSourceUrl(
+      'https://www.bilibili.com/video/BV1example?vd_source=secret&spm_id_from=tracking&keep=1#comments',
+    ),
+    {
+      url: 'https://www.bilibili.com/video/BV1example?keep=1',
+      sourceHost: 'bilibili.com',
+    },
+  );
+  assert.equal(
+    normalizePublicSourceUrl(
+      'https://www.douyin.com/video/123?share_source=copy_link',
+    ).url,
+    'https://www.douyin.com/video/123',
+  );
+});
+
 test('provider rejects malformed requests before transport', async () => {
   let calls = 0;
   const provider = createAiReviewProvider({
@@ -256,8 +275,18 @@ test('provider maps bounded HTTP and network failures to sanitized codes', async
 });
 
 test('provider validates key, model, timeout and client request id before transport', async () => {
+  let calls = 0;
+  const fetchImpl = (async () => {
+    calls += 1;
+    return new Response('{}');
+  }) as typeof fetch;
   for (const config of [
     { apiKey: '', model: 'model' },
+    { apiKey: '   ', model: 'model', fetchImpl },
+    { apiKey: ' key', model: 'model', fetchImpl },
+    { apiKey: 'key ', model: 'model', fetchImpl },
+    { apiKey: 'key\r\nX-Injected: secret', model: 'model', fetchImpl },
+    { apiKey: 'key\u0000', model: 'model', fetchImpl },
     { apiKey: 'key', model: '' },
     { apiKey: 'key', model: ' model' },
     { apiKey: 'key', model: 'model', timeoutMs: 999 },
@@ -265,6 +294,7 @@ test('provider validates key, model, timeout and client request id before transp
   ]) {
     assert.throws(() => createAiReviewProvider(config), /AI_REVIEW_PROVIDER_CONFIG_INVALID/u);
   }
+  assert.equal(calls, 0);
   const provider = createAiReviewProvider({ apiKey: 'key', model: 'model', fetchImpl: fetchReturning({}) });
   await rejectsCode(provider.execute(requestFixture(), { clientRequestId: '' }), 'AI_REVIEW_PROVIDER_CONFIG_INVALID');
 });

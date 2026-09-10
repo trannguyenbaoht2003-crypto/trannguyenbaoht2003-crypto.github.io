@@ -35,12 +35,14 @@ interface ClaimRow {
   claim_type: string;
   importance: string;
   statement: string;
+  claim_evidence_decision_id: string | null;
   decision: string | null;
   evidence_policy_revision_id: string | null;
   has_contradicted_decision: boolean;
 }
 
 interface SourceRow {
+  candidate_provenance_id: string;
   normalized_observation_id: string;
   source_id: string;
   source_policy_revision_id: string;
@@ -50,7 +52,9 @@ interface SourceRow {
   storage_permission: string;
   collector_enabled: boolean;
   url: string | null;
+  url_json_type: string | null;
   author: string | null;
+  author_json_type: string | null;
   patch_id_matches: boolean;
   catalog_revision_matches: boolean;
   game_mode_matches: boolean;
@@ -72,6 +76,8 @@ interface CandidateSelection {
 
 type PreparedSource = AiReviewRequest['evidence'][number] & {
   createdAt: string;
+  origin: string;
+  provenanceId: string;
   sourceId: string;
   sourcePolicyRevisionId: string;
 };
@@ -99,6 +105,11 @@ export interface PreparedCandidateReview {
 
 function compareText(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
+}
+
+function sameTextArray(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length
+    && left.every((value, index) => value === right[index]);
 }
 
 export function deterministicPreparationUuid(kind: string, literal: string): string {
@@ -142,6 +153,8 @@ function normalizeSources(rows: SourceRow[], selection: CandidateSelection): Pre
       || !['blob_allowed', 'reference_only'].includes(row.storage_permission)
       || !row.patch_id_matches || !row.catalog_revision_matches || !row.game_mode_matches
       || !row.subject_matches || !row.signature_matches || !row.payload_matches
+      || row.url_json_type !== 'string'
+      || ![null, 'null', 'string'].includes(row.author_json_type)
       || typeof row.url !== 'string' || (row.author !== null && typeof row.author !== 'string')
       || (row.author !== null && (row.author.length === 0 || Buffer.byteLength(row.author, 'utf8') > 256))) return null;
     let normalized: ReturnType<typeof normalizePublicSourceUrl>;
@@ -160,6 +173,8 @@ function normalizeSources(rows: SourceRow[], selection: CandidateSelection): Pre
       augmentExternalIds: [...selection.augmentExternalIds],
       itemExternalIds: [...selection.itemExternalIds],
       createdAt,
+      origin: row.origin,
+      provenanceId: row.candidate_provenance_id,
       sourceId: row.source_id,
       sourcePolicyRevisionId: row.source_policy_revision_id,
     });
@@ -216,6 +231,7 @@ async function loadPreparationState(pool: Pool, candidateId: string, candidateRe
     pool.query(`select candidate_claim_set_seal_id from candidate_claim_set_seals where candidate_revision_id = $1`, [candidateRevisionId]),
     pool.query<ClaimRow>(`
       select claim.claim_id, claim.claim_key, claim.claim_type, claim.importance, claim.statement,
+             current.claim_evidence_decision_id,
              decision.decision, decision.evidence_policy_revision_id,
              exists (select 1 from claim_evidence_decisions historical
                       where historical.claim_id = claim.claim_id
@@ -226,12 +242,15 @@ async function loadPreparationState(pool: Pool, candidateId: string, candidateRe
        where claim.candidate_id = $1 and claim.candidate_revision_id = $2
        order by claim.claim_key collate "C"`, [candidateId, candidateRevisionId]),
     pool.query<SourceRow>(`
-      select observation.normalized_observation_id, raw.source_id, raw.source_policy_revision_id,
+      select provenance.candidate_provenance_id, observation.normalized_observation_id,
+             raw.source_id, raw.source_policy_revision_id,
              provenance.origin,
              observation.created_at as observation_created_at, source.status as source_status,
              source_policy.storage_permission, source_policy.collector_enabled,
              raw.external_reference ->> 'url' as url,
+             jsonb_typeof(raw.external_reference -> 'url') as url_json_type,
              raw.external_reference ->> 'author' as author,
+             jsonb_typeof(raw.external_reference -> 'author') as author_json_type,
              observation.patch_id = revision.patch_id as patch_id_matches,
              observation.catalog_revision_id = revision.catalog_revision_id as catalog_revision_matches,
              observation.game_mode_external_id = candidate.game_mode_external_id as game_mode_matches,
@@ -302,8 +321,48 @@ function sameSourceSet(left: PreparedSource[], right: PreparedSource[]): boolean
     && left.every((source, index) => source.normalizedObservationId === right[index]?.normalizedObservationId
       && source.url === right[index]?.url && source.sourceHost === right[index]?.sourceHost
       && source.author === right[index]?.author && source.createdAt === right[index]?.createdAt
+      && source.origin === right[index]?.origin && source.provenanceId === right[index]?.provenanceId
       && source.sourceId === right[index]?.sourceId
       && source.sourcePolicyRevisionId === right[index]?.sourcePolicyRevisionId);
+}
+
+function samePreparationState(left: PreparationState, right: PreparationState): boolean {
+  const candidateKeys = [
+    'candidate_id',
+    'candidate_revision_id',
+    'patch_key',
+    'champion_external_id',
+    'normalized_signature',
+    'eligibility_policy_revision_id',
+    'evidence_policy_revision_id',
+    'moderation_policy_revision_id',
+    'review_policy_revision_id',
+  ] as const;
+  const claimKeys = [
+    'claim_id',
+    'claim_key',
+    'claim_type',
+    'importance',
+    'statement',
+    'claim_evidence_decision_id',
+    'decision',
+    'evidence_policy_revision_id',
+    'has_contradicted_decision',
+  ] as const;
+  const associationKeys = ['claim_id', 'normalized_observation_id', 'stance'] as const;
+  return candidateKeys.every((key) => left.candidate[key] === right.candidate[key])
+    && left.hasClaimSeal === right.hasClaimSeal
+    && sameTextArray(left.selection.augmentExternalIds, right.selection.augmentExternalIds)
+    && sameTextArray(left.selection.itemExternalIds, right.selection.itemExternalIds)
+    && left.claims.length === right.claims.length
+    && left.claims.every((claim, index) => claimKeys.every(
+      (key) => claim[key] === right.claims[index]?.[key],
+    ))
+    && left.associations.length === right.associations.length
+    && left.associations.every((association, index) => associationKeys.every(
+      (key) => association[key] === right.associations[index]?.[key],
+    ))
+    && sameSourceSet(left.sources, right.sources);
 }
 
 async function prepareOwnedEvidence(pool: Pool, state: PreparationState, claim: ClaimRow): Promise<boolean> {
@@ -383,6 +442,7 @@ export async function prepareCandidateReview(
       claim_type: 'community_report',
       importance: 'required',
       statement: ownedClaimStatement(initial),
+      claim_evidence_decision_id: null,
       decision: null,
       evidence_policy_revision_id: null,
       has_contradicted_decision: false,
@@ -398,23 +458,32 @@ export async function prepareCandidateReview(
     || (finalOwned !== null && (finalOwned.decision !== 'supported'
       || finalOwned.evidence_policy_revision_id !== finalState.candidate.evidence_policy_revision_id))) return null;
   const reviewContext = await loadAiReviewContext(pool, candidateId, candidateRevisionId).catch(() => null);
-  if (!reviewContext || reviewContext.reviewPolicyRevisionId !== finalState.candidate.review_policy_revision_id) return null;
+  const currentState = reviewContext
+    ? await loadPreparationState(pool, candidateId, candidateRevisionId)
+    : null;
+  if (!reviewContext || !currentState || !samePreparationState(finalState, currentState)
+    || reviewContext.eligibilityPolicyRevisionId !== currentState.candidate.eligibility_policy_revision_id
+    || reviewContext.evidencePolicyRevisionId !== currentState.candidate.evidence_policy_revision_id
+    || reviewContext.moderationPolicyRevisionId !== currentState.candidate.moderation_policy_revision_id
+    || reviewContext.reviewPolicyRevisionId !== currentState.candidate.review_policy_revision_id) return null;
 
   const request: AiReviewRequest = {
     schemaVersion: 1,
     candidateRevisionId,
     inputHash: reviewContext.inputHash,
-    patchKey: finalState.candidate.patch_key,
-    championExternalId: finalState.candidate.champion_external_id,
+    patchKey: currentState.candidate.patch_key,
+    championExternalId: currentState.candidate.champion_external_id,
     selection: {
-      augmentExternalIds: [...finalState.selection.augmentExternalIds],
-      itemExternalIds: [...finalState.selection.itemExternalIds],
+      augmentExternalIds: [...currentState.selection.augmentExternalIds],
+      itemExternalIds: [...currentState.selection.itemExternalIds],
     },
-    requiredClaims: finalState.claims
+    requiredClaims: currentState.claims
       .filter(({ importance }) => importance === 'required')
       .map(({ claim_id, statement }) => ({ claimId: claim_id, statement })),
-    evidence: finalState.sources.map(({
+    evidence: currentState.sources.map(({
       createdAt: _createdAt,
+      origin: _origin,
+      provenanceId: _provenanceId,
       sourceId: _sourceId,
       sourcePolicyRevisionId: _sourcePolicyRevisionId,
       ...source
@@ -430,10 +499,10 @@ export async function prepareCandidateReview(
   return {
     candidateId,
     candidateRevisionId,
-    eligibilityPolicyRevisionId: finalState.candidate.eligibility_policy_revision_id,
-    evidencePolicyRevisionId: finalState.candidate.evidence_policy_revision_id,
-    moderationPolicyRevisionId: finalState.candidate.moderation_policy_revision_id,
-    reviewPolicyRevisionId: finalState.candidate.review_policy_revision_id,
+    eligibilityPolicyRevisionId: currentState.candidate.eligibility_policy_revision_id,
+    evidencePolicyRevisionId: currentState.candidate.evidence_policy_revision_id,
+    moderationPolicyRevisionId: currentState.candidate.moderation_policy_revision_id,
+    reviewPolicyRevisionId: currentState.candidate.review_policy_revision_id,
     inputHash: reviewContext.inputHash,
     request,
     requestHash,

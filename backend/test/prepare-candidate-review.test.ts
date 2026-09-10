@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import test from 'node:test';
 
+import type { Pool } from 'pg';
+
 import { registerAiReviewPolicy } from '../src/modules/ai-review/review-authority.js';
 import {
   deterministicPreparationUuid,
@@ -24,6 +26,7 @@ const POLICY = {
   review: '81000000-0000-4000-8000-000000000002',
   moderation: '81000000-0000-4000-8000-000000000003',
   eligibility: '81000000-0000-4000-8000-000000000004',
+  alternateEligibility: '81000000-0000-4000-8000-000000000005',
 } as const;
 
 const OBSERVATIONS = [{
@@ -33,7 +36,7 @@ const OBSERVATIONS = [{
   normalizedId: '82000000-0000-4000-8000-000000000004',
   provenanceId: '82000000-0000-4000-8000-000000000005',
   sourceKey: 'bilibili-public-test',
-  url: 'https://www.bilibili.com/video/BV1test?utm_source=secret#comments',
+  url: 'https://www.bilibili.com/video/BV1test?vd_source=secret&utm_source=secret#comments',
   author: 'build-reporter',
 }, {
   sourceId: '83000000-0000-4000-8000-000000000001',
@@ -89,6 +92,7 @@ async function addObservation(
   pool: Awaited<ReturnType<typeof resetDatabase>>,
   index: number,
   origin: 'community_submitted' | 'ai_generated' = 'community_submitted',
+  author: unknown = OBSERVATIONS[index]!.author,
 ): Promise<void> {
   const value = OBSERVATIONS[index]!;
   await pool.query(`insert into sources (source_id,source_key,display_name,status) values ($1,$2,$2,'active')`, [value.sourceId, value.sourceKey]);
@@ -99,7 +103,7 @@ async function addObservation(
     (raw_observation_id,source_id,source_policy_revision_id,adapter_version,external_reference,content_hash,raw_blob,collected_at)
     values ($1,$2,$3,'prepare-test',$4::jsonb,$5,'RAW_SECRET_MUST_NOT_LEAVE_DATABASE',clock_timestamp())`, [
     value.rawId, value.sourceId, value.sourcePolicyId,
-    JSON.stringify({ url: value.url, author: value.author, privateMetadata: 'PRIVATE_SECRET' }),
+    JSON.stringify({ url: value.url, author, privateMetadata: 'PRIVATE_SECRET' }),
     `content-${index}`,
   ]);
   await registerNormalizedObservation(pool, {
@@ -108,6 +112,46 @@ async function addObservation(
     normalizedObservationId: value.normalizedId, provenanceId: value.provenanceId, rawObservationId: value.rawId,
     snapshot: validNormalizationSnapshot(origin),
   });
+}
+
+function interleaveAiReviewContext(
+  pool: Pool,
+  beforeContextRead: () => Promise<void>,
+): { pool: Pool; didInterleave: () => boolean } {
+  let interleaved = false;
+  const proxy = new Proxy(pool, {
+    get(target, property, receiver) {
+      if (property === 'connect') {
+        return async () => {
+          const client = await target.connect();
+          return new Proxy(client, {
+            get(clientTarget, clientProperty, clientReceiver) {
+              if (clientProperty === 'query') {
+                return async (...args: unknown[]) => {
+                  const statement = args[0];
+                  const sql = typeof statement === 'string'
+                    ? statement
+                    : statement && typeof statement === 'object' && 'text' in statement
+                      ? String(statement.text)
+                      : '';
+                  if (!interleaved && sql.includes('select revision.patch_id as "patchId"')) {
+                    interleaved = true;
+                    await beforeContextRead();
+                  }
+                  return Reflect.apply(clientTarget.query, clientTarget, args);
+                };
+              }
+              const value = Reflect.get(clientTarget, clientProperty, clientReceiver) as unknown;
+              return typeof value === 'function' ? value.bind(clientTarget) : value;
+            },
+          });
+        };
+      }
+      const value = Reflect.get(target, property, receiver) as unknown;
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
+  });
+  return { pool: proxy, didInterleave: () => interleaved };
 }
 
 async function seedCandidate(
@@ -147,7 +191,7 @@ test('current exact reports from two sites seal and replay one source-backed pre
   assert.match(first.request.requiredClaims[0]!.statement, /exact .*selection.*reported.*supplied public sources/iu);
   assert.deepEqual(first.request.evidence.map(({ sourceHost }) => sourceHost), ['bilibili.com', 'zhihu.com']);
   assert.equal(first.request.evidence[0]!.url, 'https://www.bilibili.com/video/BV1test');
-  assert.doesNotMatch(JSON.stringify(first.request), /RAW_SECRET|PRIVATE_SECRET|utm_|comments/u);
+  assert.doesNotMatch(JSON.stringify(first.request), /RAW_SECRET|PRIVATE_SECRET|utm_|vd_source|comments/u);
   const before = await Promise.all(['candidate_claims', 'claim_evidence_decisions', 'evidence_records', 'evidence_associations']
     .map((table) => tableCount(pool, table)));
 
@@ -169,6 +213,21 @@ test('one-site and AI-only provenance hold before claims or evidence mutate', as
   t.after(() => undefined);
 });
 
+test('object-valued source author holds before claims or private metadata can leave preparation', async (t) => {
+  const pool = await resetDatabase(); t.after(() => pool.end());
+  await seedActiveCatalog(pool);
+  await addObservation(pool, 0);
+  await addObservation(pool, 1, 'community_submitted', { private: 'SECRET_OBJECT_AUTHOR' });
+  await seedPolicies(pool);
+
+  assert.equal(
+    await prepareCandidateReview(pool, CANDIDATE_IDS.candidateId, CANDIDATE_IDS.candidateRevisionId),
+    null,
+  );
+  assert.equal(await tableCount(pool, 'candidate_claims'), 0);
+  assert.equal(await tableCount(pool, 'evidence_records'), 0);
+});
+
 test('stale patch and mismatched candidate identity hold', async (t) => {
   const pool = await resetDatabase(); t.after(() => pool.end());
   await seedCandidate(pool, [0, 1]);
@@ -179,6 +238,64 @@ test('stale patch and mismatched candidate identity hold', async (t) => {
     patchId: CATALOG_IDS.patchId, patchKey: '26.15', reason: 'Stale preparation test.',
   });
   assert.equal(await prepareCandidateReview(pool, CANDIDATE_IDS.candidateId, CANDIDATE_IDS.candidateRevisionId), null);
+});
+
+test('normalized report payload mismatch holds before claims or evidence mutate', async (t) => {
+  const pool = await resetDatabase(); t.after(() => pool.end());
+  await seedCandidate(pool, [0, 1]);
+  await pool.query('alter table normalized_observations disable trigger normalized_observations_immutable');
+  try {
+    await pool.query(`update normalized_observations
+      set canonical_payload = '{"schemaVersion":1,"augmentExternalIds":["1194"],"itemExternalIds":["3006","9999"]}'::jsonb
+      where normalized_observation_id = $1`, [OBSERVATIONS[1]!.normalizedId]);
+  } finally {
+    await pool.query('alter table normalized_observations enable trigger normalized_observations_immutable');
+  }
+
+  assert.equal(
+    await prepareCandidateReview(pool, CANDIDATE_IDS.candidateId, CANDIDATE_IDS.candidateRevisionId),
+    null,
+  );
+  assert.equal(await tableCount(pool, 'candidate_claims'), 0);
+  assert.equal(await tableCount(pool, 'evidence_records'), 0);
+});
+
+test('policy switch reusing the review policy cannot pair a new authority hash with old policy metadata', async (t) => {
+  const pool = await resetDatabase(); t.after(() => pool.end());
+  await seedCandidate(pool, [0, 1]);
+  await registerEligibilityPolicyRevision(pool, {
+    actorId: 'test-policy', correlationId: 'alternate-eligibility', idempotencyKey: 'alternate-eligibility',
+    eligibilityPolicyRevisionId: POLICY.alternateEligibility, evidencePolicyRevisionId: POLICY.evidence,
+    moderationPolicyRevisionId: POLICY.moderation, policyKey: 'prepare-eligibility-v2',
+    reason: 'Interleaved preparation policy.', reviewPolicyRevisionId: POLICY.review,
+    revision: 2, schemaVersion: 1,
+  });
+  const interleaving = interleaveAiReviewContext(pool, async () => {
+    await activateEligibilityPolicyRevision(pool, {
+      actorId: 'test-policy', correlationId: 'alternate-activation', idempotencyKey: 'alternate-activation',
+      eligibilityPolicyRevisionId: POLICY.alternateEligibility,
+      expectedCurrentEligibilityPolicyRevisionId: POLICY.eligibility,
+      reason: 'Switch during AI review preparation.',
+    });
+  });
+
+  assert.equal(
+    await prepareCandidateReview(interleaving.pool, CANDIDATE_IDS.candidateId, CANDIDATE_IDS.candidateRevisionId),
+    null,
+  );
+  assert.equal(interleaving.didInterleave(), true);
+});
+
+test('source append during authority hashing cannot return a hash paired with stale evidence', async (t) => {
+  const pool = await resetDatabase(); t.after(() => pool.end());
+  await seedCandidate(pool, [0, 1]);
+  const interleaving = interleaveAiReviewContext(pool, () => addObservation(pool, 2));
+
+  assert.equal(
+    await prepareCandidateReview(interleaving.pool, CANDIDATE_IDS.candidateId, CANDIDATE_IDS.candidateRevisionId),
+    null,
+  );
+  assert.equal(interleaving.didInterleave(), true);
 });
 
 test('an existing contradicted owned claim holds without overwrite', async (t) => {

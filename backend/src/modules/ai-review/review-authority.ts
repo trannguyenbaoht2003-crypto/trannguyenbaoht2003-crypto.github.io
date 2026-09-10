@@ -118,8 +118,18 @@ async function loadLockedContext(client: PoolClient, candidateId: string, candid
   const seed = await loadReviewPointerSeed(client, candidateId, candidateRevisionId);
   await lockCurrentAuthorityPointers(client, seed);
   const authority = await lockCandidateRevisionAuthority(client, candidateId, candidateRevisionId);
-  const policy = await client.query<{ review_policy_revision_id: string; model: string; prompt_version: number }>(`
-    select review.review_policy_revision_id, config.model, config.prompt_version
+  const policy = await client.query<{
+    eligibility_policy_revision_id: string;
+    evidence_policy_revision_id: string;
+    moderation_policy_revision_id: string;
+    review_policy_revision_id: string;
+    model: string;
+    prompt_version: number;
+  }>(`
+    select eligibility.eligibility_policy_revision_id,
+           eligibility.evidence_policy_revision_id,
+           eligibility.moderation_policy_revision_id,
+           review.review_policy_revision_id, config.model, config.prompt_version
       from active_eligibility_policy_revision active
       join eligibility_policy_revisions eligibility using (eligibility_policy_revision_id)
       join review_policy_revisions review using (review_policy_revision_id)
@@ -144,12 +154,24 @@ async function loadLockedContext(client: PoolClient, candidateId: string, candid
   return { authority, activePolicy, claims, seal, provenance, hashes };
 }
 
-export async function loadAiReviewContext(pool: Pool, candidateId: string, candidateRevisionId: string): Promise<{ reviewPolicyRevisionId: string; inputHash: string }> {
+export async function loadAiReviewContext(pool: Pool, candidateId: string, candidateRevisionId: string): Promise<{
+  eligibilityPolicyRevisionId: string;
+  evidencePolicyRevisionId: string;
+  moderationPolicyRevisionId: string;
+  reviewPolicyRevisionId: string;
+  inputHash: string;
+}> {
   requireUuid(candidateId, 'candidateId');
   requireUuid(candidateRevisionId, 'candidateRevisionId');
   return withTransaction(pool, async (client) => {
     const context = await loadLockedContext(client, candidateId, candidateRevisionId);
-    return { reviewPolicyRevisionId: context.activePolicy.review_policy_revision_id, inputHash: context.hashes.inputHash };
+    return {
+      eligibilityPolicyRevisionId: context.activePolicy.eligibility_policy_revision_id,
+      evidencePolicyRevisionId: context.activePolicy.evidence_policy_revision_id,
+      moderationPolicyRevisionId: context.activePolicy.moderation_policy_revision_id,
+      reviewPolicyRevisionId: context.activePolicy.review_policy_revision_id,
+      inputHash: context.hashes.inputHash,
+    };
   });
 }
 
