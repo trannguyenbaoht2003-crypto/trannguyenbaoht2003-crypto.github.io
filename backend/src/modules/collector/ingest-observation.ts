@@ -41,7 +41,26 @@ interface IdempotencyRow {
   state: string;
 }
 
+interface StoredObservationRow {
+  raw_observation_id: string;
+  source_id: string;
+  adapter_version: string;
+  content_hash: string;
+  collected_at: Date;
+}
+
 const COMMUNITY_BRIDGE_ADAPTER = 'community-collector-bridge-v1';
+
+function isStoredIngestResult(
+  value: IngestObservationResult | null,
+): value is IngestObservationResult {
+  return (
+    value !== null
+    && typeof value.observationId === 'string'
+    && typeof value.replayed === 'boolean'
+    && typeof value.blobStored === 'boolean'
+  );
+}
 
 export async function ingestObservation(
   pool: Pool,
@@ -104,12 +123,6 @@ export async function ingestObservation(
         ? payload
         : { ...payload, collectedAt: command.collectedAt },
     );
-    const legacyCommunityPayloadHash = (
-      command.adapterVersion === COMMUNITY_BRIDGE_ADAPTER
-        ? hashCanonicalJson({ ...payload, collectedAt: command.collectedAt })
-        : null
-    );
-
     const inserted = await client.query(
       `insert into idempotency_records
         (scope, idempotency_key, payload_hash, state)
@@ -130,14 +143,43 @@ export async function ingestObservation(
       if (
         record
         && record.payload_hash !== payloadHash
-        && legacyCommunityPayloadHash !== null
-        && record.payload_hash === legacyCommunityPayloadHash
+        && command.adapterVersion === COMMUNITY_BRIDGE_ADAPTER
         && record.state === 'completed'
-        && record.result !== null
       ) {
-        // Legacy community records included collectedAt in their hash. Only
-        // that exact compatibility difference is replayable.
-        return { ...record.result, replayed: true };
+        const result = record.result;
+        if (
+          isStoredIngestResult(result)
+          && !result.replayed
+          && result.observationId === command.observationId
+          && result.blobStored === blobStored
+        ) {
+          // Legacy community records included collectedAt in their hash. The
+          // persisted observation is the only trusted source for that old
+          // arrival time; never accept a receipt by key prefix or by the
+          // caller's newly supplied timestamp alone.
+          const observation = await client.query<StoredObservationRow>(
+            `select raw_observation_id, source_id, adapter_version,
+                    content_hash, collected_at
+               from raw_observations
+              where raw_observation_id = $1
+              for share`,
+            [result.observationId],
+          );
+          const stored = observation.rows[0];
+          const legacyPayloadHash = stored
+            ? hashCanonicalJson({ ...payload, collectedAt: stored.collected_at })
+            : null;
+          if (
+            stored
+            && stored.raw_observation_id === result.observationId
+            && stored.source_id === command.sourceId
+            && stored.adapter_version === COMMUNITY_BRIDGE_ADAPTER
+            && stored.content_hash === record.payload_hash
+            && legacyPayloadHash === record.payload_hash
+          ) {
+            return { ...result, replayed: true };
+          }
+        }
       }
       if (!record || record.payload_hash !== payloadHash) {
         throw new Error('IDEMPOTENCY_PAYLOAD_CONFLICT');

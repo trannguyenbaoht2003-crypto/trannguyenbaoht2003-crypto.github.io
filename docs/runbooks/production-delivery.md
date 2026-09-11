@@ -1,6 +1,6 @@
 # Production Delivery Runbook
 
-This runbook is the operational boundary for Sprint 6A, the governed community-ingestion extension in Sprint 6B, the Sprint 8F inert AI-automation delivery extension, and the 2026-08-24 production queue-backend cutover to Aiven Valkey. Repository validation can establish `PRODUCTION_REPO_READY` and, for Sprint 8F, `AI_AUTOMATION_PRODUCTION_REPO_READY`; only a separately authorized real Railway environment deployment plus the required live verification can establish delivery markers.
+This runbook is the operational boundary for Sprint 6A, the governed community-ingestion extension in Sprint 6B, the Sprint 8F inert AI-automation delivery extension, and the 2026-08-24 production queue-backend cutover to Aiven Valkey. Repository validation can establish `PRODUCTION_REPO_READY` and, for Sprint 8F, `AI_AUTOMATION_PRODUCTION_REPO_READY`; only a separately authorized real Railway environment deployment plus the required live verification can establish delivery markers. The autonomous review and publication semantics are maintained in [autonomous-ai-publication.md](autonomous-ai-publication.md).
 
 `PRODUCTION_DELIVERY_READY` cannot be emitted by CI-only validation. Likewise, `AI_AUTOMATION_DISABLED_DELIVERY_READY` cannot be claimed by repository-only CI.
 
@@ -66,11 +66,12 @@ NODE_ENV=production
 DATABASE_URL=${{Postgres.DATABASE_URL}}
 REDIS_URL=<AIVEN_VALKEY_SERVICE_URI_SECRET>
 AI_DISCOVERY_SCHEDULER_ENABLED=false
+AI_AUTONOMOUS_PUBLICATION_ENABLED=false
 ```
 
 `<AIVEN_VALKEY_SERVICE_URI_SECRET>` means the full Aiven Service URI stored in Railway secret configuration, not a literal committed value. Production must use the TLS-capable `rediss://` form supplied for the Aiven Valkey service. `backend`, `worker`, and `ai-automation` must receive the same resolved URI during a cutover or credential rotation so producers and consumers never split across two queue backends.
 
-Do not provision an OpenAI API key, provider model, provider endpoint override, or any scheduler-true value as part of Sprint 8F inert delivery. PostgreSQL remains Publication authority. Aiven Valkey is delivery infrastructure and is not a public-read authority.
+Do not provision an OpenAI API key, provider model, provider endpoint override, or any scheduler-true value as part of Sprint 8F inert delivery. `AI_DISCOVERY_SCHEDULER_ENABLED` and `AI_AUTONOMOUS_PUBLICATION_ENABLED` are independent flags; both remain false for the inert package. PostgreSQL remains Publication authority. Aiven Valkey is delivery infrastructure and is not a public-read authority.
 
 ## Production queue backend — Aiven Valkey
 

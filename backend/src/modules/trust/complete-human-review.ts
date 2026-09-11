@@ -202,7 +202,7 @@ function commandPayloadHash(command: CompleteHumanReviewCommand): string {
   ]);
 }
 
-async function lockClaims(
+export async function lockClaims(
   client: PoolClient,
   candidateRevisionId: string,
 ): Promise<ReviewClaimRow[]> {
@@ -225,7 +225,7 @@ async function lockClaims(
   return claims.rows;
 }
 
-async function loadClaimSeal(
+export async function loadClaimSeal(
   client: PoolClient,
   candidateRevisionId: string,
 ): Promise<ClaimSealRow> {
@@ -251,7 +251,8 @@ async function loadReviewPolicy(
     `select minimum_confirmed_reviews,
             applies_to_ai_provenance
        from review_policy_revisions
-      where review_policy_revision_id = $1`,
+      where review_policy_revision_id = $1
+        and review_authority = 'human'`,
     [reviewPolicyRevisionId],
   );
   const row = policy.rows[0];
@@ -334,7 +335,7 @@ interface ReviewPointerSeed {
   gameModeExternalId: string;
 }
 
-async function loadReviewPointerSeed(
+export async function loadReviewPointerSeed(
   client: PoolClient,
   candidateId: string,
   candidateRevisionId: string,
@@ -357,7 +358,7 @@ async function loadReviewPointerSeed(
   return row;
 }
 
-async function lockCurrentAuthorityPointers(
+export async function lockCurrentAuthorityPointers(
   client: PoolClient,
   seed: ReviewPointerSeed,
 ): Promise<void> {
@@ -411,7 +412,7 @@ async function lockCurrentAuthorityPointers(
   }
 }
 
-async function loadProvenance(
+export async function loadProvenance(
   client: PoolClient,
   candidateRevisionId: string,
 ): Promise<ReviewProvenanceRow[]> {
@@ -429,7 +430,7 @@ async function loadProvenance(
   return provenance.rows;
 }
 
-function reviewInputHashes(
+export function reviewInputHashes(
   candidateId: string,
   candidateRevisionId: string,
   patchId: string,
@@ -489,9 +490,9 @@ function reviewInputHashes(
   };
 }
 
-async function resolveReviewSnapshot(
+export async function resolveReviewSnapshot(
   client: PoolClient,
-  command: CompleteHumanReviewCommand,
+  command: Pick<CompleteHumanReviewCommand, 'reviewInputSnapshotId' | 'reviewPolicyRevisionId' | 'actorId'>,
   authority: Awaited<
     ReturnType<typeof lockCandidateRevisionAuthority>
   >,

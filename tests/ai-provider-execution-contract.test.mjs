@@ -91,14 +91,17 @@ test('provider execution has no public Fastify, operator-browser, Caddy, Railway
   assert.doesNotMatch(publicSurfaces, /\/api\/ai(?:\/|['"`])|ai-provider-execution/i);
 });
 
-test('provider credentials are referenced only by the private CLI production source', async () => {
+test('provider credentials are referenced only by private execution sources', async () => {
   const sourceFiles = await collectFiles('backend/src/', ['.ts']);
   const references = [];
   for (const path of sourceFiles) {
     const text = await read(path);
     if (/OPENAI_API_KEY/.test(text)) references.push(path);
   }
-  assert.deepEqual(references, ['backend/src/ai-discovery-run-cli.ts']);
+  assert.deepEqual(references, [
+    'backend/src/ai-automation-config.ts',
+    'backend/src/ai-discovery-run-cli.ts',
+  ]);
 
   const provider = await read('backend/src/modules/ai-provider/openai-responses-provider.ts');
   assert.doesNotMatch(provider, /process\.env|OPENAI_API_KEY/);
