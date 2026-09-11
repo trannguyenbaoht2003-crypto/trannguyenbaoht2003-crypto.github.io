@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { hashCanonicalJson } from '../src/shared/hash.js';
+import { normalizeObservationAggregateMetadata } from '../src/modules/candidate/normalize-observation.js';
 import { ingestObservation } from '../src/modules/collector/ingest-observation.js';
 import { activateSourcePolicy } from '../src/modules/source-policy/activate-source-policy.js';
 import { resetDatabase, tableCount } from './helpers/database.js';
@@ -186,6 +188,111 @@ test('community content identity replays across a changed collection timestamp',
     /IDEMPOTENCY_PAYLOAD_CONFLICT/,
   );
   assert.equal(await tableCount(pool, 'raw_observations'), 1);
+  await pool.end();
+});
+
+test('legacy community receipt replays from its persisted collection timestamp only', async () => {
+  const pool = await seedPolicy('blob_allowed');
+  const { rawBlob: _rawBlob, ...communityCommand } = command();
+  void _rawBlob;
+  const legacyCollectedAt = new Date('2026-07-23T01:00:00Z');
+  const retainedAggregateMetadata = normalizeObservationAggregateMetadata(
+    communityCommand.aggregateMetadata,
+  );
+  const payload = {
+    actorId: communityCommand.actorId,
+    adapterVersion: 'community-collector-bridge-v1',
+    aggregateMetadata: retainedAggregateMetadata,
+    correlationId: communityCommand.correlationId,
+    externalReference: communityCommand.externalReference,
+    idempotencyKey: 'community:legacy:candidate-content',
+    observationId: communityCommand.observationId,
+    rawBlob: null,
+    sourceId: communityCommand.sourceId,
+  };
+  const legacyPayloadHash = hashCanonicalJson({
+    ...payload,
+    collectedAt: legacyCollectedAt,
+  });
+  const policy = await pool.query<{ source_policy_revision_id: string }>(
+    `select source_policy_revision_id
+       from active_source_policies
+      where source_id = $1`,
+    [communityCommand.sourceId],
+  );
+  await pool.query(
+    `insert into raw_observations
+      (raw_observation_id, source_id, source_policy_revision_id, adapter_version,
+       external_reference, aggregate_metadata, content_hash, raw_blob, collected_at)
+     values ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7, null, $8)`,
+    [
+      communityCommand.observationId,
+      communityCommand.sourceId,
+      policy.rows[0]?.source_policy_revision_id,
+      payload.adapterVersion,
+      JSON.stringify(communityCommand.externalReference),
+      JSON.stringify(retainedAggregateMetadata),
+      legacyPayloadHash,
+      legacyCollectedAt,
+    ],
+  );
+  await pool.query(
+    `insert into idempotency_records
+      (scope, idempotency_key, payload_hash, state, result, completed_at)
+     values ('observation_ingest', $1, $2, 'completed', $3::jsonb, clock_timestamp())`,
+    [
+      payload.idempotencyKey,
+      legacyPayloadHash,
+      JSON.stringify({
+        observationId: payload.observationId,
+        replayed: false,
+        blobStored: false,
+      }),
+    ],
+  );
+
+  const replay = await ingestObservation(pool, {
+    ...communityCommand,
+    adapterVersion: payload.adapterVersion,
+    idempotencyKey: payload.idempotencyKey,
+    collectedAt: new Date('2026-07-24T01:00:00Z'),
+  });
+  assert.equal(replay.replayed, true);
+  assert.equal(await tableCount(pool, 'raw_observations'), 1);
+
+  await assert.rejects(
+    ingestObservation(pool, {
+      ...communityCommand,
+      adapterVersion: payload.adapterVersion,
+      idempotencyKey: payload.idempotencyKey,
+      collectedAt: new Date('2026-07-24T01:00:00Z'),
+      externalReference: { url: 'https://example.invalid/changed' },
+    }),
+    /IDEMPOTENCY_PAYLOAD_CONFLICT/,
+  );
+  await assert.rejects(
+    ingestObservation(pool, {
+      ...communityCommand,
+      adapterVersion: payload.adapterVersion,
+      idempotencyKey: payload.idempotencyKey,
+      observationId: '30000000-0000-4000-8000-000000000004',
+      collectedAt: new Date('2026-07-24T01:00:00Z'),
+    }),
+    /IDEMPOTENCY_PAYLOAD_CONFLICT/,
+  );
+  await pool.query(
+    'delete from raw_observations where raw_observation_id = $1',
+    [communityCommand.observationId],
+  );
+  await assert.rejects(
+    ingestObservation(pool, {
+      ...communityCommand,
+      adapterVersion: payload.adapterVersion,
+      idempotencyKey: payload.idempotencyKey,
+      collectedAt: new Date('2026-07-25T01:00:00Z'),
+    }),
+    /IDEMPOTENCY_PAYLOAD_CONFLICT/,
+  );
   await pool.end();
 });
 

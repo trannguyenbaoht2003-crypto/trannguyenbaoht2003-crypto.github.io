@@ -43,6 +43,7 @@ test('Sprint 8F production-delivery artifacts are versioned and private-by-contr
 test('production environment keeps AI automation inert and provider-free', async () => {
   const envExample = await readRequired('deploy/production/production.env.example');
   assert.match(envExample, /^AI_DISCOVERY_SCHEDULER_ENABLED=false$/m);
+  assert.match(envExample, /^AI_AUTONOMOUS_PUBLICATION_ENABLED=false$/m);
   for (const forbidden of [
     'OPENAI_API_KEY',
     'AI_DISCOVERY_OPENAI_MODEL',
@@ -145,9 +146,10 @@ test('Sprint 8F contracts are wired into the root regression', async () => {
 });
 
 test('Sprint 8F runbooks distinguish repository readiness, inert delivery, and activation authority', async () => {
-  const [production, recovery] = await Promise.all([
+  const [production, recovery, autonomous] = await Promise.all([
     readRequired('docs/runbooks/production-delivery.md'),
     readRequired('docs/runbooks/ai-provider-execution-recovery.md'),
+    readRequired('docs/runbooks/autonomous-ai-publication.md'),
   ]);
 
   for (const phrase of [
@@ -167,4 +169,18 @@ test('Sprint 8F runbooks distinguish repository readiness, inert delivery, and a
   assert.match(recovery, /disabled mode|inert/i);
   assert.match(recovery, /UNCERTAIN/);
   assert.match(recovery, /no automatic replay|not replayed/i);
+
+  for (const phrase of [
+    'AI_AUTONOMOUS_PUBLICATION_ENABLED=false',
+    'hai-dau-ai-review-v1',
+    'ai-review-hourly-v1',
+    'AI_AUTOMATION_PRODUCTION_REPO_READY',
+    'MISSING_ACTIVE_CATALOG',
+    'npm --prefix backend run ai-autonomous:status',
+    'second paid call',
+  ]) {
+    assert.ok(autonomous.includes(phrase), `autonomous runbook missing contract: ${phrase}`);
+  }
+  assert.match(autonomous, /never.*human_reviews|never inserted into `human_reviews`/i);
+  assert.match(autonomous, /registerPatchEvent[\s\S]*importCatalogRevision[\s\S]*validateCatalogRevision[\s\S]*activateCatalogRevision/);
 });

@@ -10,6 +10,20 @@ infrastructure; Redis 7 is the local/CI fixture, while production uses Aiven
 Valkey through the same `REDIS_URL` contract. Queue infrastructure never owns
 catalog, Candidate, trust, Eligibility, Publication, or public API truth.
 
+## Autonomous AI review and publication
+
+The private `ai-automation` worker implements the bounded source-backed review
+flow described in [`docs/runbooks/autonomous-ai-publication.md`](../docs/runbooks/autonomous-ai-publication.md).
+It is disabled by default with `AI_AUTONOMOUS_PUBLICATION_ENABLED=false` and
+uses a separate hourly queue from discovery. When explicitly enabled, it still
+requires a private OpenAI key/model, current catalog-backed candidates, and
+the existing moderation, eligibility, and publication authorities. The worker
+never exposes an HTTP mutation route or creates human reviews.
+
+Read-only status is available with `npm --prefix backend run ai-autonomous:status`.
+It reports structural input readiness and safe journal metadata, not prompts,
+credentials, or proof of a live publication.
+
 ## Prerequisites and test environment
 
 - Node.js 22.13 or newer.

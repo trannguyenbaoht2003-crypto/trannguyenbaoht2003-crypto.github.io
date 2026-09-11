@@ -151,7 +151,9 @@ async function executeReserved(pool: Pool, run: AutonomousRun, provider: AiRevie
         return;
     const inFlight = owned.rows[0]!;
     if (!await contextCurrent(pool, run)) {
-        await terminalRun(pool, inFlight, 'failed', 'AI_AUTONOMOUS_INPUT_STALE');
+        // The provider has not been called yet; stale authority is held for
+        // operator/current-policy recovery, never classified as a provider failure.
+        await terminalRun(pool, inFlight, 'held', 'AI_AUTONOMOUS_INPUT_STALE');
         return;
     }
     let response;
