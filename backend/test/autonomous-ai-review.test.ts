@@ -234,10 +234,40 @@ async function recordOperatorModeration(pool: Awaited<ReturnType<typeof resetDat
 test('a later existing moderation timestamp holds an unused reservation without a paid call', async t => {
     const pool = await resetDatabase(); t.after(() => pool.end()); await seed(pool);
     const policy = await ensureAutonomousReviewPolicy(pool, { model: 'gpt-test' });
+    assert.ok(await prepareCandidateReview(pool, CANDIDATE_IDS.candidateId, CANDIDATE_IDS.candidateRevisionId));
     const decisionId = await recordOperatorModeration(pool, policy.moderationPolicyRevisionId);
     await reserve(pool);
     await processAutonomousReviewTick(pool, { provider: neverProvider, model: 'gpt-test', now: time });
     assert.equal((await pool.query('select state from autonomous_ai_review_runs')).rows[0].state, 'held');
+    assert.equal((await pool.query('select moderation_decision_id from current_candidate_moderation_decisions')).rows[0].moderation_decision_id, decisionId);
+    assert.equal(await tableCount(pool, 'ai_reviews'), 0);
+    assert.equal(await tableCount(pool, 'publication_versions'), 0);
+});
+
+test('authority changing after ownership claim holds the run before any provider call', async t => {
+    const pool = await resetDatabase(); t.after(() => pool.end()); await seed(pool);
+    const run = await reserve(pool);
+    let decisionId: string | undefined;
+    const interleavedPool = new Proxy(pool, {
+        get(target, property) {
+            if (property === 'query') {
+                return async (...args: unknown[]) => {
+                    const reply = await Reflect.apply(target.query, target, args);
+                    if (!decisionId && typeof args[0] === 'string'
+                        && args[0].includes("set state='in_flight',in_flight_at=$2")) {
+                        decisionId = await recordOperatorModeration(pool, run.moderation_policy_revision_id);
+                    }
+                    return reply;
+                };
+            }
+            const value = Reflect.get(target, property) as unknown;
+            return typeof value === 'function' ? value.bind(target) : value;
+        },
+    });
+    await processAutonomousReviewTick(interleavedPool, { provider: neverProvider, model: 'gpt-test', now: time });
+    assert.ok(decisionId);
+    assert.deepEqual((await pool.query('select state,failure_code from autonomous_ai_review_runs')).rows,
+        [{ state: 'held', failure_code: 'AI_AUTONOMOUS_INPUT_STALE' }]);
     assert.equal((await pool.query('select moderation_decision_id from current_candidate_moderation_decisions')).rows[0].moderation_decision_id, decisionId);
     assert.equal(await tableCount(pool, 'ai_reviews'), 0);
     assert.equal(await tableCount(pool, 'publication_versions'), 0);

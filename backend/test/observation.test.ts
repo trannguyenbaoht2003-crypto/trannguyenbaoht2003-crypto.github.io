@@ -191,8 +191,9 @@ test('community content identity replays across a changed collection timestamp',
   await pool.end();
 });
 
-test('legacy community receipt replays from its persisted collection timestamp only', async () => {
+test('legacy community receipt replays from its persisted collection timestamp only', async (t) => {
   const pool = await seedPolicy('blob_allowed');
+  t.after(() => pool.end());
   const { rawBlob: _rawBlob, ...communityCommand } = command();
   void _rawBlob;
   const legacyCollectedAt = new Date('2026-07-23T01:00:00Z');
@@ -259,6 +260,10 @@ test('legacy community receipt replays from its persisted collection timestamp o
   });
   assert.equal(replay.replayed, true);
   assert.equal(await tableCount(pool, 'raw_observations'), 1);
+  assert.equal(await tableCount(pool, 'audit_events'), 0);
+  assert.equal(await tableCount(pool, 'outbox_events'), 0);
+  assert.deepEqual((await pool.query('select content_hash,collected_at from raw_observations')).rows,
+    [{ content_hash: legacyPayloadHash, collected_at: legacyCollectedAt }]);
 
   await assert.rejects(
     ingestObservation(pool, {
@@ -280,20 +285,33 @@ test('legacy community receipt replays from its persisted collection timestamp o
     }),
     /IDEMPOTENCY_PAYLOAD_CONFLICT/,
   );
+  // Model a receipt whose observation is absent without deleting immutable data.
+  const missingPayload = {
+    ...payload,
+    observationId: '30000000-0000-4000-8000-000000000004',
+    idempotencyKey: 'community:legacy:missing-observation',
+  };
   await pool.query(
-    'delete from raw_observations where raw_observation_id = $1',
-    [communityCommand.observationId],
+    `insert into idempotency_records
+      (scope, idempotency_key, payload_hash, state, result, completed_at)
+     values ('observation_ingest', $1, $2, 'completed', $3::jsonb, clock_timestamp())`,
+    [missingPayload.idempotencyKey,
+      hashCanonicalJson({ ...missingPayload, collectedAt: legacyCollectedAt }),
+      JSON.stringify({ observationId: missingPayload.observationId, replayed: false, blobStored: false })],
   );
   await assert.rejects(
     ingestObservation(pool, {
       ...communityCommand,
       adapterVersion: payload.adapterVersion,
-      idempotencyKey: payload.idempotencyKey,
+      idempotencyKey: missingPayload.idempotencyKey,
+      observationId: missingPayload.observationId,
       collectedAt: new Date('2026-07-25T01:00:00Z'),
     }),
     /IDEMPOTENCY_PAYLOAD_CONFLICT/,
   );
-  await pool.end();
+  assert.equal(await tableCount(pool, 'raw_observations'), 1);
+  assert.equal(await tableCount(pool, 'audit_events'), 0);
+  assert.equal(await tableCount(pool, 'outbox_events'), 0);
 });
 
 test('same idempotency key with a different payload is rejected', async () => {
