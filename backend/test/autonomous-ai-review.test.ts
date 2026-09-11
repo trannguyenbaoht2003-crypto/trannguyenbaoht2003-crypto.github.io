@@ -244,18 +244,17 @@ test('a later existing moderation timestamp holds an unused reservation without 
     assert.equal(await tableCount(pool, 'publication_versions'), 0);
 });
 
-test('authority changing after ownership claim holds the run before any provider call', async t => {
-    const pool = await resetDatabase(); t.after(() => pool.end()); await seed(pool);
-    const run = await reserve(pool);
-    let decisionId: string | undefined;
-    const interleavedPool = new Proxy(pool, {
+function afterOwnershipClaim(pool: Awaited<ReturnType<typeof resetDatabase>>, action: () => Promise<void>) {
+    let invoked = false;
+    return new Proxy(pool, {
         get(target, property) {
             if (property === 'query') {
                 return async (...args: unknown[]) => {
                     const reply = await Reflect.apply(target.query, target, args);
-                    if (!decisionId && typeof args[0] === 'string'
+                    if (!invoked && typeof args[0] === 'string'
                         && args[0].includes("set state='in_flight',in_flight_at=$2")) {
-                        decisionId = await recordOperatorModeration(pool, run.moderation_policy_revision_id);
+                        invoked = true;
+                        await action();
                     }
                     return reply;
                 };
@@ -264,12 +263,39 @@ test('authority changing after ownership claim holds the run before any provider
             return typeof value === 'function' ? value.bind(target) : value;
         },
     });
+}
+
+test('authority changing after ownership claim holds the run before any provider call', async t => {
+    const pool = await resetDatabase(); t.after(() => pool.end()); await seed(pool);
+    const run = await reserve(pool);
+    let decisionId: string | undefined;
+    const interleavedPool = afterOwnershipClaim(pool, async () => {
+        decisionId = await recordOperatorModeration(pool, run.moderation_policy_revision_id);
+    });
     await processAutonomousReviewTick(interleavedPool, { provider: neverProvider, model: 'gpt-test', now: time });
     assert.ok(decisionId);
     assert.deepEqual((await pool.query('select state,failure_code from autonomous_ai_review_runs')).rows,
         [{ state: 'held', failure_code: 'AI_AUTONOMOUS_INPUT_STALE' }]);
     assert.equal((await pool.query('select moderation_decision_id from current_candidate_moderation_decisions')).rows[0].moderation_decision_id, decisionId);
     assert.equal(await tableCount(pool, 'ai_reviews'), 0);
+    assert.equal(await tableCount(pool, 'publication_versions'), 0);
+});
+
+test('crossing the UTC hour after ownership claim holds without a delayed paid call', async t => {
+    const pool = await resetDatabase(); t.after(() => pool.end()); await seed(pool);
+    await reserve(pool, '2026-09-10T10:59:59.000Z');
+    t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-09-10T10:59:59.000Z') });
+    const interleavedPool = afterOwnershipClaim(pool, async () => {
+        t.mock.timers.setTime(Date.parse('2026-09-10T11:00:00.000Z'));
+    });
+    let calls = 0;
+    await processAutonomousReviewTick(interleavedPool, {
+        model: 'gpt-test',
+        provider: { async execute(request) { calls++; return result(request); } },
+    });
+    assert.equal(calls, 0);
+    assert.deepEqual((await pool.query('select state,failure_code from autonomous_ai_review_runs')).rows,
+        [{ state: 'held', failure_code: 'AI_AUTONOMOUS_RESERVATION_EXPIRED' }]);
     assert.equal(await tableCount(pool, 'publication_versions'), 0);
 });
 
