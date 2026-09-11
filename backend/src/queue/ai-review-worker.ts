@@ -47,5 +47,5 @@ export async function processAiReviewJob(job: Job, options: ReviewWorkerOptions)
 export function createAiReviewWorker(options: ReviewWorkerOptions & {
     connection: Redis;
 }) {
-    return new Worker<AiReviewJobData>(AI_REVIEW_QUEUE_NAME, job => processAiReviewJob(job, options), { connection: options.connection, concurrency: 1 });
+    return new Worker<AiReviewJobData, Awaited<ReturnType<typeof processAiReviewJob>>>(AI_REVIEW_QUEUE_NAME, job => processAiReviewJob(job, options), { connection: options.connection, concurrency: 1 });
 }
