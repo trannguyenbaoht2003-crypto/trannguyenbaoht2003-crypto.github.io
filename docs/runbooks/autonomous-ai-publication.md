@@ -128,11 +128,14 @@ These structural counts do not prove source eligibility or a live publication.
 
 ## Production input prerequisites
 
-The latest read-only production preflight recorded 140 raw observations at the
+The read-only production preflight on 2026-09-09 recorded 140 raw observations at the
 repository baseline patch `16.14`, zero normalized observations, zero
 CandidateRevisions, zero publication versions, no patch/catalog/entity rows,
 and 420 failed normalization attempts. This is an input blocker, not a reason
 to seed a publication.
+
+The 2026-09-11 recheck found 148 raw observations, still with zero patches,
+active catalogs, normalized observations, candidates, or publication versions.
 
 Create a genuine versioned `CatalogSnapshotV1` containing the actual
 champion/item/augment/mode entities and selection rules. Use the existing
@@ -173,4 +176,3 @@ versioned, private, disabled package. A real deployment must still use the
 exact-SHA production release gate, exact Railway deployment IDs, the existing
 disabled marker, and public smoke checks. Those checks do not create an OpenAI
 credential and do not prove a provider completion.
-

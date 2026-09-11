@@ -65,6 +65,8 @@ begin
   end if;
   if not ((old.state='reserved' and new.state in ('in_flight','held'))
     or (old.state='in_flight' and new.state in ('responded','uncertain','failed'))
+    or (old.state='in_flight' and new.state='held' and new.failure_code is not null and new.failure_code in
+      ('AI_AUTONOMOUS_INPUT_STALE','AI_AUTONOMOUS_RESERVATION_EXPIRED'))
     or (old.state='responded' and new.state in ('held','declined','published'))) then
     raise exception 'autonomous run invalid transition';
   end if;

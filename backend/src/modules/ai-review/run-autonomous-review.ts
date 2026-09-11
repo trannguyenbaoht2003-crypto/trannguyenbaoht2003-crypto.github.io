@@ -156,6 +156,12 @@ async function executeReserved(pool: Pool, run: AutonomousRun, provider: AiRevie
         await terminalRun(pool, inFlight, 'held', 'AI_AUTONOMOUS_INPUT_STALE');
         return;
     }
+    // Database revalidation can cross the reservation's UTC-hour boundary.
+    // Check again immediately before the provider, with no intervening I/O.
+    if (run.utc_tick.toISOString() !== autonomousClock(now).tick) {
+        await terminalRun(pool, inFlight, 'held', 'AI_AUTONOMOUS_RESERVATION_EXPIRED');
+        return;
+    }
     let response;
     try {
         response = await provider.execute(run.request, { clientRequestId: run.run_id });
