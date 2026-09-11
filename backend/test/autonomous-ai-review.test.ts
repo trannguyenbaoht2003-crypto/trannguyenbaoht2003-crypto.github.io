@@ -21,7 +21,8 @@ async function seed(pool: Awaited<ReturnType<typeof resetDatabase>>) {
 }
 function result(request: AiReviewRequest, outcome: 'confirmed' | 'changes_requested' | 'declined' = 'confirmed') {
     const decision = { outcome, reason: 'Supplied reports checked.', claims: request.requiredClaims.map(({ claimId }) => ({ claimId, decision: outcome === 'confirmed' ? 'supported' as const : 'insufficient' as const, observationIds: request.evidence.map(e => e.normalizedObservationId) })) };
-    return { decision, responseHash: hashCanonicalJson(decision), providerResponseId: 'response-test' };
+    const validated = validateAiReviewDecision(decision, request);
+    return { decision: validated, responseHash: hashCanonicalJson(validated), providerResponseId: 'response-test' };
 }
 const time = '2026-09-10T10:00:00.000Z';
 test('autonomous success publishes once with no human receipt across duplicate and concurrent ticks', async (t) => {
@@ -44,7 +45,7 @@ for (const outcome of ['changes_requested', 'declined', 'malformed', 'contradict
         await seed(pool);
         const provider: AiReviewProvider = { async execute(request) { const response = result(request, outcome === 'changes_requested' || outcome === 'declined' ? outcome : 'confirmed'); if (outcome === 'malformed')
                 response.responseHash = 'bad'; if (outcome === 'contradicted') {
-                response.decision.claims[0]!.decision = 'contradicted' as 'supported';
+                response.decision.claims[0]!.decision = 'contradicted';
                 response.responseHash = hashCanonicalJson(response.decision);
             } return response; } };
         await processAutonomousReviewTick(pool, { provider, model: 'gpt-test', now: time });
@@ -63,7 +64,7 @@ test('autonomous policy bootstrap is concurrent and idempotent, models have dist
 });
 import { prepareCandidateReview } from '../src/modules/ai-review/prepare-candidate-review.js';
 import { autonomousClock, reserveRun, type AutonomousRun } from '../src/modules/ai-review/autonomous-review-journal.js';
-import { AiReviewProviderError, hashAiReviewRequest } from '../src/modules/ai-review/ai-review-provider.js';
+import { AiReviewProviderError, hashAiReviewRequest, validateAiReviewDecision } from '../src/modules/ai-review/ai-review-provider.js';
 import { readAutonomousReviewStatus } from '../src/modules/ai-review/read-autonomous-review-status.js';
 async function reserve(pool: Awaited<ReturnType<typeof resetDatabase>>, now = time) {
     const prepared = await prepareCandidateReview(pool, CANDIDATE_IDS.candidateId, CANDIDATE_IDS.candidateRevisionId);
@@ -202,4 +203,72 @@ test('private readiness reports missing catalog and empty input and returns no p
     await seedActiveCatalog(pool);
     assert.equal((await readAutonomousReviewStatus(pool, { enabled: true, now: time })).inputState, 'EMPTY_CANDIDATE_INPUT');
     assert.equal(await tableCount(pool, 'ai_review_policy_configs'), 0);
+});
+
+test('persisted response hash mismatch fails closed during recovery',async t=>{
+ const pool=await resetDatabase();t.after(()=>pool.end());await seed(pool);const run=await reserve(pool);
+ await pool.query(`update autonomous_ai_review_runs set state='in_flight',in_flight_at=$2 where run_id=$1`,[run.run_id,time]);
+ const response=result(run.request);
+ await pool.query(`update autonomous_ai_review_runs set state='responded',response=$2::jsonb,provider_response_id=$3,response_hash=$4 where run_id=$1`,[run.run_id,JSON.stringify(response.decision),response.providerResponseId,'a'.repeat(64)]);
+ await processAutonomousReviewTick(pool,{provider:neverProvider,model:'gpt-test',now:time});
+ assert.equal(await tableCount(pool,'publication_versions'),0);assert.equal(await tableCount(pool,'ai_reviews'),0);
+ assert.equal((await pool.query('select state from autonomous_ai_review_runs')).rows[0].state,'held');
+});
+
+
+import { recordCandidateModerationDecision } from '../src/modules/moderation/record-candidate-moderation-decision.js';
+import { evaluateCandidateEligibility } from '../src/modules/eligibility/evaluate-candidate-eligibility.js';
+
+async function recordOperatorModeration(pool: Awaited<ReturnType<typeof resetDatabase>>, policyId: string) {
+    const decisionId = randomUUID();
+    await recordCandidateModerationDecision(pool, {
+        actorId: 'operator', candidateId: CANDIDATE_IDS.candidateId,
+        candidateRevisionId: CANDIDATE_IDS.candidateRevisionId,
+        correlationId: decisionId, idempotencyKey: decisionId, decisionId,
+        inputSnapshotId: randomUUID(), moderationPolicyRevisionId: policyId,
+        outcome: 'blocked', reason: 'Later operator decision.', evaluatedAt: '2026-09-10T10:01:00.000Z',
+    });
+    return decisionId;
+}
+
+test('a later existing moderation timestamp holds an unused reservation without a paid call', async t => {
+    const pool = await resetDatabase(); t.after(() => pool.end()); await seed(pool);
+    const policy = await ensureAutonomousReviewPolicy(pool, { model: 'gpt-test' });
+    const decisionId = await recordOperatorModeration(pool, policy.moderationPolicyRevisionId);
+    await reserve(pool);
+    await processAutonomousReviewTick(pool, { provider: neverProvider, model: 'gpt-test', now: time });
+    assert.equal((await pool.query('select state from autonomous_ai_review_runs')).rows[0].state, 'held');
+    assert.equal((await pool.query('select moderation_decision_id from current_candidate_moderation_decisions')).rows[0].moderation_decision_id, decisionId);
+    assert.equal(await tableCount(pool, 'ai_reviews'), 0);
+    assert.equal(await tableCount(pool, 'publication_versions'), 0);
+});
+
+test('response recovery holds after a later eligibility evaluation without overwriting its pointer', async t => {
+    const pool = await resetDatabase(); t.after(() => pool.end()); await seed(pool);
+    const run = await reserve(pool); await respond(pool, run);
+    const evaluationId = randomUUID();
+    await evaluateCandidateEligibility(pool, {
+        actorId: 'operator', candidateId: run.candidate_id, candidateRevisionId: run.candidate_revision_id,
+        correlationId: evaluationId, idempotencyKey: evaluationId, evaluationId, inputSnapshotId: randomUUID(),
+        evaluatedAt: '2026-09-10T10:01:00.000Z',
+    });
+    await processAutonomousReviewTick(pool, { provider: neverProvider, model: 'gpt-test', now: time });
+    assert.equal((await pool.query('select state from autonomous_ai_review_runs')).rows[0].state, 'held');
+    assert.equal((await pool.query('select candidate_eligibility_evaluation_id from current_candidate_eligibility_evaluations')).rows[0].candidate_eligibility_evaluation_id, evaluationId);
+    assert.equal(await tableCount(pool, 'publication_versions'), 0);
+});
+
+test('moderation pointer CAS rejects an autonomous decision after operator authority changes', async t => {
+    const pool = await resetDatabase(); t.after(() => pool.end()); await seed(pool);
+    const run = await reserve(pool); await respond(pool, run);
+    const decisionId = await recordOperatorModeration(pool, run.moderation_policy_revision_id);
+    await assert.rejects(recordCandidateModerationDecision(pool, {
+        actorId: 'system:ai-reviewer', candidateId: run.candidate_id, candidateRevisionId: run.candidate_revision_id,
+        correlationId: run.run_id, idempotencyKey: run.run_id, decisionId: run.chosen_moderation_decision_id,
+        inputSnapshotId: randomUUID(), moderationPolicyRevisionId: run.moderation_policy_revision_id,
+        outcome: 'clear', reason: 'Stale autonomous command.', evaluatedAt: run.started_at.toISOString(),
+    }), /AI_AUTONOMOUS_AUTHORITY_CHANGED/);
+    assert.equal((await pool.query('select moderation_decision_id from current_candidate_moderation_decisions')).rows[0].moderation_decision_id, decisionId);
+    assert.equal(await tableCount(pool, 'moderation_decisions'), 1);
+    assert.equal(await tableCount(pool, 'publication_versions'), 0);
 });

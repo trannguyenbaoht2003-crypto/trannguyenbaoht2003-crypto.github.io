@@ -31,6 +31,7 @@ create table autonomous_ai_review_runs (
   check (budget_day = (utc_tick at time zone 'UTC')::date),
   check ((response is null and provider_response_id is null and response_hash is null) or
          (response is not null and provider_response_id is not null and response_hash is not null)),
+  check (in_flight_at is null or in_flight_at >= started_at),
   check (state not in ('responded','published','declined') or response is not null),
   check (state not in ('in_flight','responded','uncertain','failed','published','declined') or in_flight_at is not null),
   check ((state = 'published') = (publication_version_id is not null))
