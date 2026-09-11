@@ -31,6 +31,8 @@ const expectedTables = [
   'ai_review_policy_configs',
   'ai_reviews',
   'audit_events',
+  'autonomous_ai_review_runs',
+  'autonomous_ai_review_scan_state',
   'candidate_claim_set_seals',
   'candidate_claims',
   'candidate_confidence_input_snapshots',

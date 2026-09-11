@@ -1,6 +1,9 @@
 import { pathToFileURL } from 'node:url';
 
 import { Queue } from 'bullmq';
+import { createAiReviewProvider } from './modules/ai-review/ai-review-provider.js';
+import { ensureAutonomousReviewPolicy } from './modules/ai-review/run-autonomous-review.js';
+import { AI_REVIEW_QUEUE_NAME, createAiReviewWorker, reconcileAiReviewScheduler, type AiReviewJobData } from './queue/ai-review-worker.js';
 
 import {
   parseAiAutomationConfig,
@@ -45,12 +48,23 @@ export async function startAiAutomationRuntime(
     { connection: queueConnection },
   );
 
+  const reviewQueue = new Queue<AiReviewJobData>(AI_REVIEW_QUEUE_NAME, { connection: queueConnection });
+  let worker: ReturnType<typeof createAiDiscoveryAutomationWorker> | undefined;
+  let reviewWorker: ReturnType<typeof createAiReviewWorker> | undefined;
+  const cleanup = async (): Promise<void> => {
+    await Promise.allSettled([worker?.close(), reviewWorker?.close()]);
+    await Promise.allSettled([queue.close(), reviewQueue.close()]);
+    await Promise.allSettled([workerConnection.quit(), queueConnection.quit()]);
+    await pool.end();
+  };
   try {
     await recoverStaleAiProviderExecutions(pool);
+    if (config.autonomousPublicationEnabled) await ensureAutonomousReviewPolicy(pool, {model: config.reviewProviderConfig!.model});
+    await reconcileAiReviewScheduler(reviewQueue, config.autonomousPublicationEnabled);
     await reconcileAiDiscoveryScheduler(queue, config.schedulerEnabled);
 
     const provider = createAiAutomationProvider(config, createOpenAiResponsesProvider);
-    const worker = createAiDiscoveryAutomationWorker({
+    worker = createAiDiscoveryAutomationWorker({
       connection: workerConnection,
       pool,
       schedulerEnabled: config.schedulerEnabled,
@@ -63,32 +77,26 @@ export async function startAiAutomationRuntime(
         : {}),
     });
 
-    await worker.waitUntilReady();
-    if (!config.schedulerEnabled) {
+    const reviewProvider = config.autonomousPublicationEnabled ? createAiReviewProvider(config.reviewProviderConfig!) : undefined;
+    reviewWorker = createAiReviewWorker({connection: workerConnection, pool, enabled: config.autonomousPublicationEnabled, ...(reviewProvider ? {provider: reviewProvider, model: config.reviewProviderConfig!.model} : {})});
+    await Promise.all([worker.waitUntilReady(), reviewWorker.waitUntilReady()]);
+    if (!config.schedulerEnabled && !config.autonomousPublicationEnabled) {
       process.stdout.write(
         'AI_AUTOMATION_DISABLED_READY scheduler_enabled=false provider_configured=false\n',
       );
+    } else {
+      process.stdout.write(`AI_AUTOMATION_READY scheduler_enabled=${config.schedulerEnabled} autonomous_publication_enabled=${config.autonomousPublicationEnabled}\n`);
     }
 
     let closePromise: Promise<void> | undefined;
     return {
       async close(): Promise<void> {
-        closePromise ??= (async () => {
-          await worker.close();
-          await queue.close();
-          await Promise.all([workerConnection.quit(), queueConnection.quit()]);
-          await pool.end();
-        })();
+        closePromise ??= cleanup();
         await closePromise;
       },
     };
   } catch (error) {
-    await Promise.allSettled([
-      queue.close(),
-      workerConnection.quit(),
-      queueConnection.quit(),
-      pool.end(),
-    ]);
+    await cleanup().catch(() => undefined);
     throw error;
   }
 }
