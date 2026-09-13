@@ -1,9 +1,10 @@
 import { createHash } from "node:crypto";
-import { readFile, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 import { parseSignalMetrics, weightedEngagementRate } from "./lib/community-moderation.mjs";
+import { assessSourceEvidence, buildDiscoveryQueries, normalizePatch, resolveCurrentPatch, sourceForUrl, validateSourceCatalog } from "./lib/community-source-catalog.mjs";
 import {
   EVIDENCE_CLASSIFIER_REVISION as EVIDENCE_V2_CLASSIFIER_REVISION,
   commentEvidenceState,
@@ -30,9 +31,9 @@ import {
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const REGISTRY_PATH = path.join(ROOT, "app/community-source-registry.json");
+const SOURCE_CATALOG_PATH = path.join(ROOT, "app/chinese-meta-source-catalog.json");
 const COMMUNITY_PATH = path.join(ROOT, "app/community-sources.json");
 const GUIDES_PATH = path.join(ROOT, "app/generated-guides.ts");
-const DATA_PATH = path.join(ROOT, "app/data.ts");
 const INBOX_PATH = path.join(ROOT, "data/community-inbox.json");
 const REVIEW_OVERRIDES_PATH = path.join(ROOT, "data/community-review-overrides.json");
 const REPORT_PATH = path.join(ROOT, "community-watch-report.json");
@@ -60,6 +61,17 @@ const VALID_EVIDENCE_REVIEW_STATES = new Set(["complete", "image-review-required
 
 function fail(message) {
   throw new Error(`Bộ theo dõi cộng đồng: ${message}`);
+}
+
+async function rejectOfflineOutputSymlinks(target) {
+  for (let location = target; ; location = path.dirname(location)) {
+    const stats = await lstat(location).catch((error) => {
+      if (error.code === "ENOENT") return undefined;
+      throw error;
+    });
+    if (stats?.isSymbolicLink()) fail("--output-dir và các tệp đầu ra offline không được đi qua liên kết tượng trưng");
+    if (path.dirname(location) === location) return;
+  }
 }
 
 function hash(value) {
@@ -127,10 +139,6 @@ function parseGuides(source) {
   const start = source.indexOf(marker);
   if (start < 0) fail("không tìm thấy generatedChampions");
   return JSON.parse(source.slice(start + marker.length).trim().replace(/;\s*$/, ""));
-}
-
-function currentPatchFromSource(source, fallback) {
-  return source.match(/dataDragonVersion\s*=\s*"(\d+\.\d+)/)?.[1] ?? fallback;
 }
 
 function patchNumber(value) {
@@ -568,6 +576,8 @@ function classifyEvidenceChannels(rows, indexes) {
 }
 
 function classify(raw, context) {
+  const source = sourceForUrl(context.sourceCatalog, raw.url);
+  if (!source || !["player-evidence", "community-reference"].includes(source.role)) return undefined;
   const url = canonicalUrl(raw.url);
   if (!url) return undefined;
   const channels = evidenceChannels(raw);
@@ -575,7 +585,8 @@ function classify(raw, context) {
   const normalizedText = normalize(text);
   const hasModeKeyword = context.registry.modeKeywords.some((keyword) => normalizedText.includes(normalize(keyword)));
   if (!hasModeKeyword) return undefined;
-  const modeValid = !(context.registry.excludedModeKeywords ?? [])
+  const sourceEvidence = assessSourceEvidence({ text, publishedAt: raw.publishedAt, currentPatch: context.currentPatch, lookbackDays: context.registry.lookbackDays });
+  const modeValid = sourceEvidence.modeValid && !(context.registry.excludedModeKeywords ?? [])
     .some((keyword) => normalizedText.includes(normalize(keyword)));
   const disqualifiers = (context.registry.disqualifierKeywords ?? [])
     .filter((keyword) => normalizedText.includes(normalize(keyword)));
@@ -593,11 +604,11 @@ function classify(raw, context) {
   };
   const comments = raw.comments && typeof raw.comments === "object" ? raw.comments : undefined;
   const commentsState = commentEvidenceState(comments, context.registry.policy.moderation);
-  const patchHint = text.match(/\b(?:16|26)\.\d{1,2}\b/)?.[0];
+  const patchHint = sourceEvidence.patchHint;
   const ageDays = raw.publishedAt
     ? Math.floor((Date.now() - Date.parse(`${raw.publishedAt}T00:00:00Z`)) / 86_400_000)
     : undefined;
-  const currentEnough = ageDays === undefined || ageDays <= context.registry.lookbackDays;
+  const currentEnough = sourceEvidence.currentEnough;
   const reasons = ["Có từ khóa Hải Đấu/ARAM Mayhem"];
   let score = 20;
   if (champions.length === 1) { score += 25; reasons.push(`Nhận dạng ${champions[0].vi}`); }
@@ -617,6 +628,7 @@ function classify(raw, context) {
   else if (!signature) status = "needs-details";
   else if (score >= context.registry.policy.minimumReviewScore) status = "ready-for-review";
   else status = "needs-details";
+  if (!currentEnough && !["known-source", "stale"].includes(status)) status = "patch-watch";
 
   const sourceImageIds = [...new Set(raw.sourceImageIds ?? [])].sort();
   const sourceImageReferenceIds = [...new Set(raw.sourceImageReferenceIds ?? [])].sort();
@@ -631,7 +643,12 @@ function classify(raw, context) {
 
   return {
     id: `candidate-${hash(url).slice(0, 16)}`,
-    platform: raw.platform,
+    platform: source.platform,
+    sourceCatalogId: source.id,
+    sourcePriority: source.priority,
+    sourceLanguage: source.language,
+    noveltySignals: sourceEvidence.noveltySignals,
+    holdReasons: sourceEvidence.holdReasons,
     url,
     title: plain(raw.title),
     author: plain(raw.author) || undefined,
@@ -731,6 +748,11 @@ function normalizeCandidate(candidate) {
     author: candidate.author,
     publishedAt: candidate.publishedAt,
     patchHint: candidate.patchHint,
+    sourceCatalogId: candidate.sourceCatalogId,
+    sourcePriority: candidate.sourcePriority,
+    sourceLanguage: candidate.sourceLanguage,
+    noveltySignals: candidate.noveltySignals,
+    holdReasons: candidate.holdReasons,
     authorTier: candidate.authorTier,
     accessState: candidate.accessState,
     modeValid: candidate.modeValid,
@@ -919,20 +941,43 @@ function validateInbox(inbox, indexes) {
 
 async function main() {
   const validateOnly = process.argv.includes("--validate-only");
+  const offline = process.argv.includes("--offline");
+  const option = (name) => {
+    const index = process.argv.indexOf(name);
+    if (index < 0) return undefined;
+    const value = process.argv[index + 1];
+    if (!value || value.startsWith("--")) fail(`thiếu giá trị ${name}`);
+    return value;
+  };
+  const outputDir = option("--output-dir");
+  if (offline && !outputDir) fail("--offline cần --output-dir riêng để không ghi đè inbox live");
+  const inboxPath = outputDir ? path.resolve(ROOT, outputDir, "community-inbox.json") : INBOX_PATH;
+  const reportPath = outputDir ? path.resolve(ROOT, outputDir, "community-watch-report.json") : REPORT_PATH;
+  if (offline && (inboxPath === INBOX_PATH || reportPath === REPORT_PATH)) fail("--output-dir không được trùng đường dẫn dữ liệu live");
+  if (offline) await Promise.all([rejectOfflineOutputSymlinks(inboxPath), rejectOfflineOutputSymlinks(reportPath)]);
+  const patchOverride = option("--current-patch");
+  if (offline && (!option("--input") || !normalizePatch(patchOverride))) fail("--offline cần --input và --current-patch hợp lệ");
+  if (!offline && patchOverride) fail("--current-patch chỉ dùng khi phát lại offline");
   const inputIndex = process.argv.indexOf("--input");
   const inputPath = inputIndex >= 0 ? path.resolve(ROOT, process.argv[inputIndex + 1]) : undefined;
-  const [registryText, communityText, guidesText, dataText, inboxText, reviewOverridesText] = await Promise.all([
+  const [registryText, communityText, guidesText, sourceCatalogText, inboxText, reviewOverridesText] = await Promise.all([
     readFile(REGISTRY_PATH, "utf8"),
     readFile(COMMUNITY_PATH, "utf8"),
     readFile(GUIDES_PATH, "utf8"),
-    readFile(DATA_PATH, "utf8"),
-    readFile(INBOX_PATH, "utf8"),
+    readFile(SOURCE_CATALOG_PATH, "utf8"),
+    readFile(inboxPath, "utf8").catch((error) => {
+      if (outputDir && error.code === "ENOENT") return JSON.stringify({ schemaVersion: 1, candidates: [] });
+      throw error;
+    }),
     readFile(REVIEW_OVERRIDES_PATH, "utf8"),
   ]);
   const registry = JSON.parse(registryText);
+  const sourceCatalog = validateSourceCatalog(JSON.parse(sourceCatalogText));
+  const discoveryQueries = buildDiscoveryQueries(sourceCatalog, registry.queries);
   const community = JSON.parse(communityText);
   const guides = parseGuides(guidesText);
   const inbox = JSON.parse(inboxText);
+  if (!offline && !validateOnly && inbox.collectionMode === "offline") fail("không dùng lại inbox offline trong lượt thu thập live");
   const indexes = buildIndexes(guides, registry);
   const reviewCatalog = buildReviewCatalog(guides);
   const reviewOverrides = validateReviewOverrides(JSON.parse(reviewOverridesText), { catalog: reviewCatalog });
@@ -940,12 +985,12 @@ async function main() {
   validateInbox(inbox, indexes);
 
   if (validateOnly) {
-    console.log(`Đã kiểm tra danh mục ${registry.queries.length} truy vấn, ${registry.creators.length} tác giả, ${inbox.candidates.length} ứng viên và ${reviewOverrides.reviews.length} override Evidence v3.1.`);
+    console.log(`Đã kiểm tra catalog ${sourceCatalog.sources.length} nguồn, ${discoveryQueries.length} truy vấn, ${registry.creators.length} tác giả, ${inbox.candidates.length} ứng viên và ${reviewOverrides.reviews.length} override Evidence v3.1.`);
     return;
   }
 
   const today = new Date().toISOString().slice(0, 10);
-  const currentPatch = currentPatchFromSource(dataText, registry.minimumPatch);
+  const currentPatch = offline ? normalizePatch(patchOverride) : await resolveCurrentPatch(request);
   const known = buildKnownSets(community, indexes);
   const rawResults = [];
   const errors = [];
@@ -956,7 +1001,7 @@ async function main() {
     rawResults.push(...manualRows.map((row) => ({ ...row, sourceQueryId: "manual-input" })));
   }
 
-  for (const query of registry.queries) {
+  for (const query of offline ? [] : discoveryQueries) {
     try {
       const rows = query.adapter === "bilibili-search" ? await collectBilibili(query) : await collectBingRss(query);
       rawResults.push(...rows);
@@ -967,7 +1012,7 @@ async function main() {
     }
   }
 
-  const context = { registry, indexes, known, today };
+  const context = { registry, indexes, known, today, sourceCatalog, currentPatch };
   const discoveredByUrl = new Map();
   const bilibiliEvidenceCache = new Map();
   const publicPageEvidenceCache = new Map();
@@ -975,11 +1020,18 @@ async function main() {
   let bilibiliSubtitleFetchCount = 0;
   let publicImageFetchCount = 0;
   let publicPageEnrichmentCount = 0;
+  let rejectedUrlCount = 0;
   for (const raw of rawResults) {
+    const source = sourceForUrl(sourceCatalog, raw.url);
+    if (!source || !["player-evidence", "community-reference"].includes(source.role)) {
+      rejectedUrlCount += 1;
+      continue;
+    }
+    raw.platform = source.platform;
     let candidate = classify(raw, context);
     const candidateUrl = canonicalUrl(raw.url);
     const hasChampionHint = findTerms([raw.title, raw.description].filter(Boolean).join(" · "), indexes.champions, 1).length === 1;
-    const canEnrich = raw.platform === "Bilibili"
+    const canEnrich = !offline && raw.platform === "Bilibili"
       && Boolean(candidateUrl)
       && hasChampionHint
       && !new Set(["known-source", "known-build", "stale"]).has(candidate?.status);
@@ -999,7 +1051,7 @@ async function main() {
         candidate = classify({ ...enriched, sourceQueryId: raw.sourceQueryId }, context);
       }
     }
-    const canEnrichPublicPage = raw.platform !== "Bilibili"
+    const canEnrichPublicPage = !offline && raw.platform !== "Bilibili"
       && Boolean(candidateUrl)
       && hasChampionHint
       && !new Set(["known-source", "known-build", "stale"]).has(candidate?.status);
@@ -1026,27 +1078,57 @@ async function main() {
   }
 
   const merged = mergeCandidates(inbox.candidates, [...discoveredByUrl.values()]);
+  // Re-evaluate retained rows on every scan. A previously true flag must not
+  // survive a patch change or an expired publication date.
+  const newlyCollected = new Set(discoveredByUrl.keys());
+  merged.candidates = merged.candidates.map((candidate) => {
+    if (newlyCollected.has(candidate.url)) return candidate;
+    const assessment = assessSourceEvidence({ text: candidate.title, patchHint: candidate.patchHint, publishedAt: candidate.publishedAt, currentPatch, lookbackDays: registry.lookbackDays });
+    // Mode may have been confirmed by description, tags or subtitles. Those
+    // raw texts are deliberately not persisted; keep the bounded decision
+    // only when no explicit excluded mode contradicts it.
+    const holdReasons = [...new Set([...(candidate.holdReasons ?? []), ...assessment.holdReasons.filter((reason) => reason !== "MODE_NOT_CONFIRMED")])];
+    const modeValid = candidate.modeValid === true && !holdReasons.includes("MODE_EXCLUDED");
+    if (!modeValid && !holdReasons.includes("MODE_EXCLUDED") && !holdReasons.includes("MODE_NOT_CONFIRMED")) holdReasons.push("MODE_NOT_CONFIRMED");
+    const source = sourceForUrl(sourceCatalog, candidate.url);
+    if (!source || !["player-evidence", "community-reference"].includes(source.role)) holdReasons.push("SOURCE_URL_INVALID");
+    return { ...candidate, modeValid, currentEnough: candidate.currentEnough === true && holdReasons.length === 0, holdReasons };
+  });
   merged.candidates = applyReviewOverrides(merged.candidates, reviewOverrides, reviewCatalog);
   merged.candidates = merged.candidates.map(enforceEvidenceV3Signature);
   applyCrossSourceStatus(merged.candidates, registry);
   merged.candidates.sort((left, right) =>
-    String(right.publishedAt ?? right.firstSeenAt).localeCompare(String(left.publishedAt ?? left.firstSeenAt))
+    Number(right.currentEnough) - Number(left.currentEnough)
+      || (left.sourcePriority ?? 100) - (right.sourcePriority ?? 100)
+      || (right.noveltySignals?.length ?? 0) - (left.noveltySignals?.length ?? 0)
+      || String(right.publishedAt ?? right.firstSeenAt).localeCompare(String(left.publishedAt ?? left.firstSeenAt))
       || right.score - left.score
       || left.url.localeCompare(right.url));
   const limitedCandidates = merged.candidates.slice(0, registry.policy.maxInboxItems);
   const normalizedCandidates = limitedCandidates.map(normalizeCandidate);
   const contentHash = hash({
     registryHash: hash(JSON.parse(registryText)),
+    sourceCatalogHash: hash(sourceCatalog),
+    collectionMode: offline ? "offline" : "live",
     currentPatch,
     candidates: normalizedCandidates,
   });
-  const previousReport = await readFile(REPORT_PATH, "utf8").then(JSON.parse).catch(() => undefined);
+  const previousReport = await readFile(reportPath, "utf8").then(JSON.parse).catch(() => undefined);
   const statusCounts = Object.fromEntries([...VALID_STATUSES].map((status) => [status, limitedCandidates.filter((candidate) => candidate.status === status).length]));
   const report = {
+    collectionMode: offline ? "offline" : "live",
     generatedAt: new Date().toISOString(),
     contentHash,
     currentPatch,
-    queryCount: registry.queries.length,
+    queryCount: discoveryQueries.length,
+    sourceCatalog: {
+      schemaVersion: sourceCatalog.schemaVersion,
+      contentHash: hash(sourceCatalog),
+      sourceCount: sourceCatalog.sources.length,
+      rejectedUrlCount,
+      noveltyCandidateCount: limitedCandidates.filter((candidate) => candidate.noveltySignals?.length).length,
+      heldCandidateCount: limitedCandidates.filter((candidate) => candidate.currentEnough !== true).length,
+    },
     creatorCount: registry.creators.length,
     candidateCount: limitedCandidates.length,
     newCandidateCount: merged.newCount,
@@ -1072,11 +1154,12 @@ async function main() {
     return;
   }
 
-  const nextInbox = { schemaVersion: 1, updatedAt: today, candidates: limitedCandidates };
+  const nextInbox = { schemaVersion: 1, collectionMode: offline ? "offline" : "live", updatedAt: today, candidates: limitedCandidates };
   validateInbox(nextInbox, indexes);
+  if (outputDir) await mkdir(path.dirname(inboxPath), { recursive: true });
   await Promise.all([
-    writeFile(INBOX_PATH, `${JSON.stringify(nextInbox, null, 2)}\n`),
-    writeFile(REPORT_PATH, `${JSON.stringify(report, null, 2)}\n`),
+    writeFile(inboxPath, `${JSON.stringify(nextInbox, null, 2)}\n`),
+    writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`),
   ]);
   console.log(`Đã lưu ${limitedCandidates.length} ứng viên (${report.reviewCandidateCount} chờ duyệt có ID rõ); hash ${contentHash}.`);
 }

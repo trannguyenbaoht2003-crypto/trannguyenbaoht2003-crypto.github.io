@@ -53,19 +53,27 @@ test("does not add an installable app surface", () => {
   assert.doesNotMatch(source, /serviceWorker|beforeinstallprompt|Cài đặt ứng dụng/i);
 });
 
-test("renders the public Evidence v3.1 review workbench with exact-ID controls", () => {
+test("renders the public Evidence v3.1 workbench with controls or a safe empty queue", () => {
   assert.match(reviewHtml, /Bảng duyệt Evidence v3\.1/i);
   const candidateCount = reviewHtml.match(/aria-label=["'](\d+) ứng viên["']/i);
   assert.ok(candidateCount, "review workbench must render its current candidate count");
-  assert.ok(Number(candidateCount[1]) > 0, "review workbench must contain an actionable candidate");
   assert.match(reviewHtml, /Chờ đối chiếu ảnh/i);
   assert.match(reviewHtml, /Chờ đối chiếu bản dịch/i);
-  assert.match(reviewHtml, /Chọn đúng 1 tướng/i);
-  assert.match(reviewHtml, /Ít nhất 1 lõi/i);
-  assert.match(reviewHtml, /Ít nhất 2 trang bị/i);
-  assert.match(reviewHtml, /Tôi đã đối chiếu/i);
   assert.match(reviewHtml, /Tải gói JSON/i);
   assert.match(reviewHtml, /Không tự động đăng/i);
+  if (Number(candidateCount[1]) === 0) {
+    assert.match(reviewHtml, /Không có ứng viên phù hợp bộ lọc/i);
+    assert.match(reviewHtml, /Chưa có ứng viên/i);
+    assert.match(reviewHtml, /Hàng chờ an toàn hiện đang trống/i);
+    assert.doesNotMatch(reviewHtml, /Chọn đúng 1 tướng|Ít nhất 1 lõi|Ít nhất 2 trang bị|Tôi đã đối chiếu/i);
+    assert.match(reviewHtml, /<button\b[^>]*\bdisabled(?:="")?[^>]*>Tải gói JSON<\/button>/i);
+  } else {
+    assert.match(reviewHtml, /Chọn đúng 1 tướng/i);
+    assert.match(reviewHtml, /Ít nhất 1 lõi/i);
+    assert.match(reviewHtml, /Ít nhất 2 trang bị/i);
+    assert.match(reviewHtml, /Tôi đã đối chiếu/i);
+    assert.doesNotMatch(reviewHtml, /Hàng chờ an toàn hiện đang trống/i);
+  }
 });
 
 test("exports a local structured package without authenticated browser writes", () => {

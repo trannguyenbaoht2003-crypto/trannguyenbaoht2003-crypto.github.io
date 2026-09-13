@@ -22,7 +22,7 @@
     "test:operator-candidate-review-queue": "node --test tests/operator-candidate-review-queue-contract.test.mjs",
     "test:operator-candidate-review-dossier": "node --test tests/operator-candidate-review-dossier-contract.test.mjs",
     "test:human-review-cli": "node --test tests/human-review-cli-contract.test.mjs",
-    "test:moderation": "node --test tests/community-moderation.test.mjs tests/community-evidence-v2.test.mjs tests/community-evidence-v3.test.mjs tests/community-review-v31.test.mjs",
+    "test:moderation": "node --test tests/community-source-catalog.test.mjs tests/community-moderation.test.mjs tests/community-evidence-v2.test.mjs tests/community-evidence-v3.test.mjs tests/community-review-v31.test.mjs",
     "test:public-data": "node --experimental-strip-types --test tests/public-data-adapter.test.ts",
     "test:feedback-client": "node --experimental-strip-types --test tests/feedback-client.test.ts",
     "test:feedback-intake": "node --experimental-strip-types --test tests/feedback-client.test.ts && node --test tests/feedback-intake-contract.test.mjs",

@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   buildCommunityObservationBatch,
+  communityReportPatch,
 } from '../src/modules/community/community-inbox-bridge.js';
 
 const SOURCE_ID = '11111111-1111-4111-8111-111111111111';
@@ -15,6 +16,7 @@ function candidate(overrides: Record<string, unknown> = {}) {
     title: 'raw title must not enter backend provenance',
     author: 'creator',
     publishedAt: '2026-08-13',
+    patchHint: '16.16',
     firstSeenAt: '2026-08-13',
     status: 'ready-for-review',
     score: 91,
@@ -52,7 +54,7 @@ test('maps one structurally valid collector row into a governed observation comm
   const command = result.commands[0]!;
   assert.equal(command.sourceId, SOURCE_ID);
   assert.equal(command.actorId, 'community-collector');
-  assert.equal(command.adapterVersion, 'community-collector-bridge-v1');
+  assert.equal(command.adapterVersion, 'community-collector-bridge-v2');
   assert.equal(command.rawBlob, undefined);
   assert.equal(command.collectedAt.toISOString(), '2026-08-13T00:00:00.000Z');
   assert.deepEqual(command.aggregateMetadata, {
@@ -74,6 +76,8 @@ test('maps one structurally valid collector row into a governed observation comm
     author: 'creator',
     publishedAt: '2026-08-13',
     status: 'ready-for-review',
+    patchHint: '16.16',
+    sourceCatalogId: undefined,
     score: 91,
     evidenceVersion: 3,
     evidenceReviewState: 'complete',
@@ -163,4 +167,50 @@ test('rejects an unsupported inbox or patch contract before producing commands',
     () => buildCommunityObservationBatch({ ...batchInput([]), inbox: { schemaVersion: 2, candidates: [] } }),
     /COMMUNITY_INBOX_SCHEMA_UNSUPPORTED/,
   );
+});
+
+test('never relabels missing or old source patches with the report patch', () => {
+  const result = buildCommunityObservationBatch(batchInput([
+    candidate({ id: 'unknown', patchHint: undefined }),
+    candidate({ id: 'old', patchHint: '16.14' }),
+    candidate({ id: 'future', patchHint: '16.18' }),
+  ]));
+  assert.equal(result.commands.length, 0);
+  assert.deepEqual(result.skipped, [
+    { candidateId: 'unknown', reason: 'PATCH_NOT_CONFIRMED' },
+    { candidateId: 'old', reason: 'PATCH_MISMATCH' },
+    { candidateId: 'future', reason: 'PATCH_MISMATCH' },
+  ]);
+});
+
+test('accepts the official Riot patch alias and preserves it in provenance', () => {
+  const result = buildCommunityObservationBatch(batchInput([candidate({ patchHint: '26.16' })]));
+  assert.equal(result.commands.length, 1);
+  assert.equal(result.commands[0]?.externalReference?.patchHint, '26.16');
+});
+
+test('requires public HTTPS provenance before ingestion', () => {
+  const result = buildCommunityObservationBatch(batchInput([
+    candidate({ id: 'no-url', url: undefined }),
+    candidate({ id: 'http', url: 'http://www.bilibili.com/video/x' }),
+    candidate({ id: 'credential', url: 'https://user:password@www.bilibili.com/video/x' }),
+    candidate({ id: 'loopback', url: 'https://127.0.0.1/' }),
+    candidate({ id: 'localhost', url: 'https://localhost/' }),
+    candidate({ id: 'lookalike', url: 'https://bilibili.com.attacker.test/video/x' }),
+    candidate({ id: 'reference', url: 'https://raw.communitydragon.org/16.18/' }),
+  ]));
+  assert.equal(result.commands.length, 0);
+  assert.ok(result.skipped.every(({ reason }) => reason === 'SOURCE_URL_INVALID'));
+});
+
+test('offline replay files cannot become collector observations', () => {
+  const input = batchInput([candidate()]);
+  assert.throws(() => buildCommunityObservationBatch({ ...input, inbox: { ...input.inbox, collectionMode: 'offline' } }), /COMMUNITY_OFFLINE_REPLAY_NOT_INGESTIBLE/);
+});
+
+test('import requires a live report with an explicit supported patch', () => {
+  assert.equal(communityReportPatch({ collectionMode: 'live', currentPatch: '16.18' }), '16.18');
+  for (const report of [{ currentPatch: '16.18' }, { collectionMode: 'offline', currentPatch: '16.18' }, { collectionMode: 'live', currentPatch: 'latest' }]) {
+    assert.throws(() => communityReportPatch(report), /COMMUNITY_REPORT_NOT_LIVE/);
+  }
 });

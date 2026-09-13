@@ -4,9 +4,15 @@ import type {
   IngestObservationCommand,
 } from '../collector/ingest-observation.js';
 
-const ADAPTER_VERSION = 'community-collector-bridge-v1';
+const ADAPTER_VERSION = 'community-collector-bridge-v2';
 const ACTOR_ID = 'community-collector';
 const PATCH_PATTERN = /^[!-~]{1,128}$/u;
+// Independent backend ingestion boundary. Catalog additions cannot silently
+// authorize a new provenance host; update this reviewed allowlist as well.
+const COMMUNITY_SOURCE_HOSTS = [
+  'bilibili.com', 'douyin.com', 'tieba.baidu.com', 'apexlol.info',
+  'lolhaidou.cn', 'zhihu.com', 'ali213.net', '3dmgame.com', '17173.com',
+];
 
 type SkipReason =
   | 'MODE_NOT_CONFIRMED'
@@ -15,7 +21,10 @@ type SkipReason =
   | 'CANDIDATE_SCHEMA_INVALID'
   | 'SUBJECT_NOT_EXACT'
   | 'SELECTION_IDS_INVALID'
-  | 'COLLECTED_AT_INVALID';
+  | 'COLLECTED_AT_INVALID'
+  | 'PATCH_NOT_CONFIRMED'
+  | 'PATCH_MISMATCH'
+  | 'SOURCE_URL_INVALID';
 
 export interface CommunityObservationSkip {
   candidateId: string;
@@ -45,6 +54,23 @@ function text(value: unknown): string | undefined {
 
 function finiteNumber(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function canonicalPatch(value: unknown): string | undefined {
+  const match = /^(?:16|26)\.([1-9]|[12]\d|30)$/u.exec(text(value) ?? '');
+  return match ? `16.${Number(match[1])}` : undefined;
+}
+
+function publicSourceUrl(value: unknown): boolean {
+  const urlText = text(value);
+  if (!urlText) return false;
+  try {
+    const url = new URL(urlText);
+    return url.protocol === 'https:' && !url.username && !url.password && !url.port
+      && COMMUNITY_SOURCE_HOSTS.some((host) => url.hostname === host || url.hostname.endsWith(`.${host}`));
+  } catch {
+    return false;
+  }
 }
 
 function scalarId(value: unknown): string | undefined {
@@ -108,6 +134,8 @@ function boundedExternalReference(candidate: Record<string, unknown>) {
     url: text(candidate.url),
     author: text(candidate.author),
     publishedAt: text(candidate.publishedAt),
+    patchHint: text(candidate.patchHint),
+    sourceCatalogId: text(candidate.sourceCatalogId),
     status: text(candidate.status),
     score: finiteNumber(candidate.score),
     evidenceVersion: finiteNumber(candidate.evidenceVersion),
@@ -124,6 +152,14 @@ function skip(
   skipped.push({ candidateId, reason });
 }
 
+export function communityReportPatch(value: unknown): string {
+  const patch = isRecord(value) ? canonicalPatch(value.currentPatch) : undefined;
+  if (!isRecord(value) || value.collectionMode !== 'live' || !patch) {
+    throw new Error('COMMUNITY_REPORT_NOT_LIVE');
+  }
+  return patch;
+}
+
 export function buildCommunityObservationBatch(
   input: BuildCommunityObservationBatchInput,
 ): CommunityObservationBatch {
@@ -137,6 +173,9 @@ export function buildCommunityObservationBatch(
     || !Array.isArray(input.inbox.candidates)
   ) {
     throw new Error('COMMUNITY_INBOX_SCHEMA_UNSUPPORTED');
+  }
+  if (input.inbox.collectionMode === 'offline') {
+    throw new Error('COMMUNITY_OFFLINE_REPLAY_NOT_INGESTIBLE');
   }
 
   const commands: IngestObservationCommand[] = [];
@@ -164,6 +203,19 @@ export function buildCommunityObservationBatch(
     }
     if (value.disqualifiers.length > 0) {
       skip(skipped, candidateId, 'CANDIDATE_DISQUALIFIED');
+      continue;
+    }
+    const sourcePatch = canonicalPatch(value.patchHint);
+    if (!sourcePatch) {
+      skip(skipped, candidateId, 'PATCH_NOT_CONFIRMED');
+      continue;
+    }
+    if (sourcePatch !== canonicalPatch(patchKey)) {
+      skip(skipped, candidateId, 'PATCH_MISMATCH');
+      continue;
+    }
+    if (!publicSourceUrl(value.url)) {
+      skip(skipped, candidateId, 'SOURCE_URL_INVALID');
       continue;
     }
     if (!Array.isArray(value.championMatches) || value.championMatches.length !== 1) {

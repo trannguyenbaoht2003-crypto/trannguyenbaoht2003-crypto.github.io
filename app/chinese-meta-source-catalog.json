@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "verifiedAt": "2026-09-12",
+  "gameModeExternalId": "aram_mayhem",
+  "purpose": "discovery-only",
+  "sources": [
+    {
+      "id": "bilibili-players", "name": "Bilibili · người chơi Hải Đấu", "platform": "Bilibili", "language": "zh-CN", "priority": 1, "role": "player-evidence",
+      "hosts": ["bilibili.com"],
+      "entryUrls": ["https://www.bilibili.com/v/topic/detail?topic_id=1326709", "https://www.bilibili.com/video/BV1k1sozLEBB/"],
+      "notes": "Chủ đề 整活大赏 dành cho ý tưởng, combo và lối chơi lạ. Video cũ chỉ là đầu mối; từng bài phải được kiểm tra lại patch và ngày đăng.",
+      "queries": [
+        {"id": "cn-bilibili-offmeta", "adapter": "bilibili-search", "query": "海克斯大乱斗 黑科技", "maxResults": 20},
+        {"id": "cn-bilibili-niche", "adapter": "bilibili-search", "query": "海克斯大乱斗 冷门 套路", "maxResults": 20},
+        {"id": "cn-bilibili-synergy", "adapter": "bilibili-search", "query": "海克斯大乱斗 联动 实测", "maxResults": 20},
+        {"id": "cn-bilibili-creative", "adapter": "bing-rss", "query": "site:bilibili.com/video 海克斯大乱斗 整活", "maxResults": 12}
+      ]
+    },
+    {
+      "id": "douyin-players", "name": "Douyin · clip thực chiến", "platform": "Douyin", "language": "zh-CN", "priority": 2, "role": "player-evidence",
+      "hosts": ["douyin.com"], "entryUrls": ["https://www.douyin.com/"],
+      "notes": "Đầu mối tìm clip; yêu cầu bài gốc, tác giả và ngày đăng. Không vượt qua đăng nhập hoặc CAPTCHA.",
+      "queries": [{"id": "cn-douyin-offmeta", "adapter": "bing-rss", "query": "site:douyin.com 海克斯大乱斗 黑科技 冷门", "maxResults": 12}]
+    },
+    {
+      "id": "tieba-players", "name": "Tieba · thảo luận người chơi", "platform": "Tieba", "language": "zh-CN", "priority": 3, "role": "player-evidence",
+      "hosts": ["tieba.baidu.com"], "entryUrls": ["https://tieba.baidu.com/"],
+      "notes": "Tìm bài thử combo và phản biện cơ chế; không lấy số lượng bình luận làm chứng minh hiệu quả.",
+      "queries": [{"id": "cn-tieba-mechanics", "adapter": "bing-rss", "query": "site:tieba.baidu.com 海克斯大乱斗 联动 实测", "maxResults": 12}]
+    },
+    {
+      "id": "apexlol-wiki", "name": "ARAM Hextech Wiki · 三元君", "platform": "Web Trung Quốc", "language": "zh-CN", "priority": 4, "role": "community-reference",
+      "hosts": ["apexlol.info"], "entryUrls": ["https://apexlol.info/zh", "https://apexlol.info/zh/hextech"],
+      "notes": "Wiki cộng đồng về tương tác tướng–lõi. Dùng để tìm cơ chế và đối chiếu tên; chưa đủ để xác nhận catalog luật của patch hiện hành.",
+      "queries": [{"id": "cn-apexlol-synergy", "adapter": "bing-rss", "query": "site:apexlol.info/zh 海克斯 联动", "maxResults": 12}]
+    },
+    {
+      "id": "lolhaidou-guides", "name": "海斗小助手 · Hải Đấu Tiểu Trợ Thủ", "platform": "Web Trung Quốc", "language": "zh-CN", "priority": 5, "role": "community-reference",
+      "hosts": ["lolhaidou.cn"], "entryUrls": ["https://lolhaidou.cn/"],
+      "notes": "Nguồn build hiện có của dự án. Từng trang cần patch và ID chính xác trước khi đi vào backend.",
+      "queries": [{"id": "cn-lolhaidou-builds", "adapter": "bing-rss", "query": "site:lolhaidou.cn 海克斯大乱斗 联动", "maxResults": 12}]
+    },
+    {
+      "id": "zhihu-analysis", "name": "Zhihu · phân tích người chơi", "platform": "Zhihu", "language": "zh-CN", "priority": 6, "role": "player-evidence",
+      "hosts": ["zhihu.com"], "entryUrls": ["https://www.zhihu.com/"],
+      "notes": "Ưu tiên bài phân tích cơ chế có ví dụ thực chiến và nguồn gốc rõ.",
+      "queries": [{"id": "cn-zhihu-offmeta", "adapter": "bing-rss", "query": "site:zhihu.com 海克斯大乱斗 冷门 机制", "maxResults": 12}]
+    },
+    {
+      "id": "cn-guide-sites", "name": "Trang hướng dẫn Trung Quốc", "platform": "Web Trung Quốc", "language": "zh-CN", "priority": 7, "role": "community-reference",
+      "hosts": ["ali213.net", "3dmgame.com", "17173.com"],
+      "entryUrls": ["https://www.ali213.net/", "https://www.3dmgame.com/", "https://www.17173.com/"],
+      "notes": "Nguồn bổ sung từ registry hiện có; bài đăng lại không tính là chứng cứ độc lập.", "queries": []
+    },
+    {
+      "id": "tencent-reference", "name": "Tencent · LoL và 101", "platform": "Web Trung Quốc", "language": "zh-CN", "priority": 8, "role": "official-reference",
+      "hosts": ["lol.qq.com", "101.qq.com"], "entryUrls": ["https://lol.qq.com/", "https://101.qq.com/"],
+      "notes": "Đối chiếu phiên bản và dữ liệu nền; trang xếp hạng không tự xác nhận combo độc lạ.", "queries": []
+    },
+    {
+      "id": "riot-reference", "name": "Riot Games · patch và game data", "platform": "Riot Games", "language": "en", "priority": 9, "role": "official-reference",
+      "hosts": ["leagueoflegends.com"],
+      "entryUrls": ["https://www.leagueoflegends.com/en-us/news/tags/patch-notes/", "https://ddragon.leagueoflegends.com/api/versions.json"],
+      "notes": "Data Dragon xác định phiên bản live. Cần bằng chứng Mayhem riêng cho tư cách hợp lệ của từng lõi.", "queries": []
+    },
+    {
+      "id": "cdragon-reference", "name": "CommunityDragon · dữ liệu client có phiên bản", "platform": "CommunityDragon", "language": "zh-CN", "priority": 10, "role": "client-reference",
+      "hosts": ["raw.communitydragon.org"],
+      "entryUrls": ["https://raw.communitydragon.org/16.18/plugins/rcp-be-lol-game-data/global/zh_cn/v1/"],
+      "notes": "Nguồn tham chiếu ID/tên. Các tệp CHERRY/Arena không chứng minh pool lõi hay luật ARAM Mayhem.", "queries": []
+    }
+  ]
+}

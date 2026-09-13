@@ -41,6 +41,7 @@ function fixture(overrides = {}) {
     patchHint: "16.14",
     accessState: "ok",
     modeValid: true,
+    currentEnough: true,
     championMatches: [{ id: "ryze", cn: "符文法师", vi: "Ryze", icon: "/ryze.png" }],
     augmentMatches: [
       { id: 101, cn: "物理转魔法", vi: "Vật Lý Thành Phép", icon: "/a101.png" },
@@ -200,6 +201,51 @@ test("demotes after a patch change without reconfirmation", () => {
 
   assert.equal(decision.status, "needs-verification");
   assert.ok(decision.reasons.includes("Chưa được xác nhận lại cho bản hiện hành"));
+});
+
+test("a collector hold cannot be overridden by matching patch or a temporary-error grace period", () => {
+  for (const accessState of ["ok", "temporary-error"]) {
+    const result = evaluateCandidate(fixture({ currentEnough: false, accessState, authorTier: "established" }), context({ previousDecision: { status: "auto-approved", patch: "16.14", consecutiveFailures: 0 } }));
+    assert.equal(result.status, "needs-verification");
+    assert.ok(result.hardGateFailures.includes("stale-patch"));
+  }
+});
+
+test("unknown source patch cannot auto-approve despite a collector flag", () => {
+  const result = evaluateCandidate(fixture({ patchHint: undefined, authorTier: "established" }), context({ independentSourceCount: 2 }));
+  assert.notEqual(result.status, "auto-approved");
+  assert.ok(result.hardGateFailures.includes("stale-patch"));
+});
+
+test("a held group member cannot supply the second source or appear as supporting evidence", () => {
+  for (const hold of [
+    { currentEnough: false, patchHint: undefined, holdReasons: ["PATCH_NOT_CONFIRMED"] },
+    { currentEnough: false, patchHint: "16.13", holdReasons: ["PATCH_MISMATCH"] },
+    { modeValid: false, holdReasons: ["MODE_NOT_CONFIRMED"] },
+    { accessState: "captcha" },
+    { disqualifiers: ["BUG"] },
+  ]) {
+    const result = moderateCandidates({
+      candidates: [
+        fixture({ id: "current", author: "A", title: "瑞兹双核心实战玩法", url: "https://a.example/current" }),
+        fixture({ id: "held", author: "B", platform: "Zhihu", title: "符文法师无限法力构筑", url: "https://b.example/held", ...hold }),
+      ], policy, currentPatch: "16.14", now: "2026-07-16T12:00:00.000Z",
+    });
+    assert.equal(result.decisions[0].status, "observing");
+    assert.deepEqual(result.decisions[0].sources.map(({ url }) => url), ["https://a.example/current"]);
+  }
+});
+
+test("a held high-engagement representative does not replace two eligible sources", () => {
+  const result = moderateCandidates({
+    candidates: [
+      fixture({ id: "held", author: "C", authorTier: "established", currentEnough: false, patchHint: "16.13", url: "https://c.example/held" }),
+      fixture({ id: "one", author: "A", title: "瑞兹双核心实战玩法", url: "https://a.example/one" }),
+      fixture({ id: "two", author: "B", platform: "Zhihu", title: "符文法师无限法力构筑", url: "https://b.example/two" }),
+    ], policy, currentPatch: "16.14", now: "2026-07-16T12:00:00.000Z",
+  });
+  assert.equal(result.decisions[0].status, "auto-approved");
+  assert.deepEqual(result.decisions[0].sources.map(({ url }) => url).sort(), ["https://a.example/one", "https://b.example/two"]);
 });
 
 test("demotes when negative comments reach 35 percent", () => {

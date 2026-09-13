@@ -25,10 +25,11 @@ function patchMinor(value) {
 }
 
 function isCurrentPatch(candidate, currentPatch) {
+  if (candidate.currentEnough !== true || candidate.holdReasons?.length) return false;
   const candidateMinor = patchMinor(candidate.patchHint);
   const currentMinor = patchMinor(currentPatch);
   if (candidateMinor !== undefined && currentMinor !== undefined) return candidateMinor === currentMinor;
-  return candidate.currentEnough !== false;
+  return false;
 }
 
 function sourceAgeHours(candidate, now) {
@@ -166,7 +167,8 @@ export function evaluateCandidate(candidate, context) {
     ? (previousDecision?.consecutiveFailures ?? 0) + 1
     : 0;
 
-  if (candidate.accessState === "temporary-error" && previousDecision?.status === "auto-approved") {
+  if (candidate.accessState === "temporary-error" && previousDecision?.status === "auto-approved"
+    && isCurrentPatch(candidate, context.currentPatch) && candidate.modeValid === true && !candidate.disqualifiers?.length) {
     const demote = consecutiveFailures >= moderation.consecutiveFailureLimit;
     return {
       ...previousDecision,
@@ -296,9 +298,18 @@ export function moderateCandidates({ candidates, policy, currentPatch, now, prev
 
   const previousBySignature = new Map(previousDecisions.map((decision) => [decision.signature, decision]));
   const decisions = groups.map((group) => {
-    const sources = [...new Map(group.map((candidate) => [candidate.url, decisionSource(candidate)])).values()];
-    const independentSourceCount = countIndependentSources(group);
-    const representative = [...group].sort((left, right) => {
+    // Every corroborating member must pass its own evidence gates. A held
+    // row must not lend its author/URL to another row's publication quorum.
+    const supportingMembers = group.filter((candidate) => {
+      if (candidate.modeValid !== true || candidate.accessState !== "ok"
+        || !isCurrentPatch(candidate, currentPatch)
+        || sourceAgeHours(candidate, now) < policy.moderation.minimumSourceAgeHours) return false;
+      const assessment = evaluateCandidate(candidate, { policy, currentPatch, now, independentSourceCount: 1 });
+      return assessment.hardGateFailures.length === 0 && assessment.status !== "rejected";
+    });
+    const sources = [...new Map(supportingMembers.map((candidate) => [candidate.url, decisionSource(candidate)])).values()];
+    const independentSourceCount = countIndependentSources(supportingMembers);
+    const representative = [...(supportingMembers.length ? supportingMembers : group)].sort((left, right) => {
       if (left.authorTier === right.authorTier) return weightedEngagementRate(right.metrics) - weightedEngagementRate(left.metrics);
       return left.authorTier === "established" ? -1 : 1;
     })[0];
