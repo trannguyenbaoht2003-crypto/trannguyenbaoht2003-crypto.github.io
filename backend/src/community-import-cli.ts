@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { createPool } from './database/pool.js';
 import { ingestObservation } from './modules/collector/ingest-observation.js';
 import { bootstrapCommunitySource } from './modules/community/bootstrap-community-source.js';
-import { buildCommunityObservationBatch } from './modules/community/community-inbox-bridge.js';
+import { buildCommunityObservationBatch, communityReportPatch } from './modules/community/community-inbox-bridge.js';
 
 function argument(name: string): string {
   const index = process.argv.indexOf(name);
@@ -12,10 +12,6 @@ function argument(name: string): string {
     throw new Error(`COMMUNITY_IMPORT_ARGUMENT_REQUIRED:${name}`);
   }
   return value;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 async function jsonFile(path: string): Promise<unknown> {
@@ -32,16 +28,14 @@ async function main(): Promise<void> {
     jsonFile(inboxPath),
     jsonFile(reportPath),
   ]);
-  if (!isRecord(report) || typeof report.currentPatch !== 'string') {
-    throw new Error('COMMUNITY_REPORT_SCHEMA_UNSUPPORTED');
-  }
+  const patchKey = communityReportPatch(report);
 
   const pool = createPool(databaseUrl);
   try {
     const authority = await bootstrapCommunitySource(pool);
     const batch = buildCommunityObservationBatch({
       inbox,
-      patchKey: report.currentPatch,
+      patchKey,
       sourceId: authority.sourceId,
     });
 

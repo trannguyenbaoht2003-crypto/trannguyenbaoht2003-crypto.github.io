@@ -1,6 +1,7 @@
 import { readFile, rename, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { collectorReportPatch } from "./lib/community-source-catalog.mjs";
 
 import {
   generatePublishedRecords,
@@ -12,7 +13,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const REGISTRY_PATH = path.join(ROOT, "app/community-source-registry.json");
 const COMMUNITY_PATH = path.join(ROOT, "app/community-sources.json");
 const GUIDES_PATH = path.join(ROOT, "app/generated-guides.ts");
-const DATA_PATH = path.join(ROOT, "app/data.ts");
+const COLLECTOR_REPORT_PATH = path.join(ROOT, "community-watch-report.json");
 const INBOX_PATH = path.join(ROOT, "data/community-inbox.json");
 const EVIDENCE_PATH = path.join(ROOT, "data/community-evidence.json");
 const DECISIONS_PATH = path.join(ROOT, "data/community-decisions.json");
@@ -30,10 +31,6 @@ function parseGuides(source) {
   const start = source.indexOf(marker);
   if (start < 0) fail("không tìm thấy generatedChampions");
   return JSON.parse(source.slice(start + marker.length).trim().replace(/;\s*$/, ""));
-}
-
-function currentPatchFromSource(source, fallback) {
-  return source.match(/dataDragonVersion\s*=\s*"(\d+\.\d+)/)?.[1] ?? fallback;
 }
 
 function isIsoDateTime(value) {
@@ -141,18 +138,19 @@ async function main() {
     return;
   }
 
-  const [registry, community, guidesText, dataText, inbox, previousDecisionFile, previousReport] = await Promise.all([
+  const [registry, community, guidesText, collectorReport, inbox, previousDecisionFile, previousReport] = await Promise.all([
     readJson(REGISTRY_PATH),
     readJson(COMMUNITY_PATH),
     readFile(GUIDES_PATH, "utf8"),
-    readFile(DATA_PATH, "utf8"),
+    readJson(COLLECTOR_REPORT_PATH),
     readJson(INBOX_PATH),
     readJson(DECISIONS_PATH, { decisions: [] }),
     readJson(REPORT_PATH, undefined).catch(() => undefined),
   ]);
   if (registry.policy?.autoPublish !== true) fail("policy.autoPublish chưa bật");
   const guides = parseGuides(guidesText);
-  const currentPatch = currentPatchFromSource(dataText, registry.minimumPatch);
+  if (inbox.collectionMode === "offline") fail("không xuất bản dữ liệu phát lại offline");
+  const currentPatch = collectorReportPatch(collectorReport);
   const now = new Date().toISOString();
   const candidates = inbox.candidates.filter((candidate) => REVIEW_STATUSES.has(candidate.status));
   const buildCandidates = candidates.filter((candidate) => candidate.signature && candidate.championMatches?.length === 1);
