@@ -27,8 +27,8 @@ export async function registerPatchEvent(
        on conflict (patch_id) do nothing`,
       [command.patchId, command.patchKey, command.displayLabel],
     );
-    const patchLock = await client.query(
-      `select patch_id
+    const patchLock = await client.query<{ patch_id: string; patch_key: string; display_label: string }>(
+      `select patch_id, patch_key, display_label
          from patches
         where patch_id = $1
         for update`,
@@ -36,6 +36,10 @@ export async function registerPatchEvent(
     );
     if (patchLock.rowCount !== 1) {
       throw new Error('PATCH_NOT_FOUND');
+    }
+    const patch = patchLock.rows[0]!;
+    if (patch.patch_key !== command.patchKey || patch.display_label !== command.displayLabel) {
+      throw new Error('PATCH_IDENTITY_CONFLICT');
     }
     await client.query(
       `insert into patch_lifecycle_events
