@@ -12,7 +12,7 @@ function run(input: unknown, args: string[] = [], databaseUrl = privateValue) {
     cwd: new URL('..', import.meta.url),
     encoding: 'utf8',
     env: { ...process.env, DATABASE_URL: databaseUrl },
-    input: typeof input === 'string' ? input : JSON.stringify(input),
+    input: typeof input === 'string' || Buffer.isBuffer(input) ? input : JSON.stringify(input),
     timeout: 10_000,
     maxBuffer: 2 * 1024 * 1024,
   });
@@ -114,4 +114,32 @@ test('database failures expose a safe code without connection strings or stack t
   assert.equal(result.status, 1);
   assert.equal(result.stdout, '');
   assert.equal(result.stderr, 'CATALOG_OPERATIONS_FAILED\n');
+});
+
+test('malformed UTF-8 is rejected instead of silently changing a catalog name', () => {
+  const snapshot = validCatalogSnapshot();
+  snapshot.entities[0]!.displayName = 'invalid-byte-marker';
+  const bytes = Buffer.from(JSON.stringify({ action: 'inspect', snapshot }));
+  bytes[bytes.indexOf('invalid-byte-marker')] = 0xff;
+  const result = run(bytes);
+  assert.equal(result.status, 1);
+  assert.equal(result.stdout, '');
+  assert.equal(result.stderr, 'CATALOG_OPERATIONS_INPUT_INVALID\n');
+});
+
+test('revision fits PostgreSQL integer before a database connection is attempted', () => {
+  const input = {
+    action: 'import', actorId: 'catalog-operator', correlationId: 'revision-boundary',
+    catalogRevisionId: '40000000-0000-4000-8000-000000000005',
+    patchId: '40000000-0000-4000-8000-000000000003',
+    sourceId: '40000000-0000-4000-8000-000000000001',
+    sourcePolicyRevisionId: '40000000-0000-4000-8000-000000000002',
+    idempotencyKey: 'revision-boundary', snapshot: validCatalogSnapshot(),
+  };
+  const overflow = run({ ...input, revision: 2147483648 }, [], '');
+  assert.equal(overflow.status, 1);
+  assert.equal(overflow.stderr, 'CATALOG_OPERATIONS_INPUT_INVALID\n');
+  const maximum = run({ ...input, revision: 2147483647 }, [], '');
+  assert.equal(maximum.status, 1);
+  assert.equal(maximum.stderr, 'CATALOG_OPERATIONS_CONFIG_INVALID\n');
 });

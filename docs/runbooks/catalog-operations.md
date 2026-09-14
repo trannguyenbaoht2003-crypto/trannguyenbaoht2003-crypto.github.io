@@ -33,7 +33,7 @@ npm --prefix backend run build
 npm --prefix backend run --silent catalog:operations < /private/catalog-command.json
 ```
 
-CLI chỉ đọc một JSON object qua stdin, tối đa 8 MiB. Không nhận tham số trên
+CLI chỉ đọc một JSON object UTF-8 hợp lệ qua stdin, tối đa 8 MiB. Không nhận tham số trên
 command line; trường không biết, UUID không hợp lệ, timestamp không chuẩn,
 schema hoặc kiểu dữ liệu sai đều bị từ chối. UUID lệnh là v4 hoặc v5.
 `occurredAt` dùng UTC ISO đầy đủ, gồm mili giây, ví dụ
@@ -58,6 +58,7 @@ database private; `actorId` là dấu vết audit, không phải cơ chế đăn
 Chỉ patch `active` mới nhập/kích hoạt được catalog. Khi dùng lại một `patchId`,
 cả `patchKey` và `displayLabel` phải khớp định danh đã đăng ký.
 `validatorRulesetVersion` phải là `catalog-rules-v1`.
+`revision` là số nguyên từ 1 đến 2.147.483.647, khớp giới hạn PostgreSQL.
 
 Để kiểm tra một snapshot riêng trước khi tạo command nhập:
 

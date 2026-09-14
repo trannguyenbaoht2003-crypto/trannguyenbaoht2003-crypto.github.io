@@ -158,7 +158,7 @@ export function parseCatalogOperationsInput(stdin: string): CatalogOperationsInp
         action: 'import',
         catalogRevisionId: uuid(raw.catalogRevisionId),
         patchId: uuid(raw.patchId),
-        revision: integer(raw.revision),
+        revision: integer(raw.revision, 2_147_483_647),
         sourceId: uuid(raw.sourceId),
         sourcePolicyRevisionId: uuid(raw.sourcePolicyRevisionId),
         idempotencyKey: text(raw.idempotencyKey),

@@ -93,7 +93,11 @@ async function readStdin(): Promise<string> {
     if (size > MAX_CATALOG_INPUT_BYTES) throw new Error('CATALOG_OPERATIONS_INPUT_INVALID');
     chunks.push(buffer);
   }
-  return Buffer.concat(chunks).toString('utf8');
+  try {
+    return new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(Buffer.concat(chunks));
+  } catch {
+    throw new Error('CATALOG_OPERATIONS_INPUT_INVALID');
+  }
 }
 
 async function main(): Promise<void> {
