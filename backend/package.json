@@ -24,7 +24,8 @@
     "start:ai-automation": "node dist/src/ai-automation-worker.js",
     "operator:dev": "node --import tsx src/operator-server.ts",
     "operator": "node dist/src/operator-server.js",
-    "ai-autonomous:status": "node dist/src/ai-autonomous-status-cli.js"
+    "ai-autonomous:status": "node dist/src/ai-autonomous-status-cli.js",
+    "catalog:operations": "node dist/src/catalog-operations-cli.js"
   },
   "dependencies": {
     "bullmq": "5.80.11",

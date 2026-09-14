@@ -148,10 +148,23 @@ Publication, or relabel old observations as a newer patch. A real first run
 may correctly hold with no current sources; that is not successful AI
 publication.
 
-OpenAI Platform key creation and target discovery were rejected during the
-implementation preflight, so no key or real model call exists. The current
-Neon AI Gateway project/region is not a ready substitute. Re-verify both
-dependencies before activation.
+The private [`catalog:operations` CLI](catalog-operations.md) exposes inspect,
+patch registration, import, validation, and explicit activation through these
+same authorities. Offline inspection and database validation do not establish
+the factual correctness of an upstream game catalog.
+
+The earlier implementation preflight could not create a provider credential.
+That historical result was superseded on 2026-09-12: the private credential
+was configured and an authentication probe succeeded. No paid model completion
+or autonomous publication was established by that probe.
+
+The production release on 2026-09-13 kept both AI modes disabled and passed
+the existing HTTP/browser smoke checks. The subsequent read-only input check
+found 170 raw observations (169 bridge-v1 rows at `16.14`, one bridge-v2 row at
+`16.18`), zero active catalogs, normalized observations, CandidateRevisions,
+publication versions, and autonomous review runs. The remaining dependency is
+verified game catalog/evidence input; installing a key or deploying the worker
+alone does not resolve it. Re-read current private status before activation.
 
 ## Disable, restart, and rollback
 
