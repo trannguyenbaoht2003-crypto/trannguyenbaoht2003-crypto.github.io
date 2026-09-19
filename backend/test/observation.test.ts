@@ -4,6 +4,7 @@ import test from 'node:test';
 import { hashCanonicalJson } from '../src/shared/hash.js';
 import { normalizeObservationAggregateMetadata } from '../src/modules/candidate/normalize-observation.js';
 import { ingestObservation } from '../src/modules/collector/ingest-observation.js';
+import { buildCommunityObservationBatch } from '../src/modules/community/community-inbox-bridge.js';
 import { activateSourcePolicy } from '../src/modules/source-policy/activate-source-policy.js';
 import { resetDatabase, tableCount } from './helpers/database.js';
 
@@ -329,6 +330,46 @@ for (const adapterVersion of ['community-collector-bridge-v1', 'community-collec
     assert.equal(await tableCount(pool, 'outbox_events'), 0);
   });
 }
+
+test('the current community bridge can ingest the same discovery on successive days', async (t) => {
+  const pool = await seedPolicy('blob_allowed');
+  t.after(() => pool.end());
+  const build = (firstSeenAt: string) => {
+    const batch = buildCommunityObservationBatch({
+      sourceId: command().sourceId,
+      patchKey: '16.18',
+      inbox: {
+        schemaVersion: 1,
+        collectionMode: 'live',
+        candidates: [{
+          id: 'rediscovered-samira',
+          url: 'https://www.bilibili.com/video/BV1example/',
+          patchHint: '16.18',
+          firstSeenAt,
+          modeValid: true,
+          currentEnough: true,
+          disqualifiers: [],
+          championMatches: [{ id: 'samira' }],
+          augmentMatches: [{ id: '1194' }],
+          itemMatches: [{ id: '3006' }],
+        }],
+      },
+    });
+    assert.equal(batch.skipped.length, 0);
+    assert.equal(batch.commands.length, 1);
+    return batch.commands[0]!;
+  };
+  const first = build('2026-09-13');
+  const rediscovered = build('2026-09-14');
+  assert.equal(first.idempotencyKey, rediscovered.idempotencyKey);
+  assert.equal((await ingestObservation(pool, first)).replayed, false);
+  assert.equal((await ingestObservation(pool, rediscovered)).replayed, true);
+  assert.equal(await tableCount(pool, 'raw_observations'), 1);
+  assert.equal(await tableCount(pool, 'audit_events'), 1);
+  assert.equal(await tableCount(pool, 'outbox_events'), 1);
+  assert.deepEqual((await pool.query('select collected_at from raw_observations')).rows,
+    [{ collected_at: new Date('2026-09-13T00:00:00Z') }]);
+});
 
 test('unknown adapters retain collection timestamp as part of their idempotency payload', async (t) => {
   const pool = await seedPolicy('blob_allowed');
