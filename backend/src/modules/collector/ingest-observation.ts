@@ -49,7 +49,10 @@ interface StoredObservationRow {
   collected_at: Date;
 }
 
-const COMMUNITY_BRIDGE_ADAPTER = 'community-collector-bridge-v1';
+const COMMUNITY_BRIDGE_ADAPTERS = new Set([
+  'community-collector-bridge-v1',
+  'community-collector-bridge-v2',
+]);
 
 function isStoredIngestResult(
   value: IngestObservationResult | null,
@@ -119,7 +122,7 @@ export async function ingestObservation(
     // arrival hint and may differ when an old inbox is replayed after an
     // image update, so it must not invalidate that replay.
     const payloadHash = hashCanonicalJson(
-      command.adapterVersion === COMMUNITY_BRIDGE_ADAPTER
+      COMMUNITY_BRIDGE_ADAPTERS.has(command.adapterVersion)
         ? payload
         : { ...payload, collectedAt: command.collectedAt },
     );
@@ -143,7 +146,7 @@ export async function ingestObservation(
       if (
         record
         && record.payload_hash !== payloadHash
-        && command.adapterVersion === COMMUNITY_BRIDGE_ADAPTER
+        && COMMUNITY_BRIDGE_ADAPTERS.has(command.adapterVersion)
         && record.state === 'completed'
       ) {
         const result = record.result;
@@ -173,7 +176,7 @@ export async function ingestObservation(
             stored
             && stored.raw_observation_id === result.observationId
             && stored.source_id === command.sourceId
-            && stored.adapter_version === COMMUNITY_BRIDGE_ADAPTER
+            && stored.adapter_version === command.adapterVersion
             && stored.content_hash === record.payload_hash
             && legacyPayloadHash === record.payload_hash
           ) {
