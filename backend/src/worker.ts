@@ -69,7 +69,7 @@ const monitoringQueue = new Queue(MONITORING_QUEUE_NAME, {
 const dispatcherController = new AbortController();
 const dispatcherPromise = runOutboxDispatchLoop({
   dispatch: async () => {
-    await dispatchOutbox({
+    return dispatchOutbox({
       pool,
       queues: {
         eligibility: eligibilityQueue,
@@ -85,6 +85,10 @@ const dispatcherPromise = runOutboxDispatchLoop({
   },
   signal: dispatcherController.signal,
   sleepMs: 1_000,
+  // Let serverless Postgres suspend between batches in production. Keep a
+  // minute of fast polling after activity for asynchronously generated events.
+  idleSleepMs: config.nodeEnv === 'production' ? 30 * 60_000 : 1_000,
+  activeGraceMs: 60_000,
 });
 
 let shutdownPromise: Promise<void> | undefined;
